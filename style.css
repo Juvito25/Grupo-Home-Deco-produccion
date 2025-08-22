@@ -1,0 +1,417 @@
+/*
+Theme Name: Grupo Home Deco - Producción
+Theme URI: https://...
+Author: Juvi Web | Automatización y Desarrollo Web
+Author URI: https:instagram.com/juviweb 
+Description: Tema personalizado para el Gestor de Flujo de Producción.
+Version: 1.0
+Template: hello-elementor
+/* ==========================================================================
+   1. Variables de Color y Tipografía (Paleta Grupo Home Deco)
+   ========================================================================== */
+:root {
+    --color-fondo: #F1F5F1;
+    --color-fondo-claro: #FFFFFF;
+    --color-borde: #E5E7EB;
+    
+    --texto-principal: #3E3E3E;
+    --texto-secundario: #6B7280;
+    
+    --color-primario: #2563EB; /* Usaremos un azul para acciones principales como en los mockups */
+    --color-primario-hover: #1D4ED8;
+    
+    --color-verde: #4A7C59;
+    --color-rojo: #B34A49;
+    --color-amarillo: #F59E0B; /* Para prioridades medias */
+    --color-gris: #9CA3AF;   /* Para estados neutrales */
+
+    --font-family-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* ==========================================================================
+   2. Estilos Globales
+   ========================================================================== */
+body {
+    background-color: var(--color-fondo);
+    font-family: var(--font-family-sans);
+    color: var(--texto-principal);
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+/* ==========================================================================
+   3. Estructura de la Aplicación
+   ========================================================================== */
+.ghd-app-wrapper {
+    display: flex;
+    min-height: 100vh;
+}
+
+.ghd-sidebar {
+    width: 260px;
+    background-color: var(--color-fondo-claro);
+    border-right: 1px solid var(--color-borde);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-header .logo {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--texto-principal);
+    margin: 0 0 2rem 0;
+}
+
+.sidebar-nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sidebar-nav li a {
+    display: block;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--texto-secundario);
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.sidebar-nav li a:hover {
+    background-color: var(--color-fondo);
+    color: var(--texto-principal);
+}
+
+.sidebar-nav li.active a {
+    background-color: var(--color-primario);
+    color: white;
+}
+
+.ghd-main-content {
+    flex-grow: 1;
+    padding: 2rem;
+    overflow-y: auto;
+}
+
+.ghd-main-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.ghd-main-header h2 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+/* ==========================================================================
+   4. Componentes (Botones, Tarjetas, Tablas, etc.)
+   ========================================================================== */
+
+/* Tarjetas */
+.ghd-card {
+    background-color: var(--color-fondo-claro);
+    border-radius: 8px;
+    border: 1px solid var(--color-borde);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Botones */
+.ghd-btn {
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.ghd-btn-primary {
+    background-color: var(--color-primario);
+    color: white;
+}
+.ghd-btn-primary:hover {
+    background-color: var(--color-primario-hover);
+}
+
+.ghd-btn-secondary {
+    background-color: var(--color-fondo-claro);
+    color: var(--texto-principal);
+    border: 1px solid var(--color-borde);
+}
+.ghd-btn-secondary:hover {
+    background-color: var(--color-fondo);
+}
+
+.ghd-btn-tertiary {
+    background-color: transparent;
+    color: var(--texto-secundario);
+}
+.ghd-btn-tertiary:hover {
+    background-color: var(--color-fondo);
+}
+
+.ghd-btn-icon {
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--texto-secundario);
+}
+
+/* Filtros */
+.ghd-filters {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+.ghd-filters input, .ghd-filters select {
+    padding: 0.6rem;
+    border-radius: 6px;
+    border: 1px solid var(--color-borde);
+    background-color: var(--color-fondo-claro);
+}
+.ghd-filters input {
+    flex-grow: 1;
+}
+
+/* Tabla */
+.ghd-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.ghd-table th, .ghd-table td {
+    padding: 0.8rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--color-borde);
+}
+
+.ghd-table th {
+    font-weight: 600;
+    color: var(--texto-secundario);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+}
+
+.ghd-table tbody tr:hover {
+    background-color: var(--color-fondo);
+}
+
+/* Etiquetas (Tags) */
+.ghd-tag {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.tag-blue { background-color: #DBEAFE; color: #1E40AF; }
+.tag-red { background-color: #FEE2E2; color: #991B1B; } /* Usaremos un rojo más vivo para la tag */
+.tag-yellow { background-color: #FEF3C7; color: #92400E; }
+.tag-green { background-color: #D1FAE5; color: #065F46; }
+.tag-gray { background-color: #F3F4F6; color: #4B5563; }
+
+/* ==========================================================================
+   5. Iconos y Ajustes de UI
+   ========================================================================== */
+.sidebar-nav li a i {
+    width: 20px; /* Alinea los iconos */
+    margin-right: 12px;
+    text-align: center;
+}
+
+/* ==========================================================================
+   6. Estilos Responsives (CÓDIGO CORREGIDO Y MEJORADO)
+   ========================================================================== */
+
+/* Overlay para el fondo cuando el menú móvil está abierto */
+body.sidebar-open::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5); /* Fondo negro semi-transparente */
+    z-index: 999; /* Justo debajo del sidebar */
+}
+#mobile-menu-toggle{
+    display: none;
+}
+/* Para Tablets y pantallas más pequeñas (menos de 1024px) */
+@media (max-width: 1024px) {
+    .ghd-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100%;
+    z-index: 1000;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.2); /* Sombra para que destaque sobre el contenido */
+} 
+
+    .ghd-sidebar.sidebar-visible {
+        transform: translateX(0); /* Clase para mostrarlo */
+    }
+
+    .ghd-main-content {
+        margin-left: 0;
+        width: 100%;
+        /* Evita que el contenido principal se pueda desplazar cuando el menú está abierto */
+        transition: filter 0.3s ease-in-out;
+    }
+    
+    body.sidebar-open .ghd-main-content {
+        filter: blur(2px); /* Opcional: desenfoca el contenido de fondo */
+    }
+
+    /* Mostramos el botón del menú móvil */
+    #mobile-menu-toggle {
+        display: block !important;
+        font-size: 22px;
+        color: var(--texto-principal);
+    }
+}
+
+
+/* Para Móviles (menos de 768px) */
+@media (max-width: 768px) {
+    .ghd-main-content {
+        padding: 1rem;
+    }
+
+    .ghd-main-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .ghd-filters {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .ghd-table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch; /* Mejora el scroll en iOS */
+    }
+    .ghd-table {
+        min-width: 800px;
+    }
+}
+
+.header-title-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* ==========================================================================
+   Componentes Adicionales para UI Móvil
+   ========================================================================== */
+
+/* Capa de fondo para el menú móvil */
+.ghd-sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5); /* Negro semitransparente */
+    z-index: 999; /* Justo debajo del sidebar */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+}
+
+.ghd-sidebar-overlay.is-visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Estilos para el menú de acciones */
+.actions-cell {
+    position: relative; /* Permite posicionar el menú dentro de la celda */
+}
+
+.actions-dropdown .actions-toggle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+}
+.actions-dropdown .actions-toggle:hover {
+    background-color: var(--color-fondo);
+}
+
+.actions-menu {
+    display: none; /* Oculto por defecto */
+    position: absolute;
+    right: 30px;
+    top: 10px;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    z-index: 10;
+    width: 200px;
+    padding: 0.5rem;
+    border: 1px solid var(--color-borde);
+}
+
+.actions-menu.is-open {
+    display: block; /* Lo mostramos con JS */
+}
+
+.actions-menu-group {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--color-borde);
+}
+.actions-menu-group:last-child {
+    border-bottom: none;
+}
+
+.actions-menu-title {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--texto-secundario);
+}
+
+.actions-menu .action-link {
+    display: block;
+    padding: 0.5rem 0.75rem;
+    text-decoration: none;
+    color: var(--texto-principal);
+    border-radius: 4px;
+}
+
+.actions-menu .action-link:hover {
+    background-color: var(--color-fondo);
+}
+
+/* Estilos para la opción actual/deshabilitada en el menú de acciones */
+.actions-menu .action-link.is-current {
+    color: var(--texto-secundario);
+    font-weight: 600; /* Lo ponemos en negrita para que destaque */
+    background-color: var(--color-fondo);
+    pointer-events: none; /* Esto deshabilita cualquier evento de clic */
+    cursor: default;      /* El cursor se muestra como texto normal */
+}
