@@ -1,8 +1,9 @@
 # Gestor de Flujo de Producción - Grupo Home Deco
 
-<img src="./img/sello.png" alt="Texto alternativo" width="100" /> 
-<img src="./img/2.png" alt="Texto alternativo" width="200"/>
-
+<div style="display:flex; justify-content: space-around;">
+    <img src="./img/sello.png" alt="Texto alternativo" width="100" /> 
+    <img src="./img/2.png" alt="Texto alternativo" width="200"/>
+</div>
 Sistema de gestión interna diseñado a medida para **Grupo Home Deco**, una fábrica de sillones. La aplicación centraliza y supervisa el ciclo de vida completo de los pedidos, desde su recepción hasta la entrega final, optimizando la comunicación entre los diferentes sectores de la fábrica.
 
 Este proyecto está construido como un tema hijo de WordPress, utilizando una arquitectura de aplicación para proporcionar una experiencia de panel de control (dashboard) robusta y a medida.

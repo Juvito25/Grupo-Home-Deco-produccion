@@ -74,8 +74,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         priorityCell.textContent = value;
                         priorityCell.className = 'ghd-tag ' + data.data.new_class;
                     } else if (action === 'change_sector') {
-                        const sectorCell = row.querySelector('td:nth-child(6)');
-                        sectorCell.textContent = value;
+                        // Si la asignación fue exitosa, eliminamos la fila de la vista con una animación
+                        row.style.transition = 'opacity 0.5s ease';
+                        row.style.opacity = '0';
+                        setTimeout(() => row.remove(), 500);
                     }
                 } else {
                     alert('Error: ' + data.data.message);

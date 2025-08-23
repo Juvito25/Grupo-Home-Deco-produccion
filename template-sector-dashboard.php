@@ -1,32 +1,30 @@
 <?php
-/*
- * Template Name: GHD - Panel de Sector
- */
+/* Template Name: GHD - Panel de Sector */
+get_header();
 
-get_header(); 
-
-// Primero, nos aseguramos de que el usuario haya iniciado sesión.
 if (!is_user_logged_in()) {
-    // Si no ha iniciado sesión, lo redirigimos a la página de login.
     wp_redirect(wp_login_url());
     exit;
 }
 
-// Obtenemos los datos del usuario actual
+// --- LÓGICA CORREGIDA PARA OBTENER EL NOMBRE DEL SECTOR ---
 $current_user = wp_get_current_user();
 $user_roles = $current_user->roles;
 $user_role = !empty($user_roles) ? $user_roles[0] : '';
 
-// Convertimos el ID del rol (ej: 'rol_carpinteria') al nombre del sector (ej: 'Carpintería')
-$sector_name = '';
-if (strpos($user_role, 'rol_') === 0) {
-    $sector_name = ucfirst(str_replace('rol_', '', $user_role));
-}
-
+// Mapeo directo de Roles a Nombres de Sector (a prueba de errores y tildes)
+$role_to_sector_map = array(
+    'rol_carpinteria' => 'Carpintería',
+    'rol_costura'     => 'Costura',
+    'rol_tapiceria'   => 'Tapicería',
+    'rol_logistica'   => 'Logística',
+);
+// Se asigna el nombre del sector a partir del mapa. Si no se encuentra, queda vacío.
+$sector_name = isset($role_to_sector_map[$user_role]) ? $role_to_sector_map[$user_role] : '';
 ?>
 
 <div class="ghd-app-wrapper">
-    <!-- El sidebar será diferente para los trabajadores -->
+    <!-- BARRA LATERAL (TRABAJADOR) - CORREGIDA -->
     <aside class="ghd-sidebar">
         <div class="sidebar-header">
             <h1 class="logo">Mi Puesto</h1>
@@ -35,7 +33,7 @@ if (strpos($user_role, 'rol_') === 0) {
             <ul>
                 <li class="active"><a href="#"><i class="fa-solid fa-inbox"></i> <span>Mis Tareas</span></a></li>
                 <li><a href="#"><i class="fa-solid fa-user-circle"></i> <span><?php echo esc_html($current_user->display_name); ?></span></a></li>
-                <li><a href="<?php echo wp_logout_url(); ?>"><i class="fa-solid fa-sign-out-alt"></i> <span>Cerrar Sesión</span></a></li>
+                <li><a href="<?php echo wp_logout_url(home_url()); ?>"><i class="fa-solid fa-sign-out-alt"></i> <span>Cerrar Sesión</span></a></li>
             </ul>
         </nav>
     </aside>
@@ -43,41 +41,35 @@ if (strpos($user_role, 'rol_') === 0) {
     <main class="ghd-main-content">
         <header class="ghd-main-header">
             <h2>Tareas de <?php echo esc_html($sector_name); ?></h2>
-            <!-- Aquí podríamos añadir un botón de "Refrescar" o filtros si fuera necesario -->
         </header>
 
         <div class="ghd-sector-tasks-grid">
             <?php
-            // Solo si hemos identificado un sector válido para el usuario...
             if (!empty($sector_name)) {
-                // Preparamos la consulta para obtener solo los pedidos de este sector
                 $args = array(
                     'post_type'      => 'orden_produccion',
                     'posts_per_page' => -1,
-                    'orderby'        => 'meta_value', // Ordenaremos por prioridad
+                    'orderby'        => 'meta_value',
                     'meta_key'       => 'prioridad_pedido',
-                    'order'          => 'DESC', // 'Alta' suele estar al final, así que DESC lo pone primero
+                    'order'          => 'DESC',
                     'meta_query'     => array(
                         array(
                             'key'     => 'sector_actual',
-                            'value'   => $sector_name, // ¡LA MAGIA OCURRE AQUÍ!
+                            'value'   => $sector_name,
                             'compare' => '=',
                         ),
                     ),
                 );
-
                 $sector_query = new WP_Query($args);
 
                 if ($sector_query->have_posts()) :
                     while ($sector_query->have_posts()) : $sector_query->the_post();
                         $prioridad = get_field('prioridad_pedido');
-                        $prioridad_class = 'tag-green'; // Baja por defecto
+                        $prioridad_class = 'tag-green';
                         if ($prioridad == 'Alta') $prioridad_class = 'tag-red';
                         if ($prioridad == 'Media') $prioridad_class = 'tag-yellow';
             ?>
-            
-            <!-- MAQUETACIÓN DE LA TARJETA DE PEDIDO (AÚN NO TIENE ESTILOS) -->
-            <div class="ghd-task-card">
+            <div class="ghd-task-card" id="order-<?php echo get_the_ID(); ?>">
                 <div class="card-header">
                     <h3><?php the_title(); ?></h3>
                     <span class="ghd-tag <?php echo $prioridad_class; ?>"><?php echo esc_html($prioridad); ?></span>
@@ -88,15 +80,19 @@ if (strpos($user_role, 'rol_') === 0) {
                 </div>
                 <div class="card-footer">
                     <button class="ghd-btn ghd-btn-secondary">Ver Detalles</button>
-                    <button class="ghd-btn ghd-btn-primary">Mover a Siguiente Sector</button>
+                    <button 
+                        class="ghd-btn ghd-btn-primary move-to-next-sector-btn" 
+                        data-order-id="<?php echo get_the_ID(); ?>"
+                        data-nonce="<?php echo wp_create_nonce('ghd_move_order_nonce'); ?>">
+                        Mover a Siguiente Sector
+                    </button>
                 </div>
             </div>
-
             <?php 
                     endwhile;
                 else:
             ?>
-                <p>No tienes tareas asignadas en este momento.</p>
+                <p class="no-tasks-message">No tienes tareas asignadas en este momento.</p>
             <?php
                 endif;
                 wp_reset_postdata();
@@ -107,5 +103,4 @@ if (strpos($user_role, 'rol_') === 0) {
         </div>
     </main>
 </div>
-
 <?php get_footer(); ?>

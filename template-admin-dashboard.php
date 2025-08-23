@@ -3,14 +3,23 @@
  * Template Name: GHD - Panel de Administrador
  */
 
+// --- CONTROL DE ACCESO ---
+// Si el usuario no ha iniciado sesión, lo mandamos a la página de login.
+if (!is_user_logged_in()) {
+    auth_redirect();
+}
+// Si el usuario ha iniciado sesión PERO NO es un administrador, lo mandamos a la página de inicio.
+if (!current_user_can('manage_options')) {
+    wp_redirect(home_url());
+    exit;
+}
+
 get_header(); // Carga el header de WordPress
 ?>
 
 <div class="ghd-app-wrapper">
     
-    <!-- ================================================== -->
-    <!-- 1. BARRA LATERAL DE NAVEGACIÓN                     -->
-    <!-- ================================================== -->
+    <!-- BARRA LATERAL (ADMINISTRADOR) -->
     <aside class="ghd-sidebar">
         <div class="sidebar-header">
             <h1 class="logo">Gestor de Producción</h1>
@@ -27,14 +36,11 @@ get_header(); // Carga el header de WordPress
         </nav>
     </aside>
 
-    <!-- ================================================== -->
-    <!-- 2. CONTENIDO PRINCIPAL                             -->
-    <!-- ================================================== -->
+    <!-- CONTENIDO PRINCIPAL -->
     <main class="ghd-main-content">
         
         <header class="ghd-main-header">
             <div class="header-title-wrapper">
-                <!-- BOTÓN HAMBURGUESA (SÓLO VISIBLE EN MÓVIL) -->
                 <button id="mobile-menu-toggle" class="ghd-btn-icon">
                     <i class="fa-solid fa-bars"></i>
                 </button>
@@ -46,7 +52,7 @@ get_header(); // Carga el header de WordPress
             </div>
         </header>
 
-        <!-- SECCIÓN DE FILTROS -->
+        <!-- FILTROS -->
         <div class="ghd-card ghd-filters">
              <input type="search" placeholder="Buscar Pedidos...">
              <select><option>Todos los Estados</option></select>
@@ -72,12 +78,11 @@ get_header(); // Carga el header de WordPress
                 </thead>
                 <tbody>
                     <?php
-                    // 1. Preparamos los argumentos para la consulta (Lógica de "Bandeja de Entrada")
                     $args = array(
                         'post_type'      => 'orden_produccion',
                         'posts_per_page' => -1,
                         'orderby'        => 'date',
-                        'order'          => 'ASC', // El más antiguo primero
+                        'order'          => 'ASC',
                         'meta_query'     => array(
                             array(
                                 'key'     => 'estado_pedido',
@@ -86,44 +91,26 @@ get_header(); // Carga el header de WordPress
                             ),
                         ),
                     );
-
                     $pedidos_query = new WP_Query($args);
 
                     if ($pedidos_query->have_posts()) :
-                        while ($pedidos_query->have_posts()) : $pedidos_query->the_post(); 
-                            
-                            // Obtenemos los valores de los campos personalizados (usando los nombres correctos)
-                            $nombre_cliente  = get_field('nombre_cliente');
-                            $estado          = get_field('estado_pedido');
-                            $prioridad       = get_field('prioridad_pedido');
-                            $sector_actual   = get_field('sector_actual');
-                            $fecha_pedido    = get_field('fecha_del_pedido');
+                        while ($pedidos_query->have_posts()) : $pedidos_query->the_post();
+                            $estado = get_field('estado_pedido');
+                            $prioridad = get_field('prioridad_pedido');
+                            $sector_actual = get_field('sector_actual');
 
-                            // Lógica para asignar colores a las etiquetas de prioridad
-                            $prioridad_class = 'tag-green'; // Baja por defecto
-                            if ($prioridad == 'Alta') {
-                                $prioridad_class = 'tag-red';
-                            } elseif ($prioridad == 'Media') {
-                                $prioridad_class = 'tag-yellow';
-                            }
-
-                            // Lógica para asignar colores a las etiquetas de estado
-                            $estado_class = 'tag-gray'; // Pendiente por defecto
-                            if (in_array($estado, array('Carpintería', 'Costura', 'Tapicería', 'Logística'))) {
-                                $estado_class = 'tag-blue';
-                            } elseif ($estado == 'Completado') {
-                                $estado_class = 'tag-green';
-                            }
+                            $prioridad_class = 'tag-green';
+                            if ($prioridad == 'Alta') $prioridad_class = 'tag-red';
+                            elseif ($prioridad == 'Media') $prioridad_class = 'tag-yellow';
                     ?>
-
                     <tr>
                         <td><input type="checkbox"></td>
                         <td><strong><?php echo esc_html(get_the_title()); ?></strong></td>
-                        <td><?php echo esc_html($nombre_cliente); ?></td>
-                        <td><span class="ghd-tag <?php echo $estado_class; ?>"><?php echo esc_html($estado); ?></span></td>
+                        <td><?php echo esc_html(get_field('nombre_cliente')); ?></td>
+                        <td><span class="ghd-tag tag-gray"><?php echo esc_html($estado); ?></span></td>
                         <td><span class="ghd-tag <?php echo $prioridad_class; ?>"><?php echo esc_html($prioridad); ?></span></td>
                         <td><?php echo esc_html($sector_actual); ?></td>
-                        <td><?php echo esc_html($fecha_pedido); ?></td>
+                        <td><?php echo esc_html(get_field('fecha_pedido')); ?></td>
                         <td class="actions-cell">
                             <div class="actions-dropdown">
                                 <button class="ghd-btn-icon actions-toggle" data-order-id="<?php echo get_the_ID(); ?>">
@@ -139,14 +126,11 @@ get_header(); // Carga el header de WordPress
                                     <div class="actions-menu-group">
                                         <span class="actions-menu-title">Asignar Sector</span>
                                         <?php
-                                        $sectores = ghd_get_sectores_produccion(); // Obtenemos la lista de nuestra función
+                                        $sectores = ghd_get_sectores_produccion();
                                         foreach ($sectores as $sector) {
-                                            // Comprobamos si el sector del bucle es el mismo que el sector actual del pedido
                                             if ($sector === $sector_actual) {
-                                                // Si es el actual, añadimos la clase 'is-current' y no es un enlace
                                                 echo '<span class="action-link is-current">' . esc_html($sector) . ' (Actual)</span>';
                                             } else {
-                                                // Si no es el actual, creamos el enlace normal
                                                 echo '<a href="#" class="action-link" data-action="change_sector" data-value="' . esc_attr($sector) . '">' . esc_html($sector) . '</a>';
                                             }
                                         }
@@ -156,7 +140,6 @@ get_header(); // Carga el header de WordPress
                             </div>
                         </td>
                     </tr>
-
                     <?php 
                         endwhile;
                     else: 
@@ -166,16 +149,11 @@ get_header(); // Carga el header de WordPress
                     </tr>
                     <?php
                     endif;
-                    
                     wp_reset_postdata(); 
                     ?>
                 </tbody>
             </table>
         </div>
-
     </main>
 </div>
-
-<?php
-get_footer(); // Carga el footer de WordPress
-?>
+<?php get_footer(); ?>
