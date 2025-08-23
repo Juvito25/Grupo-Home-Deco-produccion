@@ -88,6 +88,7 @@ get_header(); // Carga el header de WordPress
                         <th><input type="checkbox"></th>
                         <th>Código de Pedido</th>
                         <th>Cliente</th>
+                        <th>Producto</th>
                         <th>Estado</th>
                         <th>Prioridad</th>
                         <th>Sector Actual</th>
@@ -98,13 +99,14 @@ get_header(); // Carga el header de WordPress
                 <tbody>
                     <?php
                     // CONSULTA: Por defecto, muestra TODOS los pedidos.
+                    // En template-admin-dashboard.php
                     $args = array(
                         'post_type'      => 'orden_produccion',
                         'posts_per_page' => -1,
                         'orderby'        => 'date',
-                        'order'          => 'DESC',
+                        'order'          => 'DESC', // Los más nuevos primero
                     );
-                    
+                    $pedidos_query = new WP_Query($args);
                     /* OPCIONAL: Para volver a la vista de "Bandeja de Entrada" (solo pendientes), descomenta este bloque
                     $args['meta_query'] = array(
                         array(
@@ -140,6 +142,7 @@ get_header(); // Carga el header de WordPress
                                 'post_id'         => get_the_ID(),
                                 'titulo'          => get_the_title(),
                                 'nombre_cliente'  => get_field('nombre_cliente'),
+                                'nombre_del_producto' => get_field('nombre_del_producto'), // Asegúrate de que este campo existe en ACF
                                 'estado'          => $estado,
                                 'prioridad'       => $prioridad,
                                 'sector_actual'   => get_field('sector_actual'),

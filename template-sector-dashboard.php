@@ -24,12 +24,20 @@ if (current_user_can('manage_options')) {
 get_header(); // Carga el header de WordPress
 
 // Obtenemos los datos del usuario actual para personalizar la vista
+// --- BLOQUE NUEVO Y CORREGIDO ---
 $current_user = wp_get_current_user();
 $user_roles = $current_user->roles;
 $user_role = !empty($user_roles) ? $user_roles[0] : '';
 
-// Mapeamos el ID del rol (ej: 'rol_carpinteria') a un nombre legible (ej: 'Carpintería')
-$sector_name = ucfirst(str_replace('rol_', '', $user_role));
+// Usamos un mapa explícito para evitar problemas con acentos y caracteres especiales
+$role_to_sector_map = array(
+    'rol_carpinteria' => 'Carpintería',
+    'rol_costura'     => 'Costura',
+    'rol_tapiceria'   => 'Tapicería',
+    'rol_logistica'   => 'Logística',
+);
+
+$sector_name = isset($role_to_sector_map[$user_role]) ? $role_to_sector_map[$user_role] : '';
 ?>
 
 <div class="ghd-app-wrapper">
@@ -99,7 +107,7 @@ $sector_name = ucfirst(str_replace('rol_', '', $user_role));
                     </div>
                     <div class="card-info-group">
                         <span class="info-label">Producto:</span>
-                        <span class="info-value"><?php echo esc_html(get_field('nombre_producto')); // NOTA: Necesitas crear este campo 'nombre_producto' en ACF. ?></span>
+                        <span class="info-value"><?php echo esc_html(get_field('nombre_del_producto')); ?></span>
                     </div>
                 </div>
                 <div class="card-footer">

@@ -120,28 +120,83 @@ function ghd_update_order_callback() {
 /**
  * Manejador AJAX para mover un pedido al siguiente sector desde el Panel de Sector.
  */
-add_action('wp_ajax_ghd_move_to_next_sector', 'ghd_move_to_next_sector_callback');
-function ghd_move_to_next_sector_callback() {
-    check_ajax_referer('ghd_ajax-nonce', 'nonce'); // Usamos el mismo nonce para simplificar
-    if (!current_user_can('read')) {
-        wp_send_json_error(array('message' => 'No tienes permisos.'));
+// --- REEMPLAZA ESTA FUNCIÓN COMPLETA EN TU functions.php ---
+
+// Manejador AJAX para filtrar pedidos en el Panel de Admin
+add_action('wp_ajax_ghd_filter_orders', 'ghd_filter_orders_callback');
+function ghd_filter_orders_callback() {
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+
+    $args = array(
+        'post_type'      => 'orden_produccion',
+        'posts_per_page' => -1,
+        'orderby'        => 'date',
+        'order'          => 'DESC',
+        'meta_query'     => array('relation' => 'AND'),
+    );
+
+    // Aplicar filtros de estado y prioridad
+    if (!empty($_POST['status'])) {
+        $args['meta_query'][] = array('key' => 'estado_pedido', 'value' => sanitize_text_field($_POST['status']));
+    }
+    if (!empty($_POST['priority'])) {
+        $args['meta_query'][] = array('key' => 'prioridad_pedido', 'value' => sanitize_text_field($_POST['priority']));
+    }
+    
+    // Búsqueda por palabra clave (título o cliente)
+    if (!empty($_POST['search'])) {
+        $search_term = sanitize_text_field($_POST['search']);
+        $args['meta_query']['relation'] = 'OR'; // Buscamos en cliente O en título
+        $args['meta_query'][] = array('key' => 'nombre_cliente', 'value' => $search_term, 'compare' => 'LIKE');
+        
+        // El filtro para el título es especial y debe añadirse y quitarse para no afectar otras consultas
+        $search_filter = function($where) use ($search_term) {
+            global $wpdb;
+            $where .= " OR {$wpdb->posts}.post_title LIKE '%" . esc_sql($wpdb->esc_like($search_term)) . "%'";
+            return $where;
+        };
+        add_filter('posts_where', $search_filter, 10, 1);
     }
 
-    $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
-    if (!$order_id) {
-        wp_send_json_error(array('message' => 'ID de pedido no válido.'));
+    $pedidos_query = new WP_Query($args);
+    
+    // ¡IMPORTANTE! Removemos el filtro 'posts_where' después de usarlo para que no afecte a otras consultas
+    if (isset($search_filter)) {
+        remove_filter('posts_where', $search_filter, 10);
     }
+    
+    ob_start();
 
-    $current_sector = get_field('sector_actual', $order_id);
-    $next_sector = ghd_get_next_sector($current_sector);
+    if ($pedidos_query->have_posts()) {
+        while ($pedidos_query->have_posts()) {
+            $pedidos_query->the_post();
+            
+            // Preparamos los datos aquí mismo para pasarlos a la plantilla de la fila
+            $estado = get_field('estado_pedido');
+            $prioridad = get_field('prioridad_pedido');
+            $prioridad_class = 'tag-green';
+            if ($prioridad == 'Alta') $prioridad_class = 'tag-red'; elseif ($prioridad == 'Media') $prioridad_class = 'tag-yellow';
+            $estado_class = 'tag-gray';
+            if (in_array($estado, ghd_get_sectores_produccion())) $estado_class = 'tag-blue'; elseif ($estado == 'Completado') $estado_class = 'tag-green';
 
-    if (!$next_sector) {
-        wp_send_json_error(array('message' => 'No se pudo determinar el siguiente sector.'));
+            $args_fila = array(
+                'post_id'         => get_the_ID(),
+                'titulo'          => get_the_title(),
+                'nombre_cliente'  => get_field('nombre_cliente'),
+                'nombre_producto' => get_field('nombre_producto'), // Pasamos el nombre del producto
+                'estado'          => $estado,
+                'prioridad'       => $prioridad,
+                'sector_actual'   => get_field('sector_actual'),
+                'fecha_pedido'    => get_field('fecha_pedido'),
+                'prioridad_class' => $prioridad_class,
+                'estado_class'    => $estado_class,
+            );
+            get_template_part('template-parts/order-row-admin', null, $args_fila);
+        }
+    } else {
+        echo '<tr><td colspan="9" style="text-align:center;">No se encontraron pedidos con esos filtros.</td></tr>'; // colspan ahora es 9
     }
-
-    // Actualizamos ambos campos para mantener la consistencia
-    update_field('sector_actual', $next_sector, $order_id);
-    update_field('estado_pedido', $next_sector, $order_id);
-
-    wp_send_json_success(array('message' => 'Pedido movido a ' . $next_sector));
+    wp_reset_postdata();
+    
+    wp_send_json_success(array('html' => ob_get_clean()));
 }

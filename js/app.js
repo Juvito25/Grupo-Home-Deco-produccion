@@ -79,14 +79,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        row.style.transition = 'opacity 0.5s ease';
-                        row.style.opacity = '0';
-                        setTimeout(() => row.remove(), 500);
+                        // Actualizamos la UI con los nuevos datos SIN eliminar la fila
+                        if (action === 'change_priority') {
+                            const priorityCell = row.querySelector('td:nth-child(6) .ghd-tag'); // Columna 6 ahora
+                            priorityCell.textContent = value;
+                            priorityCell.className = 'ghd-tag ' + data.data.new_class;
+                        } else if (action === 'change_sector') {
+                            const sectorCell = row.querySelector('td:nth-child(7)'); // Columna 7 ahora
+                            sectorCell.textContent = value;
+                            const stateCell = row.querySelector('td:nth-child(5) .ghd-tag'); // Columna 5 ahora
+                            stateCell.textContent = value;
+                            stateCell.className = 'ghd-tag tag-blue';
+                        }
                     } else {
                         alert('Error: ' + (data.data.message || 'Ocurrió un error.'));
-                        row.style.opacity = '1';
                     }
-                })
+                }) 
                 .catch(error => console.error('Error:', error))
                 .finally(closeAllActionMenus);
             });
@@ -139,3 +147,50 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// --- LÓGICA DE FILTROS PARA EL PANEL DE ADMIN ---
+const searchFilter = document.getElementById('ghd-search-filter');
+const statusFilter = document.getElementById('ghd-status-filter');
+const priorityFilter = document.getElementById('ghd-priority-filter');
+const resetFiltersBtn = document.getElementById('ghd-reset-filters');
+const tableBody = document.querySelector('.ghd-table tbody');
+
+function applyFilters() {
+    if (!tableBody) return; // Salir si no estamos en la página del admin
+    
+    tableBody.style.opacity = '0.5';
+
+    const params = new URLSearchParams({
+        action: 'ghd_filter_orders',
+        nonce: ghd_ajax.nonce,
+        search: searchFilter.value,
+        status: statusFilter.value,
+        priority: priorityFilter.value,
+    });
+
+    fetch(ghd_ajax.ajax_url, {
+        method: 'POST',
+        body: params
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            tableBody.innerHTML = data.data.html;
+        }
+    })
+    .finally(() => {
+        tableBody.style.opacity = '1';
+    });
+}
+
+if (searchFilter) { // Si los filtros existen, añadimos los listeners
+    searchFilter.addEventListener('keyup', applyFilters);
+    statusFilter.addEventListener('change', applyFilters);
+    priorityFilter.addEventListener('change', applyFilters);
+    resetFiltersBtn.addEventListener('click', () => {
+        searchFilter.value = '';
+        statusFilter.value = '';
+        priorityFilter.value = '';
+        applyFilters();
+    });
+}
