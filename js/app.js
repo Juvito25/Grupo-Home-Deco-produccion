@@ -74,10 +74,22 @@ document.addEventListener('DOMContentLoaded', function() {
                         priorityCell.textContent = value;
                         priorityCell.className = 'ghd-tag ' + data.data.new_class;
                     } else if (action === 'change_sector') {
-                        // Si la asignación fue exitosa, eliminamos la fila de la vista con una animación
-                        row.style.transition = 'opacity 0.5s ease';
-                        row.style.opacity = '0';
-                        setTimeout(() => row.remove(), 500);
+                        // --- LÓGICA DE FEEDBACK ACTUALIZADA ---
+                        // Actualizamos el sector visualmente
+                        const sectorCell = row.querySelector('td:nth-child(6)');
+                        sectorCell.textContent = value;
+                        
+                        // Actualizamos la etiqueta de estado para que coincida
+                        const stateCell = row.querySelector('td:nth-child(4) .ghd-tag');
+                        stateCell.textContent = value;
+
+                        // Cambiamos el color de la etiqueta de estado
+                        stateCell.classList.remove('tag-gray', 'tag-blue', 'tag-green'); // Limpiamos colores viejos
+                        if (value === 'Completado') {
+                            stateCell.classList.add('tag-green');
+                        } else {
+                            stateCell.classList.add('tag-blue');
+                        }
                     }
                 } else {
                     alert('Error: ' + data.data.message);
@@ -90,4 +102,49 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
+});
+
+// --- LÓGICA PARA LOS FILTROS DEL PANEL DE ADMIN ---
+const searchFilter = document.getElementById('ghd-search-filter');
+const statusFilter = document.getElementById('ghd-status-filter');
+const priorityFilter = document.getElementById('ghd-priority-filter');
+const resetBtn = document.getElementById('ghd-reset-filters');
+const tableBody = document.querySelector('.ghd-table tbody');
+
+function applyFilters() {
+    if (!tableBody) return;
+    
+    tableBody.style.opacity = '0.5';
+
+    fetch(ghd_ajax.ajax_url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            action: 'ghd_filter_orders',
+            nonce: ghd_ajax.nonce,
+            search: searchFilter.value,
+            status: statusFilter.value,
+            priority: priorityFilter.value
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            tableBody.innerHTML = data.data.html;
+        }
+    })
+    .finally(() => {
+        tableBody.style.opacity = '1';
+    });
+}
+
+// Event Listeners
+searchFilter.addEventListener('keyup', applyFilters);
+statusFilter.addEventListener('change', applyFilters);
+priorityFilter.addEventListener('change', applyFilters);
+resetBtn.addEventListener('click', () => {
+    searchFilter.value = '';
+    statusFilter.value = '';
+    priorityFilter.value = '';
+    applyFilters();
 });

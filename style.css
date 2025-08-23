@@ -466,3 +466,57 @@ body.sidebar-open::before {
     border-bottom-left-radius: 8px;
     border-bottom-right-radius: 8px;
 }
+
+/* ==========================================================================
+   Mejoras de Estilo para la Tarjeta de Tarea
+   ========================================================================== */
+
+.ghd-task-card .card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem; /* Espacio entre las filas de información */
+}
+
+.ghd-task-card .card-info-group {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.ghd-task-card .info-label {
+    font-weight: 600;
+    color: var(--texto-secundario);
+}
+
+.ghd-task-card .info-value {
+    font-weight: 500;
+    text-align: right;
+}
+
+/* Aseguramos que los botones se vean bien incluso si uno es un enlace */
+.ghd-task-card .card-footer .ghd-btn {
+    text-decoration: none;
+    text-align: center;
+}
+
+/* ==========================================================================
+   Estilos para la Página de Detalle de Pedido
+   ========================================================================== */
+.ghd-single-order-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .ghd-single-order-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.card-section-title {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--color-borde);
+}

@@ -1,25 +1,20 @@
 <?php
 /* Template Name: GHD - Panel de Sector */
-get_header();
 
-if (!is_user_logged_in()) {
-    wp_redirect(wp_login_url());
-    exit;
-}
+// El control de acceso y redirección ahora está en functions.php
 
-// --- LÓGICA CORREGIDA PARA OBTENER EL NOMBRE DEL SECTOR ---
+get_header(); // Ahora sí podemos llamar al header de forma segura
+
 $current_user = wp_get_current_user();
 $user_roles = $current_user->roles;
 $user_role = !empty($user_roles) ? $user_roles[0] : '';
 
-// Mapeo directo de Roles a Nombres de Sector (a prueba de errores y tildes)
 $role_to_sector_map = array(
     'rol_carpinteria' => 'Carpintería',
     'rol_costura'     => 'Costura',
     'rol_tapiceria'   => 'Tapicería',
     'rol_logistica'   => 'Logística',
 );
-// Se asigna el nombre del sector a partir del mapa. Si no se encuentra, queda vacío.
 $sector_name = isset($role_to_sector_map[$user_role]) ? $role_to_sector_map[$user_role] : '';
 ?>
 
@@ -69,17 +64,24 @@ $sector_name = isset($role_to_sector_map[$user_role]) ? $role_to_sector_map[$use
                         if ($prioridad == 'Alta') $prioridad_class = 'tag-red';
                         if ($prioridad == 'Media') $prioridad_class = 'tag-yellow';
             ?>
+            <!-- REEMPLAZA LA TARJETA DE TAREA EXISTENTE CON ESTA VERSIÓN FINAL -->
             <div class="ghd-task-card" id="order-<?php echo get_the_ID(); ?>">
                 <div class="card-header">
                     <h3><?php the_title(); ?></h3>
                     <span class="ghd-tag <?php echo $prioridad_class; ?>"><?php echo esc_html($prioridad); ?></span>
                 </div>
                 <div class="card-body">
-                    <p><strong>Cliente:</strong> <?php echo esc_html(get_field('nombre_cliente')); ?></p>
-                    <p><strong>Producto:</strong> [Aquí irá el nombre del producto]</p>
+                    <div class="card-info-group">
+                        <span class="info-label">Cliente:</span>
+                        <span class="info-value"><?php echo esc_html(get_field('nombre_cliente')); ?></span>
+                    </div>
+                    <div class="card-info-group">
+                        <span class="info-label">Producto:</span>
+                        <span class="info-value"><?php echo esc_html(get_field('nombre_producto')); ?></span>
+                    </div>
                 </div>
                 <div class="card-footer">
-                    <button class="ghd-btn ghd-btn-secondary">Ver Detalles</button>
+                    <a href="<?php the_permalink(); ?>" class="ghd-btn ghd-btn-secondary">Ver Detalles</a>
                     <button 
                         class="ghd-btn ghd-btn-primary move-to-next-sector-btn" 
                         data-order-id="<?php echo get_the_ID(); ?>"
