@@ -1,43 +1,41 @@
 /*
 Theme Name: Grupo Home Deco - Producción
-Theme URI: https://...
+Theme URI: https://gruphomedeco.com/
 Author: Juvi Web | Automatización y Desarrollo Web
-Author URI: https:instagram.com/juviweb 
+Author URI: https://instagram.com/juviweb
 Description: Tema personalizado para el Gestor de Flujo de Producción.
-Version: 1.0
+Version: 1.2
 Template: hello-elementor
+*/
+
 /* ==========================================================================
-   1. Variables de Color y Tipografía (Paleta Grupo Home Deco)
+   1. VARIABLES Y ESTILOS GLOBALES
    ========================================================================== */
 :root {
-    --color-fondo: #F1F5F1;
+    --color-fondo-app: #F3F4F6;
     --color-fondo-claro: #FFFFFF;
     --color-borde: #E5E7EB;
-    
     --texto-principal: #3E3E3E;
     --texto-secundario: #6B7280;
-    
-    --color-primario: #2563EB; /* Usaremos un azul para acciones principales como en los mockups */
-    --color-primario-hover: #1D4ED8;
-    
-    --color-verde: #4A7C59;
+    --texto-claro: #F1F5F1;
+    --color-primario: #4A7C59;
+    --color-primario-hover: #3a6347;
     --color-rojo: #B34A49;
-    --color-amarillo: #F59E0B; /* Para prioridades medias */
-    --color-gris: #9CA3AF;   /* Para estados neutrales */
-
+    --color-amarillo: #F59E0B;
+    --color-gris: #9CA3AF;
     --font-family-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
-/* ==========================================================================
-   2. Estilos Globales
-   ========================================================================== */
 body {
-    background-color: var(--color-fondo);
+    background-color: var(--color-fondo-app);
     font-family: var(--font-family-sans);
     color: var(--texto-principal);
     margin: 0;
     font-size: 16px;
     line-height: 1.5;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
 }
 
 * {
@@ -45,83 +43,50 @@ body {
 }
 
 /* ==========================================================================
-   3. Estructura de la Aplicación
+   2. ESTRUCTURA PRINCIPAL DE LA APLICACIÓN
    ========================================================================== */
+.ghd-site-header {
+    background-color: var(--color-fondo-claro);
+    padding: 1rem 2rem;
+    border-bottom: 1px solid var(--color-borde);
+    text-align: center;
+}
+
+.ghd-site-header h1 {
+    margin: 0;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--color-rojo);
+}
+
 .ghd-app-wrapper {
     display: flex;
-    min-height: 100vh;
+    flex-grow: 1;
 }
 
 .ghd-sidebar {
     width: 260px;
-    background-color: var(--color-fondo-claro);
-    border-right: 1px solid var(--color-borde);
+    background-color: var(--texto-principal);
+    color: var(--texto-claro);
     padding: 1.5rem;
     display: flex;
     flex-direction: column;
-}
-
-.sidebar-header .logo {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--texto-principal);
-    margin: 0 0 2rem 0;
-}
-
-.sidebar-nav ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.sidebar-nav li a {
-    display: block;
-    padding: 0.75rem 1rem;
-    border-radius: 6px;
-    text-decoration: none;
-    color: var(--texto-secundario);
-    font-weight: 500;
-    margin-bottom: 0.25rem;
-}
-
-.sidebar-nav li a:hover {
-    background-color: var(--color-fondo);
-    color: var(--texto-principal);
-}
-
-.sidebar-nav li.active a {
-    background-color: var(--color-primario);
-    color: white;
+    transition: transform 0.3s ease-in-out;
+    flex-shrink: 0;
 }
 
 .ghd-main-content {
     flex-grow: 1;
     padding: 2rem;
     overflow-y: auto;
-}
-
-.ghd-main-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-}
-
-.ghd-main-header h2 {
-    font-size: 1.8rem;
-    font-weight: 700;
-    margin: 0;
-}
-
-.header-actions {
-    display: flex;
-    gap: 1rem;
+    max-width: 1400px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 /* ==========================================================================
-   4. Componentes (Botones, Tarjetas, Tablas, etc.)
+   3. COMPONENTES REUTILIZABLES
    ========================================================================== */
-
 /* Tarjetas */
 .ghd-card {
     background-color: var(--color-fondo-claro);
@@ -129,394 +94,117 @@ body {
     border: 1px solid var(--color-borde);
     padding: 1.5rem;
     margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 /* Botones */
 .ghd-btn {
-    padding: 0.6rem 1.2rem;
+    padding: clamp(0.5rem, 2vw, 0.6rem) clamp(0.8rem, 3vw, 1.2rem);
+    font-size: clamp(0.8rem, 2.5vw, 0.9rem);
     border: none;
     border-radius: 6px;
     font-weight: 600;
     cursor: pointer;
     transition: background-color 0.2s;
-}
-
-.ghd-btn-primary {
-    background-color: var(--color-primario);
-    color: white;
-}
-.ghd-btn-primary:hover {
-    background-color: var(--color-primario-hover);
-}
-
-.ghd-btn-secondary {
-    background-color: var(--color-fondo-claro);
-    color: var(--texto-principal);
-    border: 1px solid var(--color-borde);
-}
-.ghd-btn-secondary:hover {
-    background-color: var(--color-fondo);
-}
-
-.ghd-btn-tertiary {
-    background-color: transparent;
-    color: var(--texto-secundario);
-}
-.ghd-btn-tertiary:hover {
-    background-color: var(--color-fondo);
-}
-
-.ghd-btn-icon {
-    background: transparent;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-    color: var(--texto-secundario);
-}
-
-/* Filtros */
-.ghd-filters {
-    display: flex;
-    gap: 1rem;
+    display: inline-flex;
     align-items: center;
+    justify-content: center;
+    white-space: nowrap;
 }
-.ghd-filters input, .ghd-filters select {
-    padding: 0.6rem;
-    border-radius: 6px;
-    border: 1px solid var(--color-borde);
-    background-color: var(--color-fondo-claro);
-}
-.ghd-filters input {
-    flex-grow: 1;
-}
-
-/* Tabla */
-.ghd-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.ghd-table th, .ghd-table td {
-    padding: 0.8rem 1rem;
-    text-align: left;
-    border-bottom: 1px solid var(--color-borde);
-}
-
-.ghd-table th {
-    font-weight: 600;
-    color: var(--texto-secundario);
-    font-size: 0.8rem;
-    text-transform: uppercase;
-}
-
-.ghd-table tbody tr:hover {
-    background-color: var(--color-fondo);
-}
+.ghd-btn i { margin-right: 8px; }
+.ghd-btn-primary { background-color: var(--color-primario); color: white; }
+.ghd-btn-primary:hover { background-color: var(--color-primario-hover); }
+.ghd-btn-secondary { background-color: var(--color-fondo-claro); color: var(--texto-principal); border: 1px solid var(--color-borde); }
+.ghd-btn-secondary:hover { background-color: var(--color-fondo); }
+.ghd-btn-tertiary { background-color: transparent; color: var(--texto-secundario); }
+.ghd-btn-tertiary:hover { background-color: var(--color-fondo); }
+.ghd-btn-icon { background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--texto-secundario); }
 
 /* Etiquetas (Tags) */
-.ghd-tag {
-    display: inline-block;
-    padding: 0.2rem 0.6rem;
-    border-radius: 12px;
-    font-size: 0.8rem;
-    font-weight: 500;
-}
-
+.ghd-tag { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: 500; }
 .tag-blue { background-color: #DBEAFE; color: #1E40AF; }
-.tag-red { background-color: #FEE2E2; color: #991B1B; } /* Usaremos un rojo más vivo para la tag */
+.tag-red { background-color: #FEE2E2; color: #991B1B; }
 .tag-yellow { background-color: #FEF3C7; color: #92400E; }
 .tag-green { background-color: #D1FAE5; color: #065F46; }
 .tag-gray { background-color: #F3F4F6; color: #4B5563; }
 
 /* ==========================================================================
-   5. Iconos y Ajustes de UI
+   4. SECCIONES ESPECÍFICAS
    ========================================================================== */
-.sidebar-nav li a i {
-    width: 20px; /* Alinea los iconos */
-    margin-right: 12px;
-    text-align: center;
-}
+/* Sidebar */
+.sidebar-header .logo { font-size: 1.5rem; font-weight: 700; color: var(--texto-claro); margin: 0 0 2rem 0; }
+.sidebar-nav ul { list-style: none; padding: 0; margin: 0; }
+.sidebar-nav li a { display: flex; align-items: center; padding: 0.75rem 1rem; border-radius: 6px; text-decoration: none; color: #a7a7a7; font-weight: 500; margin-bottom: 0.25rem; transition: all 0.2s ease; }
+.sidebar-nav li a i { width: 20px; margin-right: 12px; text-align: center; }
+.sidebar-nav li a:hover { background-color: rgba(255, 255, 255, 0.05); color: var(--texto-claro); }
+.sidebar-nav li.active a { background-color: var(--color-primario); color: white; }
+
+/* Encabezado Principal */
+.ghd-main-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; gap: 1rem; }
+.ghd-main-header h2 { font-size: clamp(1.25rem, 4vw, 1.8rem); font-weight: 700; margin: 0; white-space: nowrap; }
+.header-title-wrapper { display: flex; align-items: center; gap: 1rem; }
+.header-actions { display: flex; gap: clamp(0.5rem, 2vw, 1rem); flex-shrink: 0; }
+
+/* Filtros */
+.ghd-filters { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+.ghd-filters input, .ghd-filters select { padding: 0.6rem; border-radius: 6px; border: 1px solid var(--color-borde); background-color: var(--color-fondo-claro); }
+.ghd-filters input { flex-grow: 1; }
+
+/* Tabla */
+.ghd-table { width: 100%; border-collapse: collapse; }
+.ghd-table th, .ghd-table td { padding: 0.8rem 1rem; text-align: left; border-bottom: 1px solid var(--color-borde); }
+.ghd-table th { font-weight: 600; color: var(--texto-secundario); font-size: 0.8rem; text-transform: uppercase; }
+.ghd-table tbody tr:hover { background-color: var(--color-fondo); }
+
+/* Menú de Acciones */
+.actions-cell { position: relative; }
+.actions-dropdown .actions-toggle { width: 32px; height: 32px; border-radius: 50%; }
+.actions-dropdown .actions-toggle:hover { background-color: var(--color-fondo); }
+.actions-menu { display: none; position: absolute; right: 30px; top: 10px; background-color: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 10; width: 200px; padding: 0.5rem; border: 1px solid var(--color-borde); }
+.actions-menu.is-open { display: block; }
+.actions-menu-group { padding: 0.5rem 0; border-bottom: 1px solid var(--color-borde); }
+.actions-menu-group:last-child { border-bottom: none; }
+.actions-menu-title { display: block; padding: 0.5rem 0.75rem; font-size: 0.8rem; font-weight: 600; color: var(--texto-secundario); }
+.actions-menu .action-link { display: block; padding: 0.5rem 0.75rem; text-decoration: none; color: var(--texto-principal); border-radius: 4px; }
+.actions-menu .action-link:hover { background-color: var(--color-fondo); }
+.actions-menu .action-link.is-current { color: var(--texto-secundario); font-weight: 600; background-color: var(--color-fondo); pointer-events: none; cursor: default; }
+
+/* Panel de Sector y Tarjetas de Tarea */
+.ghd-sector-tasks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; border: 1px dashed var(--color-borde); background-color: rgba(255, 255, 255, 0.5); border-radius: 8px; padding: 1.5rem; min-height: 300px; }
+.ghd-task-card { background-color: var(--color-fondo-claro); border: 1px solid var(--color-borde); border-radius: 8px; display: flex; flex-direction: column; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); }
+.ghd-task-card .card-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--color-borde); }
+.ghd-task-card .card-header h3 { margin: 0; font-size: 1.1rem; }
+.ghd-task-card .card-body { padding: 1.5rem; flex-grow: 1; display: flex; flex-direction: column; gap: 0.75rem; }
+.ghd-task-card .card-info-group { display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.75rem; border-bottom: 1px solid var(--color-borde); }
+.ghd-task-card .card-info-group:last-child { border-bottom: none; }
+.ghd-task-card .info-label { font-weight: 600; color: var(--texto-secundario); font-size: 0.9rem; }
+.ghd-task-card .info-value { font-weight: 500; text-align: right; }
+.ghd-task-card .card-footer { padding: 1rem 1.5rem; background-color: var(--color-fondo); border-top: 1px solid var(--color-borde); display: flex; justify-content: flex-end; gap: 1rem; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
+.ghd-task-card .card-footer .ghd-btn { text-decoration: none; text-align: center; }
 
 /* ==========================================================================
-   6. Estilos Responsives (CÓDIGO CORREGIDO Y MEJORADO)
+   5. RESPONSIVE Y UI MÓVIL
    ========================================================================== */
+#mobile-menu-toggle { display: none; }
+.ghd-sidebar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 999; opacity: 0; visibility: hidden; transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out; }
+.ghd-sidebar-overlay.is-visible { opacity: 1; visibility: visible; }
 
-/* Overlay para el fondo cuando el menú móvil está abierto */
-body.sidebar-open::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5); /* Fondo negro semi-transparente */
-    z-index: 999; /* Justo debajo del sidebar */
-}
-#mobile-menu-toggle{
-    display: none;
-}
-/* Para Tablets y pantallas más pequeñas (menos de 1024px) */
 @media (max-width: 1024px) {
-    .ghd-sidebar {
-    position: fixed;
-    left: 0;
-    top: 0;
-    height: 100%;
-    z-index: 1000;
-    transform: translateX(-100%);
-    transition: transform 0.3s ease-in-out;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.2); /* Sombra para que destaque sobre el contenido */
-} 
-
-    .ghd-sidebar.sidebar-visible {
-        transform: translateX(0); /* Clase para mostrarlo */
-    }
-
-    .ghd-main-content {
-        margin-left: 0;
-        width: 100%;
-        /* Evita que el contenido principal se pueda desplazar cuando el menú está abierto */
-        transition: filter 0.3s ease-in-out;
-    }
-    
-    body.sidebar-open .ghd-main-content {
-        filter: blur(2px); /* Opcional: desenfoca el contenido de fondo */
-    }
-
-    /* Mostramos el botón del menú móvil */
-    #mobile-menu-toggle {
-        display: block !important;
-        font-size: 22px;
-        color: var(--texto-principal);
-    }
+    .ghd-sidebar { position: fixed; top: 0; left: 0; height: 100%; z-index: 1000; transform: translateX(-100%); box-shadow: 0 0 20px rgba(0, 0, 0, 0.2); }
+    .ghd-sidebar.sidebar-visible { transform: translateX(0); }
+    .ghd-main-content { margin-left: 0; width: 100%; }
+    #mobile-menu-toggle { display: block !important; }
 }
 
+@media (max-width: 820px) {
+    .ghd-main-header { flex-wrap: wrap; }
+}
 
-/* Para Móviles (menos de 768px) */
 @media (max-width: 768px) {
-    .ghd-main-content {
-        padding: 1rem;
-    }
-
-    .ghd-main-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 1rem;
-    }
-
-    .ghd-filters {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .ghd-table-wrapper {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch; /* Mejora el scroll en iOS */
-    }
-    .ghd-table {
-        min-width: 800px;
-    }
-}
-
-.header-title-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-/* ==========================================================================
-   Componentes Adicionales para UI Móvil
-   ========================================================================== */
-
-/* Capa de fondo para el menú móvil */
-.ghd-sidebar-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5); /* Negro semitransparente */
-    z-index: 999; /* Justo debajo del sidebar */
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
-}
-
-.ghd-sidebar-overlay.is-visible {
-    opacity: 1;
-    visibility: visible;
-}
-
-/* Estilos para el menú de acciones */
-.actions-cell {
-    position: relative; /* Permite posicionar el menú dentro de la celda */
-}
-
-.actions-dropdown .actions-toggle {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-}
-.actions-dropdown .actions-toggle:hover {
-    background-color: var(--color-fondo);
-}
-
-.actions-menu {
-    display: none; /* Oculto por defecto */
-    position: absolute;
-    right: 30px;
-    top: 10px;
-    background-color: white;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    z-index: 10;
-    width: 200px;
-    padding: 0.5rem;
-    border: 1px solid var(--color-borde);
-}
-
-.actions-menu.is-open {
-    display: block; /* Lo mostramos con JS */
-}
-
-.actions-menu-group {
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--color-borde);
-}
-.actions-menu-group:last-child {
-    border-bottom: none;
-}
-
-.actions-menu-title {
-    display: block;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--texto-secundario);
-}
-
-.actions-menu .action-link {
-    display: block;
-    padding: 0.5rem 0.75rem;
-    text-decoration: none;
-    color: var(--texto-principal);
-    border-radius: 4px;
-}
-
-.actions-menu .action-link:hover {
-    background-color: var(--color-fondo);
-}
-
-/* Estilos para la opción actual/deshabilitada en el menú de acciones */
-.actions-menu .action-link.is-current {
-    color: var(--texto-secundario);
-    font-weight: 600; /* Lo ponemos en negrita para que destaque */
-    background-color: var(--color-fondo);
-    pointer-events: none; /* Esto deshabilita cualquier evento de clic */
-    cursor: default;      /* El cursor se muestra como texto normal */
-}
-
-/* ==========================================================================
-   Estilos para el Panel de Sector
-   ========================================================================== */
-
-.ghd-sector-tasks-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1.5rem;
-}
-
-.ghd-task-card {
-    background-color: var(--color-fondo-claro);
-    border: 1px solid var(--color-borde);
-    border-radius: 8px;
-    display: flex;
-    flex-direction: column;
-}
-
-.ghd-task-card .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid var(--color-borde);
-}
-
-.ghd-task-card .card-header h3 {
-    margin: 0;
-    font-size: 1.1rem;
-}
-
-.ghd-task-card .card-body {
-    padding: 1.5rem;
-    flex-grow: 1;
-}
-
-.ghd-task-card .card-body p {
-    margin: 0 0 0.5rem 0;
-}
-
-.ghd-task-card .card-footer {
-    padding: 1rem 1.5rem;
-    background-color: var(--color-fondo);
-    border-top: 1px solid var(--color-borde);
-    display: flex;
-    justify-content: flex-end;
-    gap: 1rem;
-    border-bottom-left-radius: 8px;
-    border-bottom-right-radius: 8px;
-}
-
-/* ==========================================================================
-   Mejoras de Estilo para la Tarjeta de Tarea
-   ========================================================================== */
-
-.ghd-task-card .card-body {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem; /* Espacio entre las filas de información */
-}
-
-.ghd-task-card .card-info-group {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.ghd-task-card .info-label {
-    font-weight: 600;
-    color: var(--texto-secundario);
-}
-
-.ghd-task-card .info-value {
-    font-weight: 500;
-    text-align: right;
-}
-
-/* Aseguramos que los botones se vean bien incluso si uno es un enlace */
-.ghd-task-card .card-footer .ghd-btn {
-    text-decoration: none;
-    text-align: center;
-}
-
-/* ==========================================================================
-   Estilos para la Página de Detalle de Pedido
-   ========================================================================== */
-.ghd-single-order-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
-}
-
-@media (min-width: 768px) {
-    .ghd-single-order-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-.card-section-title {
-    margin-top: 0;
-    margin-bottom: 1.5rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--color-borde);
+    .ghd-main-content { padding: 1rem; }
+    .ghd-main-header { flex-direction: column; align-items: flex-start; }
+    .ghd-main-header .header-actions { width: 100%; justify-content: flex-end; }
+    .ghd-filters { flex-direction: column; align-items: stretch; }
+    .ghd-table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .ghd-table { min-width: 800px; }
 }

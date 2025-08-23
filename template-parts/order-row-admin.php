@@ -1,41 +1,28 @@
 <?php
 /**
  * Template Part para mostrar una fila de pedido en la tabla del administrador.
+ * Este archivo es un componente "tonto": recibe todos sus datos a través de la variable $args
+ * que se le pasa desde el archivo `template-admin-dashboard.php`.
+ * No contiene lógica de obtención de datos.
  */
 
-// Obtenemos todos los datos del pedido actual dentro del bucle
-$estado        = get_field('estado_pedido');
-$prioridad     = get_field('prioridad_pedido');
-$sector_actual = get_field('sector_actual');
-
-// Lógica para asignar clases de color a la etiqueta de prioridad
-$prioridad_class = 'tag-green'; // Baja por defecto
-if ($prioridad == 'Alta') {
-    $prioridad_class = 'tag-red';
-} elseif ($prioridad == 'Media') {
-    $prioridad_class = 'tag-yellow';
-}
-
-// Lógica para asignar clases de color a la etiqueta de estado
-$estado_class = 'tag-gray'; // Pendiente por defecto
-if (in_array($estado, ghd_get_sectores_produccion())) { // Usamos la función global de sectores
-    $estado_class = 'tag-blue';
-} elseif ($estado == 'Completado') {
-    $estado_class = 'tag-green';
+// Si la variable $args no existe, no hacemos nada para evitar errores.
+if (!isset($args) || !is_array($args)) {
+    return;
 }
 ?>
 
 <tr>
     <td><input type="checkbox"></td>
-    <td><strong><?php echo esc_html(get_the_title()); ?></strong></td>
-    <td><?php echo esc_html(get_field('nombre_cliente')); ?></td>
-    <td><span class="ghd-tag <?php echo $estado_class; ?>"><?php echo esc_html($estado); ?></span></td>
-    <td><span class="ghd-tag <?php echo $prioridad_class; ?>"><?php echo esc_html($prioridad); ?></span></td>
-    <td><?php echo esc_html($sector_actual); ?></td>
-    <td><?php echo esc_html(get_field('fecha_pedido')); ?></td>
+    <td><strong><?php echo esc_html($args['titulo']); ?></strong></td>
+    <td><?php echo esc_html($args['nombre_cliente']); ?></td>
+    <td><span class="ghd-tag <?php echo esc_attr($args['estado_class']); ?>"><?php echo esc_html($args['estado']); ?></span></td>
+    <td><span class="ghd-tag <?php echo esc_attr($args['prioridad_class']); ?>"><?php echo esc_html($args['prioridad']); ?></span></td>
+    <td><?php echo esc_html($args['sector_actual']); ?></td>
+    <td><?php echo esc_html($args['fecha_pedido']); ?></td>
     <td class="actions-cell">
         <div class="actions-dropdown">
-            <button class="ghd-btn-icon actions-toggle" data-order-id="<?php echo get_the_ID(); ?>">
+            <button class="ghd-btn-icon actions-toggle" data-order-id="<?php echo esc_attr($args['post_id']); ?>">
                 <i class="fa-solid fa-ellipsis-vertical"></i>
             </button>
             <div class="actions-menu">
@@ -50,7 +37,7 @@ if (in_array($estado, ghd_get_sectores_produccion())) { // Usamos la función gl
                     <?php
                     $sectores = ghd_get_sectores_produccion();
                     foreach ($sectores as $sector) {
-                        if ($sector === $sector_actual) {
+                        if ($sector === $args['sector_actual']) {
                             echo '<span class="action-link is-current">' . esc_html($sector) . ' (Actual)</span>';
                         } else {
                             echo '<a href="#" class="action-link" data-action="change_sector" data-value="' . esc_attr($sector) . '">' . esc_html($sector) . '</a>';

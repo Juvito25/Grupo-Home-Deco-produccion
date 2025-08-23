@@ -1,7 +1,5 @@
 <?php
-/*
- * Template Name: GHD - Panel de Administrador
- */
+/* Template Name: GHD - Panel de Administrador */
 
 // --- CONTROL DE ACCESO ---
 // Si el usuario no ha iniciado sesión, lo mandamos a la página de login.
@@ -47,13 +45,16 @@ get_header(); // Carga el header de WordPress
                 <h2>Panel de Administrador</h2>
             </div> 
             <div class="header-actions">
-                <button class="ghd-btn ghd-btn-secondary">Exportar Datos</button>
-                <button class="ghd-btn ghd-btn-primary">Nuevo Pedido</button>
+                <button class="ghd-btn ghd-btn-secondary">
+                    <i class="fa-solid fa-download"></i> <span>Exportar Datos</span>
+                </button>
+                <button class="ghd-btn ghd-btn-primary">
+                    <i class="fa-solid fa-plus"></i> <span>Nuevo Pedido</span>
+                </button>
             </div>
         </header>
 
         <!-- FILTROS -->
-        <!-- SECCIÓN DE FILTROS - CON IDs -->
         <div class="ghd-card ghd-filters">
             <input type="search" id="ghd-search-filter" placeholder="Buscar por Código o Cliente...">
             
@@ -61,7 +62,6 @@ get_header(); // Carga el header de WordPress
                 <option value="">Todos los Estados</option>
                 <option value="Pendiente">Pendiente</option>
                 <?php
-                // Rellenamos dinámicamente los estados/sectores
                 $sectores_para_filtro = ghd_get_sectores_produccion();
                 foreach ($sectores_para_filtro as $sector) {
                     echo '<option value="' . esc_attr($sector) . '">' . esc_html($sector) . '</option>';
@@ -79,6 +79,7 @@ get_header(); // Carga el header de WordPress
             
             <button id="ghd-reset-filters" class="ghd-btn ghd-btn-tertiary">Restablecer</button>
         </div>
+
         <!-- TABLA DE PEDIDOS -->
         <div class="ghd-card ghd-table-wrapper">
             <table class="ghd-table">
@@ -89,39 +90,72 @@ get_header(); // Carga el header de WordPress
                         <th>Cliente</th>
                         <th>Estado</th>
                         <th>Prioridad</th>
-                        <th>Próximo Sector</th>
+                        <th>Sector Actual</th>
                         <th>Fecha del Pedido</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php
-                    // CONSULTA MODIFICADA: Mostrar TODOS los pedidos
+                    // CONSULTA: Por defecto, muestra TODOS los pedidos.
                     $args = array(
                         'post_type'      => 'orden_produccion',
-                        'posts_per_page' => -1, // -1 para traer todos
+                        'posts_per_page' => -1,
                         'orderby'        => 'date',
-                        'order'          => 'DESC', // Los más nuevos primero
+                        'order'          => 'DESC',
                     );
+                    
+                    /* OPCIONAL: Para volver a la vista de "Bandeja de Entrada" (solo pendientes), descomenta este bloque
+                    $args['meta_query'] = array(
+                        array(
+                            'key'     => 'estado_pedido',
+                            'value'   => 'Pendiente',
+                            'compare' => '=',
+                        ),
+                    );
+                    */
+
                     $pedidos_query = new WP_Query($args);
 
                     if ($pedidos_query->have_posts()) :
                         while ($pedidos_query->have_posts()) : $pedidos_query->the_post();
+                            
+                            // 1. Recopilamos y preparamos todos los datos en el archivo principal
                             $estado = get_field('estado_pedido');
                             $prioridad = get_field('prioridad_pedido');
-                            $sector_actual = get_field('sector_actual');
-
+                            
                             $prioridad_class = 'tag-green';
                             if ($prioridad == 'Alta') $prioridad_class = 'tag-red';
                             elseif ($prioridad == 'Media') $prioridad_class = 'tag-yellow';
-                    ?>
-                    <?php get_template_part('template-parts/order-row-admin'); ?>
-                    <?php 
+
+                            $estado_class = 'tag-gray';
+                            if (in_array($estado, ghd_get_sectores_produccion())) {
+                                $estado_class = 'tag-blue';
+                            } elseif ($estado == 'Completado') {
+                                $estado_class = 'tag-green';
+                            }
+                            
+                            // 2. Creamos el array de datos para pasar al archivo de la fila
+                            $args_fila = array(
+                                'post_id'         => get_the_ID(),
+                                'titulo'          => get_the_title(),
+                                'nombre_cliente'  => get_field('nombre_cliente'),
+                                'estado'          => $estado,
+                                'prioridad'       => $prioridad,
+                                'sector_actual'   => get_field('sector_actual'),
+                                'fecha_pedido'    => get_field('fecha_del_pedido'),
+                                'prioridad_class' => $prioridad_class,
+                                'estado_class'    => $estado_class,
+                            );
+
+                            // 3. Llamamos al template part y le pasamos el array de datos
+                            get_template_part('template-parts/order-row-admin', null, $args_fila);
+
                         endwhile;
                     else: 
                     ?>
                     <tr>
-                        <td colspan="8" style="text-align:center;">No hay órdenes pendientes de asignación.</td>
+                        <td colspan="8" style="text-align:center;">No se encontraron órdenes de producción.</td>
                     </tr>
                     <?php
                     endif;
