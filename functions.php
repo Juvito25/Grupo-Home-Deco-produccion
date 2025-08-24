@@ -83,3 +83,82 @@ add_action('wp_ajax_ghd_refresh_tasks', function() {
     wp_reset_postdata();
     wp_send_json_success(['html' => ob_get_clean()]);
 });
+
+// --- MANEJADOR AJAX PARA FILTRAR PEDIDOS EN EL PANEL DE ADMIN ---
+// --- REEMPLAZA ESTA FUNCIÓN COMPLETA EN TU functions.php ---
+
+add_action('wp_ajax_ghd_filter_orders', 'ghd_filter_orders_callback');
+function ghd_filter_orders_callback() {
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+
+    $args = array(
+        'post_type'      => 'orden_produccion',
+        'posts_per_page' => -1,
+        'meta_query'     => array('relation' => 'AND'),
+    );
+
+    // Aplicar filtros de estado y prioridad (sin cambios)
+    if (!empty($_POST['status'])) {
+        $args['meta_query'][] = array('key' => 'estado_pedido', 'value' => sanitize_text_field($_POST['status']));
+    }
+    if (!empty($_POST['priority'])) {
+        $args['meta_query'][] = array('key' => 'prioridad_pedido', 'value' => sanitize_text_field($_POST['priority']));
+    }
+    
+    // --- LÓGICA DE BÚSQUEDA CORREGIDA Y ROBUSTA ---
+    if (!empty($_POST['search'])) {
+        $search_term = sanitize_text_field($_POST['search']);
+        
+        // WordPress no permite buscar en el título y en un meta_query con OR directamente.
+        // La solución es hacer dos consultas y unir los resultados. Es la forma más segura.
+
+        // Consulta 1: Buscar por Título (Código de Pedido)
+        $query1_args = $args;
+        $query1_args['s'] = $search_term;
+        $query1 = new WP_Query($query1_args);
+        $post_ids1 = wp_list_pluck($query1->posts, 'ID');
+
+        // Consulta 2: Buscar por Nombre de Cliente
+        $query2_args = $args;
+        $query2_args['meta_query'][] = array(
+            'key' => 'nombre_cliente',
+            'value' => $search_term,
+            'compare' => 'LIKE'
+        );
+        $query2 = new WP_Query($query2_args);
+        $post_ids2 = wp_list_pluck($query2->posts, 'ID');
+
+        // Unimos los IDs de ambas consultas y eliminamos duplicados
+        $merged_ids = array_unique(array_merge($post_ids1, $post_ids2));
+
+        // Si no hay resultados, forzamos que la consulta final no devuelva nada.
+        if (empty($merged_ids)) {
+            $merged_ids = array(0);
+        }
+
+        // Modificamos la consulta principal para que solo traiga los posts que hemos encontrado.
+        $args = array(
+            'post_type' => 'orden_produccion',
+            'post__in'  => $merged_ids,
+            'posts_per_page' => -1,
+            'orderby'   => 'date',
+            'order'     => 'DESC',
+        );
+    }
+
+    $pedidos_query = new WP_Query($args);
+    
+    ob_start();
+
+    if ($pedidos_query->have_posts()) {
+        while ($pedidos_query->have_posts()) {
+            $pedidos_query->the_post();
+            get_template_part('template-parts/order-row-admin', null, ghd_prepare_order_row_data(get_the_ID()));
+        }
+    } else {
+        echo '<tr><td colspan="9" style="text-align:center;">No se encontraron pedidos con esos filtros.</td></tr>';
+    }
+    wp_reset_postdata();
+    
+    wp_send_json_success(array('html' => ob_get_clean()));
+}

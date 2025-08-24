@@ -96,7 +96,7 @@ get_header(); // Carga el header de WordPress
                         <th>Acciones</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="ghd-orders-table-body">
                     <?php
                     // CONSULTA: Por defecto, muestra TODOS los pedidos.
                     // En template-admin-dashboard.php

@@ -142,3 +142,56 @@ if (sectorGrid) {
         }
     });
 }
+
+// --- LÓGICA DE FILTROS PARA EL PANEL DE ADMIN ---
+const searchFilter = document.getElementById('ghd-search-filter');
+const statusFilter = document.getElementById('ghd-status-filter');
+const priorityFilter = document.getElementById('ghd-priority-filter');
+const resetFiltersBtn = document.getElementById('ghd-reset-filters');
+const tableBody = document.getElementById('ghd-orders-table-body');
+
+function applyFilters() {
+    if (!tableBody) return; // Salir si no estamos en la página del admin
+    
+    tableBody.style.opacity = '0.5';
+
+    const params = new URLSearchParams({
+        action: 'ghd_filter_orders',
+        nonce: ghd_ajax.nonce,
+        search: searchFilter.value,
+        status: statusFilter.value,
+        priority: priorityFilter.value,
+    });
+
+    fetch(ghd_ajax.ajax_url, {
+        method: 'POST',
+        body: params
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            tableBody.innerHTML = data.data.html;
+        }
+    })
+    .finally(() => {
+        tableBody.style.opacity = '1';
+    });
+}
+
+if (searchFilter) { // Si los filtros existen, añadimos los listeners
+    let searchTimeout;
+    searchFilter.addEventListener('keyup', () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(applyFilters, 500); // Espera 500ms después de teclear
+    });
+    
+    statusFilter.addEventListener('change', applyFilters);
+    priorityFilter.addEventListener('change', applyFilters);
+    
+    resetFiltersBtn.addEventListener('click', () => {
+        searchFilter.value = '';
+        statusFilter.value = '';
+        priorityFilter.value = '';
+        applyFilters();
+    });
+}
