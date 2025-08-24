@@ -152,7 +152,9 @@ body {
     display: flex;
     flex-direction: column;
 }
-
+.sidebar-header{
+    padding: 5%;
+}
 .ghd-sidebar .sidebar-header {
     margin-bottom: 2rem;
     flex-shrink: 0; /* Evita que el header se encoja */
@@ -273,4 +275,75 @@ body {
     .ghd-filters { flex-direction: column; align-items: stretch; }
     .ghd-table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .ghd-table { min-width: 800px; }
+}
+
+/* ==========================================================================
+   NUEVO HEADER PROFESIONAL (V3)
+   ========================================================================== */
+.ghd-pro-header {
+    background-color: var(--color-fondo-claro);
+    padding: 0.75rem 2rem;
+    border-bottom: 1px solid var(--color-borde);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0; /* Evita que se encoja */
+}
+
+.header-logo-title {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.header-logo {
+    height: 40px;
+    width: auto;
+}
+
+.header-title-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.main-title {
+    font-weight: 600;
+    color: var(--texto-principal);
+}
+
+.sub-title {
+    font-size: 0.85rem;
+    color: var(--texto-secundario);
+}
+
+.header-user-profile {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.user-info {
+    display: flex;
+    flex-direction: column;
+    text-align: right;
+}
+
+.user-name {
+    font-weight: 600;
+}
+
+.user-role {
+    font-size: 0.85rem;
+    color: var(--texto-secundario);
+}
+
+.user-avatar img {
+    border-radius: 50%;
+}
+
+/* Ajuste responsive para el header */
+@media (max-width: 600px) {
+    .header-title-group, .user-info {
+        display: none; /* Ocultamos texto en pantallas muy pequeñas */
+    }
 }

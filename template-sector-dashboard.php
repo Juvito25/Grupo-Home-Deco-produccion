@@ -4,7 +4,6 @@ $user = wp_get_current_user(); $role = $user->roles[0] ?? '';
 $role_to_sector_map = ['rol_carpinteria' => 'Carpintería', 'rol_costura' => 'Costura', 'rol_tapiceria' => 'Tapicería', 'rol_logistica' => 'Logística'];
 $sector = $role_to_sector_map[$role] ?? '';
 ?>
-<div class="ghd-site-header"><!--<h1>Grupo Home Deco</h1>--></div>
 <div class="ghd-app-wrapper">
     <?php get_template_part('template-parts/sidebar-sector'); ?>
     <main class="ghd-main-content">
