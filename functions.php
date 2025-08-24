@@ -30,7 +30,7 @@ function ghd_prepare_order_row_data($post_id) {
     $prioridad_class = 'tag-green'; if ($prioridad == 'Alta') $prioridad_class = 'tag-red'; elseif ($prioridad == 'Media') $prioridad_class = 'tag-yellow';
     $estado_class = 'tag-gray'; if (in_array($estado, ghd_get_sectores_produccion())) $estado_class = 'tag-blue'; elseif ($estado == 'Completado') $estado_class = 'tag-green';
     
-    return [ 'post_id' => $post_id, 'titulo' => get_the_title($post_id), 'nombre_cliente'  => get_field('nombre_cliente', $post_id), 'nombre_producto' => get_field('nombre_producto', $post_id), 'estado' => $estado, 'prioridad' => $prioridad, 'sector_actual' => get_field('sector_actual', $post_id), 'fecha_pedido' => get_field('fecha_pedido', $post_id), 'prioridad_class' => $prioridad_class, 'estado_class' => $estado_class ];
+    return [ 'post_id' => $post_id, 'titulo' => get_the_title($post_id), 'nombre_cliente'  => get_field('nombre_cliente', $post_id), 'nombre_producto' => get_field('nombre_producto', $post_id), 'estado' => $estado, 'prioridad' => $prioridad, 'sector_actual' => get_field('sector_actual', $post_id), 'fecha_del_pedido' => get_field('fecha_del_pedido', $post_id), 'prioridad_class' => $prioridad_class, 'estado_class' => $estado_class ];
 }
 
 // --- 3. LÓGICA AJAX ---
@@ -91,72 +91,58 @@ add_action('wp_ajax_ghd_filter_orders', 'ghd_filter_orders_callback');
 function ghd_filter_orders_callback() {
     check_ajax_referer('ghd-ajax-nonce', 'nonce');
 
+    // 1. OBTENER TODOS LOS PEDIDOS - SIN FILTROS COMPLEJOS
+    // Esta es la consulta más simple y robusta posible.
     $args = array(
         'post_type'      => 'orden_produccion',
         'posts_per_page' => -1,
-        'meta_query'     => array('relation' => 'AND'),
     );
-
-    // Aplicar filtros de estado y prioridad (sin cambios)
-    if (!empty($_POST['status'])) {
-        $args['meta_query'][] = array('key' => 'estado_pedido', 'value' => sanitize_text_field($_POST['status']));
-    }
-    if (!empty($_POST['priority'])) {
-        $args['meta_query'][] = array('key' => 'prioridad_pedido', 'value' => sanitize_text_field($_POST['priority']));
-    }
-    
-    // --- LÓGICA DE BÚSQUEDA CORREGIDA Y ROBUSTA ---
-    if (!empty($_POST['search'])) {
-        $search_term = sanitize_text_field($_POST['search']);
-        
-        // WordPress no permite buscar en el título y en un meta_query con OR directamente.
-        // La solución es hacer dos consultas y unir los resultados. Es la forma más segura.
-
-        // Consulta 1: Buscar por Título (Código de Pedido)
-        $query1_args = $args;
-        $query1_args['s'] = $search_term;
-        $query1 = new WP_Query($query1_args);
-        $post_ids1 = wp_list_pluck($query1->posts, 'ID');
-
-        // Consulta 2: Buscar por Nombre de Cliente
-        $query2_args = $args;
-        $query2_args['meta_query'][] = array(
-            'key' => 'nombre_cliente',
-            'value' => $search_term,
-            'compare' => 'LIKE'
-        );
-        $query2 = new WP_Query($query2_args);
-        $post_ids2 = wp_list_pluck($query2->posts, 'ID');
-
-        // Unimos los IDs de ambas consultas y eliminamos duplicados
-        $merged_ids = array_unique(array_merge($post_ids1, $post_ids2));
-
-        // Si no hay resultados, forzamos que la consulta final no devuelva nada.
-        if (empty($merged_ids)) {
-            $merged_ids = array(0);
-        }
-
-        // Modificamos la consulta principal para que solo traiga los posts que hemos encontrado.
-        $args = array(
-            'post_type' => 'orden_produccion',
-            'post__in'  => $merged_ids,
-            'posts_per_page' => -1,
-            'orderby'   => 'date',
-            'order'     => 'DESC',
-        );
-    }
-
     $pedidos_query = new WP_Query($args);
-    
+
+    // Sanitizamos los valores de los filtros una sola vez
+    $status_filter   = isset($_POST['status']) ? sanitize_text_field($_POST['status']) : '';
+    $priority_filter = isset($_POST['priority']) ? sanitize_text_field($_POST['priority']) : '';
+    $search_filter   = isset($_POST['search']) ? sanitize_text_field($_POST['search']) : '';
+
     ob_start();
 
     if ($pedidos_query->have_posts()) {
+        $found_posts = false;
         while ($pedidos_query->have_posts()) {
             $pedidos_query->the_post();
-            get_template_part('template-parts/order-row-admin', null, ghd_prepare_order_row_data(get_the_ID()));
+            $post_id = get_the_ID();
+
+            // 2. FILTRAR LOS RESULTADOS EN PHP (MÉTODO A PRUEBA DE BALAS)
+            // Obtenemos los datos de cada pedido
+            $estado = get_field('estado_pedido', $post_id);
+            $prioridad = get_field('prioridad_pedido', $post_id);
+            $cliente = get_field('nombre_cliente', $post_id);
+            $codigo = get_the_title($post_id);
+
+            // Comprobamos si el pedido actual pasa cada filtro
+            if (!empty($status_filter) && $estado !== $status_filter) {
+                continue; // Si no coincide, saltamos al siguiente pedido
+            }
+            if (!empty($priority_filter) && $prioridad !== $priority_filter) {
+                continue; // Si no coincide, saltamos al siguiente pedido
+            }
+            if (!empty($search_filter) && 
+                stripos($cliente, $search_filter) === false && 
+                stripos($codigo, $search_filter) === false) {
+                continue; // Si no coincide ni en cliente ni en código, saltamos al siguiente
+            }
+
+            // Si el pedido ha pasado todos los filtros, lo mostramos
+            $found_posts = true;
+            get_template_part('template-parts/order-row-admin', null, ghd_prepare_order_row_data($post_id));
         }
+
+        if (!$found_posts) {
+            echo '<tr><td colspan="9" style="text-align:center;">No se encontraron pedidos con esos filtros.</td></tr>';
+        }
+
     } else {
-        echo '<tr><td colspan="9" style="text-align:center;">No se encontraron pedidos con esos filtros.</td></tr>';
+        echo '<tr><td colspan="9" style="text-align:center;">No hay órdenes de producción.</td></tr>';
     }
     wp_reset_postdata();
     

@@ -348,3 +348,73 @@ body {
         display: none; /* Ocultamos texto en pantallas muy pequeñas */
     }
 }
+
+/* ==========================================================================
+   NUEVOS ESTILOS - FILTROS DEL PANEL DE ADMIN V2
+   ========================================================================== */
+
+/* Contenedor principal de los filtros */
+.ghd-filters-wrapper {
+    display: flex;
+    flex-wrap: wrap; /* Permite que los filtros salten a la siguiente línea en pantallas pequeñas */
+    gap: 1.5rem;
+    align-items: flex-end; /* Alinea los elementos por la parte inferior */
+    justify-content: space-between;
+    padding: 1.5rem;
+    background-color: var(--color-fondo-claro);
+    border-radius: 8px;
+    border: 1px solid var(--color-borde);
+    margin-bottom: 1.5rem;
+}
+
+/* Grupo para cada filtro (etiqueta + input) */
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 300px; 
+}
+
+.filter-group label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--texto-secundario);
+}
+
+/* Estilo para los campos de input y select dentro de los filtros */
+.ghd-filters-wrapper input,
+.ghd-filters-wrapper select {
+    padding: 0.6rem;
+    border-radius: 6px;
+    border: 1px solid var(--color-borde);
+    background-color: var(--color-fondo-claro);
+    min-width: 180px; /* Ancho mínimo para los desplegables */
+}
+
+.ghd-filters-wrapper input[type="search"] {
+    flex-grow: 1; /* Permite que el campo de búsqueda crezca */
+    min-width: 250px;
+}
+
+/* Estilo específico para el botón de restablecer */
+.ghd-filters-wrapper .ghd-btn-icon {
+    height: 44.19px;
+    width: 44.19px;
+    border: 1px solid var(--color-borde);
+    border-radius: 6px;
+    color: var(--texto-secundario);
+    transition: all 0.2s ease;
+
+    /* --- LÍNEAS CORREGIDAS Y AÑADIDAS --- */
+    background-color: var(--color-fondo-claro); /* Fondo blanco como los otros campos */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0; /* Elimina el padding por defecto del botón */
+    font-size: 1rem; /* Ajusta el tamaño del icono si es necesario */
+    cursor: pointer;
+}
+.ghd-filters-wrapper .ghd-btn-icon:hover {
+    background-color: var(--color-fondo-app);
+    color: var(--texto-principal);
+}

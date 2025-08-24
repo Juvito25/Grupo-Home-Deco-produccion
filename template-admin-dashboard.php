@@ -54,32 +54,36 @@ get_header(); // Carga el header de WordPress
             </div>
         </header>
 
-        <!-- FILTROS -->
-        <div class="ghd-card ghd-filters">
-            <input type="search" id="ghd-search-filter" placeholder="Buscar por Código o Cliente...">
-            
-            <select id="ghd-status-filter">
-                <option value="">Todos los Estados</option>
-                <option value="Pendiente">Pendiente</option>
-                <?php
-                $sectores_para_filtro = ghd_get_sectores_produccion();
-                foreach ($sectores_para_filtro as $sector) {
-                    echo '<option value="' . esc_attr($sector) . '">' . esc_html($sector) . '</option>';
-                }
-                ?>
-                <option value="Completado">Completado</option>
-            </select>
-            
-            <select id="ghd-priority-filter">
-                <option value="">Todas las Prioridades</option>
-                <option value="Alta">Alta</option>
-                <option value="Media">Media</option>
-                <option value="Baja">Baja</option>
-            </select>
-            
-            <button id="ghd-reset-filters" class="ghd-btn ghd-btn-tertiary">Restablecer</button>
+        <!-- INICIO DE LA NUEVA SECCIÓN DE FILTROS -->
+        <div class="ghd-filters-wrapper">
+            <div class="filter-group">
+                <label for="ghd-search-filter">Buscar Pedidos</label>
+                <input type="search" id="ghd-search-filter" placeholder="Buscar...">
+            </div>
+            <div class="filter-group">
+                <label for="ghd-status-filter">Estado</label>
+                <select id="ghd-status-filter">
+                    <option value="">Todos los Estados</option>
+                    <option value="Pendiente">Pendiente</option>
+                    <?php foreach (ghd_get_sectores_produccion() as $sector) { echo '<option value="' . esc_attr($sector) . '">' . esc_html($sector) . '</option>'; } ?>
+                    <option value="Completado">Completado</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="ghd-priority-filter">Prioridad</label>
+                <select id="ghd-priority-filter">
+                    <option value="">Todas las Prioridades</option>
+                    <option value="Alta">Alta</option>
+                    <option value="Media">Media</option>
+                    <option value="Baja">Baja</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <button id="ghd-reset-filters" class="ghd-btn-icon" title="Restablecer filtros">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+            </div>
         </div>
-
         <!-- TABLA DE PEDIDOS -->
         <div class="ghd-card ghd-table-wrapper">
             <table class="ghd-table">
@@ -146,7 +150,7 @@ get_header(); // Carga el header de WordPress
                                 'estado'          => $estado,
                                 'prioridad'       => $prioridad,
                                 'sector_actual'   => get_field('sector_actual'),
-                                'fecha_pedido'    => get_field('fecha_del_pedido'),
+                                'fecha_del_pedido'    => get_field('fecha_del_pedido'),
                                 'prioridad_class' => $prioridad_class,
                                 'estado_class'    => $estado_class,
                             );
