@@ -142,7 +142,7 @@ get_header(); // Carga el header de WordPress
                                 'post_id'         => get_the_ID(),
                                 'titulo'          => get_the_title(),
                                 'nombre_cliente'  => get_field('nombre_cliente'),
-                                'nombre_del_producto' => get_field('nombre_del_producto'), // Asegúrate de que este campo existe en ACF
+                                'nombre_producto' => get_field('nombre_producto'), // Asegúrate de que este campo existe en ACF
                                 'estado'          => $estado,
                                 'prioridad'       => $prioridad,
                                 'sector_actual'   => get_field('sector_actual'),

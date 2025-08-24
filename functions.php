@@ -1,30 +1,18 @@
 <?php
 /**
- * Funciones del Tema para el Gestor de Producción de Grupo Home Deco.
+ * functions.php - Versión Estable V1 - CORREGIDA Y FINAL
  */
 
 // --- 1. CARGA DE ESTILOS Y SCRIPTS ---
 add_action('wp_enqueue_scripts', 'ghd_enqueue_assets');
 function ghd_enqueue_assets() {
-    // Cargar estilos del tema padre (Hello Elementor)
     wp_enqueue_style('parent-style', get_template_directory_uri() . '/style.css');
-    
-    // Cargar librerías externas
     wp_enqueue_style('google-fonts', 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap', false);
     wp_enqueue_style('font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css', array(), '6.4.2');
-    
-    // Cargar el archivo de estilos principal de nuestro tema hijo
-    wp_enqueue_style('ghd-style', get_stylesheet_uri(), array('parent-style'), '1.2'); // Incrementamos versión
+    wp_enqueue_style('ghd-style', get_stylesheet_uri(), array('parent-style'), '3.1');
+    wp_enqueue_script('ghd-app', get_stylesheet_directory_uri() . '/js/app.js', array(), '3.1', true);
 
-    // Cargar el archivo JavaScript principal de nuestra aplicación
-    wp_enqueue_script('ghd-app', get_stylesheet_directory_uri() . '/js/app.js', array(), '1.2', true);
-}
-
-// --- 2. PASAR DATOS DE PHP A JAVASCRIPT ---
-add_action('wp_enqueue_scripts', 'ghd_localize_scripts');
-function ghd_localize_scripts() {
-    // Solo cargamos estos datos si estamos en una página de nuestra aplicación
-    if (is_page_template('template-admin-dashboard.php') || is_page_template('template-sector-dashboard.php')) {
+    if (is_page_template('template-admin-dashboard.php') || is_page_template('template-sector-dashboard.php') || is_singular('orden_produccion')) {
         wp_localize_script('ghd-app', 'ghd_ajax', array(
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce'    => wp_create_nonce('ghd-ajax-nonce')
@@ -32,171 +20,77 @@ function ghd_localize_scripts() {
     }
 }
 
+// --- 2. FUNCIONES DE AYUDA ---
+function ghd_get_sectores_produccion() { return ['Carpintería', 'Costura', 'Tapicería', 'Logística']; }
+function ghd_get_next_sector($sector) { $flujo = ['Carpintería' => 'Costura', 'Costura' => 'Tapicería', 'Tapicería' => 'Logística', 'Logística' => 'Completado']; return $flujo[$sector] ?? null; }
 
-// --- 3. FUNCIONES DE AYUDA GLOBALES ---
-
-/**
- * Devuelve la lista de sectores de producción.
- * Centraliza la lógica para un mantenimiento fácil.
- */
-function ghd_get_sectores_produccion() {
-    return array('Carpintería', 'Costura', 'Tapicería', 'Logística');
-}
-
-/**
- * Devuelve el siguiente sector en el flujo de producción.
- * @param string $current_sector El sector actual.
- * @return string|null El siguiente sector o null si es el final.
- */
-function ghd_get_next_sector($current_sector) {
-    $flujo_produccion = array(
-        'Carpintería' => 'Costura',
-        'Costura'     => 'Tapicería',
-        'Tapicería'   => 'Logística',
-        'Logística'   => 'Completado'
-    );
-    return isset($flujo_produccion[$current_sector]) ? $flujo_produccion[$current_sector] : null;
-}
-
-
-// --- 4. INTEGRACIÓN CON ADVANCED CUSTOM FIELDS (ACF) ---
-
-/**
- * Rellena dinámicamente el campo de selección 'sector_actual' de ACF
- * con los valores de nuestra función ghd_get_sectores_produccion().
- */
-add_filter('acf/load_field/name=sector_actual', 'ghd_acf_load_sectores');
-function ghd_acf_load_sectores($field) {
-    $field['choices'] = array();
-    $field['choices']['Pendiente'] = 'Pendiente'; // Estado inicial
-    $sectores = ghd_get_sectores_produccion();
-    foreach ($sectores as $sector) {
-        $field['choices'][$sector] = $sector;
-    }
-    return $field;
-}
-
-
-// --- 5. LÓGICA DE PETICIONES AJAX ---
-
-/**
- * Manejador AJAX para actualizar un pedido desde el Panel de Administrador.
- */
-add_action('wp_ajax_ghd_update_order', 'ghd_update_order_callback');
-function ghd_update_order_callback() {
-    check_ajax_referer('ghd-ajax-nonce', 'nonce');
-    if (!current_user_can('edit_posts')) {
-        wp_send_json_error(array('message' => 'No tienes permisos.'));
-    }
-
-    $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
-    $field    = isset($_POST['field']) ? sanitize_key($_POST['field']) : '';
-    $value    = isset($_POST['value']) ? sanitize_text_field($_POST['value']) : '';
-
-    if (!$order_id || !$field || !$value) {
-        wp_send_json_error(array('message' => 'Faltan datos.'));
-    }
-
-    // Actualizamos el campo principal (prioridad_pedido o sector_actual)
-    update_field($field, $value, $order_id);
+function ghd_prepare_order_row_data($post_id) {
+    $estado = get_field('estado_pedido', $post_id);
+    $prioridad = get_field('prioridad_pedido', $post_id);
+    $prioridad_class = 'tag-green'; if ($prioridad == 'Alta') $prioridad_class = 'tag-red'; elseif ($prioridad == 'Media') $prioridad_class = 'tag-yellow';
+    $estado_class = 'tag-gray'; if (in_array($estado, ghd_get_sectores_produccion())) $estado_class = 'tag-blue'; elseif ($estado == 'Completado') $estado_class = 'tag-green';
     
-    // Lógica adicional: si se asigna un sector, también se actualiza el estado.
-    if ($field === 'sector_actual') {
-        update_field('estado_pedido', $value, $order_id);
-    }
-
-    // Preparamos datos para la respuesta al frontend
-    $response_data = array();
-    if ($field === 'prioridad_pedido') {
-        $new_class = 'tag-green';
-        if ($value === 'Alta') $new_class = 'tag-red';
-        elseif ($value === 'Media') $new_class = 'tag-yellow';
-        $response_data['new_class'] = $new_class;
-    }
-
-    wp_send_json_success($response_data);
+    return [
+        'post_id' => $post_id, 'titulo' => get_the_title($post_id), 'nombre_cliente'  => get_field('nombre_cliente', $post_id),
+        'nombre_producto' => get_field('nombre_producto', $post_id), 'estado' => $estado, 'prioridad' => $prioridad,
+        'sector_actual' => get_field('sector_actual', $post_id), 'fecha_pedido' => get_field('fecha_pedido', $post_id),
+        'prioridad_class' => $prioridad_class, 'estado_class' => $estado_class,
+    ];
 }
 
-/**
- * Manejador AJAX para mover un pedido al siguiente sector desde el Panel de Sector.
- */
-// --- REEMPLAZA ESTA FUNCIÓN COMPLETA EN TU functions.php ---
+// --- 3. LÓGICA AJAX ---
+add_action('wp_ajax_ghd_update_order', function() {
+    check_ajax_referer('ghd-ajax-nonce', 'nonce'); if (!current_user_can('edit_posts')) wp_send_json_error();
+    $id = intval($_POST['order_id']); $field = sanitize_key($_POST['field']); $value = sanitize_text_field($_POST['value']);
+    update_field($field, $value, $id); if ($field === 'sector_actual') update_field('estado_pedido', $value, $id);
+    ob_start();
+    get_template_part('template-parts/order-row-admin', null, ghd_prepare_order_row_data($id));
+    wp_send_json_success(['html' => ob_get_clean()]);
+});
 
-// Manejador AJAX para filtrar pedidos en el Panel de Admin
-add_action('wp_ajax_ghd_filter_orders', 'ghd_filter_orders_callback');
-function ghd_filter_orders_callback() {
-    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+add_action('wp_ajax_ghd_move_to_next_sector', function() {
+    check_ajax_referer('ghd-ajax-nonce', 'nonce'); if (!current_user_can('read')) wp_send_json_error();
+    $id = intval($_POST['order_id']); $next = ghd_get_next_sector(get_field('sector_actual', $id));
+    if ($next) { update_field('sector_actual', $next, $id); update_field('estado_pedido', $next, $id); wp_send_json_success(); } 
+    else { wp_send_json_error(); }
+});
 
-    $args = array(
-        'post_type'      => 'orden_produccion',
-        'posts_per_page' => -1,
-        'orderby'        => 'date',
-        'order'          => 'DESC',
-        'meta_query'     => array('relation' => 'AND'),
-    );
+// --- MANEJADOR AJAX PARA REFRESCAR TAREAS (VERSIÓN CORREGIDA) ---
+add_action('wp_ajax_ghd_refresh_tasks', function() {
+    check_ajax_referer('ghd-ajax-nonce', 'nonce'); if (!current_user_can('read')) wp_send_json_error();
 
-    // Aplicar filtros de estado y prioridad
-    if (!empty($_POST['status'])) {
-        $args['meta_query'][] = array('key' => 'estado_pedido', 'value' => sanitize_text_field($_POST['status']));
-    }
-    if (!empty($_POST['priority'])) {
-        $args['meta_query'][] = array('key' => 'prioridad_pedido', 'value' => sanitize_text_field($_POST['priority']));
-    }
-    
-    // Búsqueda por palabra clave (título o cliente)
-    if (!empty($_POST['search'])) {
-        $search_term = sanitize_text_field($_POST['search']);
-        $args['meta_query']['relation'] = 'OR'; // Buscamos en cliente O en título
-        $args['meta_query'][] = array('key' => 'nombre_cliente', 'value' => $search_term, 'compare' => 'LIKE');
-        
-        // El filtro para el título es especial y debe añadirse y quitarse para no afectar otras consultas
-        $search_filter = function($where) use ($search_term) {
-            global $wpdb;
-            $where .= " OR {$wpdb->posts}.post_title LIKE '%" . esc_sql($wpdb->esc_like($search_term)) . "%'";
-            return $where;
-        };
-        add_filter('posts_where', $search_filter, 10, 1);
-    }
+    $user = wp_get_current_user();
+    $role = $user->roles[0] ?? '';
+    // CORRECCIÓN CLAVE: Usamos el mapa de roles para obtener el nombre correcto del sector con acento.
+    $role_to_sector_map = ['rol_carpinteria' => 'Carpintería', 'rol_costura' => 'Costura', 'rol_tapiceria' => 'Tapicería', 'rol_logistica' => 'Logística'];
+    $sector = $role_to_sector_map[$role] ?? '';
 
-    $pedidos_query = new WP_Query($args);
-    
-    // ¡IMPORTANTE! Removemos el filtro 'posts_where' después de usarlo para que no afecte a otras consultas
-    if (isset($search_filter)) {
-        remove_filter('posts_where', $search_filter, 10);
-    }
+    if (empty($sector)) { wp_send_json_error(); }
+
+    $query = new WP_Query(['post_type' => 'orden_produccion', 'posts_per_page' => -1, 'meta_query' => [['key' => 'sector_actual', 'value' => $sector]]]);
     
     ob_start();
-
-    if ($pedidos_query->have_posts()) {
-        while ($pedidos_query->have_posts()) {
-            $pedidos_query->the_post();
-            
-            // Preparamos los datos aquí mismo para pasarlos a la plantilla de la fila
-            $estado = get_field('estado_pedido');
-            $prioridad = get_field('prioridad_pedido');
-            $prioridad_class = 'tag-green';
-            if ($prioridad == 'Alta') $prioridad_class = 'tag-red'; elseif ($prioridad == 'Media') $prioridad_class = 'tag-yellow';
-            $estado_class = 'tag-gray';
-            if (in_array($estado, ghd_get_sectores_produccion())) $estado_class = 'tag-blue'; elseif ($estado == 'Completado') $estado_class = 'tag-green';
-
-            $args_fila = array(
-                'post_id'         => get_the_ID(),
-                'titulo'          => get_the_title(),
-                'nombre_cliente'  => get_field('nombre_cliente'),
-                'nombre_producto' => get_field('nombre_producto'), // Pasamos el nombre del producto
-                'estado'          => $estado,
-                'prioridad'       => $prioridad,
-                'sector_actual'   => get_field('sector_actual'),
-                'fecha_pedido'    => get_field('fecha_pedido'),
-                'prioridad_class' => $prioridad_class,
-                'estado_class'    => $estado_class,
-            );
-            get_template_part('template-parts/order-row-admin', null, $args_fila);
+    if ($query->have_posts()) {
+        while ($query->have_posts()) {
+            $query->the_post();
+            $p = get_field('prioridad_pedido'); $pc = ($p == 'Alta') ? 'tag-red' : (($p == 'Media') ? 'tag-yellow' : 'tag-green');
+            ?>
+            <div class="ghd-task-card" id="order-<?php echo get_the_ID(); ?>">
+                <div class="card-header"><h3><?php the_title(); ?></h3><span class="ghd-tag <?php echo $pc; ?>"><?php echo esc_html($p); ?></span></div>
+                <div class="card-body">
+                    <p><strong>Cliente:</strong> <?php echo esc_html(get_field('nombre_cliente')); ?></p>
+                    <p><strong>Producto:</strong> <?php echo esc_html(get_field('nombre_producto')); ?></p>
+                </div>
+                <div class="card-footer">
+                    <a href="<?php the_permalink(); ?>" class="ghd-btn ghd-btn-secondary">Detalles</a>
+                    <button class="ghd-btn ghd-btn-primary move-to-next-sector-btn" data-order-id="<?php echo get_the_ID(); ?>" data-nonce="<?php echo wp_create_nonce('ghd-ajax-nonce'); ?>">Mover</button>
+                </div>
+            </div>
+            <?php
         }
     } else {
-        echo '<tr><td colspan="9" style="text-align:center;">No se encontraron pedidos con esos filtros.</td></tr>'; // colspan ahora es 9
+        echo '<p>No tienes tareas asignadas.</p>';
     }
     wp_reset_postdata();
-    
-    wp_send_json_success(array('html' => ob_get_clean()));
-}
+    wp_send_json_success(['html' => ob_get_clean()]);
+});
