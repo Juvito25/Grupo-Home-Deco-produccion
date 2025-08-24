@@ -79,3 +79,66 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// --- LÓGICA PARA EL BOTÓN "MOVER A SIGUIENTE SECTOR" (PANEL SECTOR) ---
+const sectorGrid = document.querySelector('.ghd-sector-tasks-grid');
+
+// Usamos delegación de eventos en el contenedor por si la lista se refresca con AJAX.
+if (sectorGrid) {
+    sectorGrid.addEventListener('click', function(e) {
+        const moveBtn = e.target.closest('.move-to-next-sector-btn');
+        
+        if (moveBtn) {
+            e.preventDefault();
+            
+            if (!confirm('¿Estás seguro de que quieres mover este pedido al siguiente sector?')) {
+                return;
+            }
+
+            const orderId = moveBtn.dataset.orderId;
+            const nonce = moveBtn.dataset.nonce;
+            const card = moveBtn.closest('.ghd-task-card');
+
+            // Feedback visual inmediato
+            card.style.opacity = '0.5';
+            moveBtn.disabled = true;
+            moveBtn.textContent = 'Moviendo...';
+
+            const params = new URLSearchParams({
+                action: 'ghd_move_to_next_sector',
+                nonce: nonce,
+                order_id: orderId,
+            });
+
+            fetch(ghd_ajax.ajax_url, {
+                method: 'POST',
+                body: params
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Si tiene éxito, eliminamos la tarjeta con una animación
+                    card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(0.95)';
+                    setTimeout(() => {
+                        card.remove();
+                    }, 500);
+                } else {
+                    // Si falla, mostramos un error y restauramos la tarjeta
+                    alert('Error: ' + (data.data.message || 'No se pudo mover el pedido.'));
+                    card.style.opacity = '1';
+                    moveBtn.disabled = false;
+                    moveBtn.textContent = 'Mover a Siguiente Sector';
+                }
+            })
+            .catch(error => {
+                console.error('Error de red:', error);
+                alert('Ocurrió un error de red. Inténtalo de nuevo.');
+                card.style.opacity = '1';
+                moveBtn.disabled = false;
+                moveBtn.textContent = 'Mover a Siguiente Sector';
+            });
+        }
+    });
+}
