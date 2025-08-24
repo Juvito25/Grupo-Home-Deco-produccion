@@ -20,7 +20,7 @@ if (!isset($args) || !is_array($args)) {
     <td><span class="ghd-tag <?php echo esc_attr($args['estado_class']); ?>"><?php echo esc_html($args['estado']); ?></span></td>
     <td><span class="ghd-tag <?php echo esc_attr($args['prioridad_class']); ?>"><?php echo esc_html($args['prioridad']); ?></span></td>
     <td><?php echo esc_html($args['sector_actual']); ?></td>
-    <td><?php echo esc_html($args['fecha_pedido']); ?></td>
+    <td><?php echo esc_html($args['fecha_del_pedido']); ?></td>
     <td class="actions-cell">
         <div class="actions-dropdown">
             <button class="ghd-btn-icon actions-toggle" data-order-id="<?php echo esc_attr($args['post_id']); ?>">

@@ -82,6 +82,7 @@ body {
     max-width: 1400px;
     margin-left: auto;
     margin-right: auto;
+    background-color: var(--color-fondo-app);
 }
 
 /* ==========================================================================
@@ -131,13 +132,81 @@ body {
 /* ==========================================================================
    4. SECCIONES ESPECÍFICAS
    ========================================================================== */
-/* Sidebar */
-.sidebar-header .logo { font-size: 1.5rem; font-weight: 700; color: var(--texto-claro); margin: 0 0 2rem 0; }
-.sidebar-nav ul { list-style: none; padding: 0; margin: 0; }
-.sidebar-nav li a { display: flex; align-items: center; padding: 0.75rem 1rem; border-radius: 6px; text-decoration: none; color: #a7a7a7; font-weight: 500; margin-bottom: 0.25rem; transition: all 0.2s ease; }
-.sidebar-nav li a i { width: 20px; margin-right: 12px; text-align: center; }
-.sidebar-nav li a:hover { background-color: rgba(255, 255, 255, 0.05); color: var(--texto-claro); }
-.sidebar-nav li.active a { background-color: var(--color-primario); color: white; }
+
+/* --- SIDEBAR (ESTRUCTURA FINAL CON WRAPPER INTERNO) --- */
+.ghd-sidebar {
+    width: 260px;
+    background-color: var(--texto-principal);
+    color: var(--texto-claro);
+    padding: 0; /* El padding ahora lo controla el wrapper */
+    display: flex; /* Asegura que el wrapper pueda crecer */
+    transition: transform 0.3s ease-in-out;
+    flex-shrink: 0;
+}
+
+.sidebar-content-wrapper {
+    width: 20%;
+    min-height: 100%;
+    max-height: 100%;
+    /*background-color: var(--color-primario);*/ 
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+}
+.sidebar-header{
+    padding: 5%;
+}
+.ghd-sidebar .sidebar-header {
+    margin-bottom: 2rem;
+    flex-shrink: 0; /* Evita que el header se encoja */
+}
+
+.ghd-sidebar .sidebar-header .logo {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--texto-claro);
+    margin: 0;
+    padding: 0;
+    line-height: 1.2;
+}
+
+.sidebar-nav {
+    flex-grow: 1; /* Permite que la navegación ocupe el espacio restante */
+}
+
+.sidebar-nav ul { 
+    list-style: none; 
+    padding: 0; 
+    margin: 0; 
+}
+
+.sidebar-nav li a { 
+    display: flex; 
+    align-items: center; 
+    padding: 0.75rem 1rem; 
+    border-radius: 6px; 
+    text-decoration: none; 
+    color: #a7a7a7; 
+    font-weight: 500; 
+    margin-bottom: 0.25rem; 
+    transition: all 0.2s ease; 
+}
+
+.sidebar-nav li a i { 
+    width: 20px; 
+    margin-right: 12px; 
+    text-align: center; 
+}
+
+.sidebar-nav li a:hover { 
+    background-color: rgba(255, 255, 255, 0.05); 
+    color: var(--texto-claro); 
+}
+
+.sidebar-nav li.active a { 
+    background-color: var(--color-primario); 
+    color: white; 
+}
 
 /* Encabezado Principal */
 .ghd-main-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; gap: 1rem; }
@@ -207,4 +276,145 @@ body {
     .ghd-filters { flex-direction: column; align-items: stretch; }
     .ghd-table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .ghd-table { min-width: 800px; }
+}
+
+/* ==========================================================================
+   NUEVO HEADER PROFESIONAL (V3)
+   ========================================================================== */
+.ghd-pro-header {
+    background-color: var(--color-fondo-claro);
+    padding: 0.75rem 2rem;
+    border-bottom: 1px solid var(--color-borde);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0; /* Evita que se encoja */
+}
+
+.header-logo-title {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.header-logo {
+    height: 40px;
+    width: auto;
+}
+
+.header-title-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.main-title {
+    font-weight: 600;
+    color: var(--texto-principal);
+}
+
+.sub-title {
+    font-size: 0.85rem;
+    color: var(--texto-secundario);
+}
+
+.header-user-profile {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.user-info {
+    display: flex;
+    flex-direction: column;
+    text-align: right;
+}
+
+.user-name {
+    font-weight: 600;
+}
+
+.user-role {
+    font-size: 0.85rem;
+    color: var(--texto-secundario);
+}
+
+.user-avatar img {
+    border-radius: 50%;
+}
+
+/* Ajuste responsive para el header */
+@media (max-width: 600px) {
+    .header-title-group, .user-info {
+        display: none; /* Ocultamos texto en pantallas muy pequeñas */
+    }
+}
+
+/* ==========================================================================
+   NUEVOS ESTILOS - FILTROS DEL PANEL DE ADMIN V2
+   ========================================================================== */
+
+/* Contenedor principal de los filtros */
+.ghd-filters-wrapper {
+    display: flex;
+    flex-wrap: wrap; /* Permite que los filtros salten a la siguiente línea en pantallas pequeñas */
+    gap: 1.5rem;
+    align-items: flex-end; /* Alinea los elementos por la parte inferior */
+    justify-content: space-between;
+    padding: 1.5rem;
+    background-color: var(--color-fondo-claro);
+    border-radius: 8px;
+    border: 1px solid var(--color-borde);
+    margin-bottom: 1.5rem;
+}
+
+/* Grupo para cada filtro (etiqueta + input) */
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 300px; 
+}
+
+.filter-group label {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--texto-secundario);
+}
+
+/* Estilo para los campos de input y select dentro de los filtros */
+.ghd-filters-wrapper input,
+.ghd-filters-wrapper select {
+    padding: 0.6rem;
+    border-radius: 6px;
+    border: 1px solid var(--color-borde);
+    background-color: var(--color-fondo-claro);
+    min-width: 180px; /* Ancho mínimo para los desplegables */
+}
+
+.ghd-filters-wrapper input[type="search"] {
+    flex-grow: 1; /* Permite que el campo de búsqueda crezca */
+    min-width: 250px;
+}
+
+/* Estilo específico para el botón de restablecer */
+.ghd-filters-wrapper .ghd-btn-icon {
+    height: 44.19px;
+    width: 44.19px;
+    border: 1px solid var(--color-borde);
+    border-radius: 6px;
+    color: var(--texto-secundario);
+    transition: all 0.2s ease;
+
+    /* --- LÍNEAS CORREGIDAS Y AÑADIDAS --- */
+    background-color: var(--color-fondo-claro); /* Fondo blanco como los otros campos */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0; /* Elimina el padding por defecto del botón */
+    font-size: 1rem; /* Ajusta el tamaño del icono si es necesario */
+    cursor: pointer;
+}
+.ghd-filters-wrapper .ghd-btn-icon:hover {
+    background-color: var(--color-fondo-app);
+    color: var(--texto-principal);
 }
