@@ -65,6 +65,12 @@ $sector_name = isset($role_to_sector_map[$user_role]) ? $role_to_sector_map[$use
                 </button>
                 <h2>Tareas de <?php echo esc_html($sector_name); ?></h2>
             </div>
+            <!-- BOTÓN DE REFRESCAR -->
+            <div class="header-actions">
+                <button id="ghd-refresh-tasks" class="ghd-btn ghd-btn-secondary">
+                    <i class="fa-solid fa-sync"></i> <span>Refrescar</span>
+                </button>
+            </div>
         </header>
 
         <div class="ghd-sector-tasks-grid">

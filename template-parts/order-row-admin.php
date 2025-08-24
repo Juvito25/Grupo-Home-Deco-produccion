@@ -16,7 +16,7 @@ if (!isset($args) || !is_array($args)) {
     <td><input type="checkbox"></td>
     <td><strong><?php echo esc_html($args['titulo']); ?></strong></td>
     <td><?php echo esc_html($args['nombre_cliente']); ?></td>
-    <td><?php echo esc_html($args['nombre_del_producto']); ?></td>
+    <td><?php echo esc_html($args['nombre_producto']); ?></td>
     <td><span class="ghd-tag <?php echo esc_attr($args['estado_class']); ?>"><?php echo esc_html($args['estado']); ?></span></td>
     <td><span class="ghd-tag <?php echo esc_attr($args['prioridad_class']); ?>"><?php echo esc_html($args['prioridad']); ?></span></td>
     <td><?php echo esc_html($args['sector_actual']); ?></td>
