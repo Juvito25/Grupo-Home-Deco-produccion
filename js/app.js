@@ -80,12 +80,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// --- LÓGICA PARA EL BOTÓN "MOVER A SIGUIENTE SECTOR" (PANEL SECTOR) ---
-const sectorGrid = document.querySelector('.ghd-sector-tasks-grid');
+// --- LÓGICA PARA EL BOTÓN "MOVER A SIGUIENTE SECTOR" (UNIVERSAL) ---
+// Esta lógica ahora funcionará tanto en el panel de sector como en la página de detalles.
+const mainContent = document.querySelector('.ghd-main-content');
 
-// Usamos delegación de eventos en el contenedor por si la lista se refresca con AJAX.
-if (sectorGrid) {
-    sectorGrid.addEventListener('click', function(e) {
+if (mainContent) {
+    mainContent.addEventListener('click', function(e) {
         const moveBtn = e.target.closest('.move-to-next-sector-btn');
         
         if (moveBtn) {
@@ -97,10 +97,10 @@ if (sectorGrid) {
 
             const orderId = moveBtn.dataset.orderId;
             const nonce = moveBtn.dataset.nonce;
-            const card = moveBtn.closest('.ghd-task-card');
+            const card = moveBtn.closest('.ghd-task-card') || moveBtn.closest('.ghd-card'); // Busca el contenedor padre
 
-            // Feedback visual inmediato
-            card.style.opacity = '0.5';
+            // Feedback visual
+            if (card) card.style.opacity = '0.5';
             moveBtn.disabled = true;
             moveBtn.textContent = 'Moviendo...';
 
@@ -117,27 +117,25 @@ if (sectorGrid) {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Si tiene éxito, eliminamos la tarjeta con una animación
-                    card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-                    card.style.opacity = '0';
-                    card.style.transform = 'scale(0.95)';
-                    setTimeout(() => {
-                        card.remove();
-                    }, 500);
+                    // Si tiene éxito, redirigimos o eliminamos la tarjeta
+                    if (card && card.classList.contains('ghd-task-card')) {
+                        card.remove(); // Si estamos en el panel de sector, eliminamos la tarjeta
+                    } else {
+                        alert('¡Pedido movido con éxito!');
+                        location.reload(); // Si estamos en la página de detalles, la recargamos
+                    }
                 } else {
-                    // Si falla, mostramos un error y restauramos la tarjeta
                     alert('Error: ' + (data.data.message || 'No se pudo mover el pedido.'));
-                    card.style.opacity = '1';
+                    if (card) card.style.opacity = '1';
                     moveBtn.disabled = false;
-                    moveBtn.textContent = 'Mover a Siguiente Sector';
+                    // (Aquí podrías restaurar el texto original del botón si quisieras)
                 }
             })
             .catch(error => {
                 console.error('Error de red:', error);
                 alert('Ocurrió un error de red. Inténtalo de nuevo.');
-                card.style.opacity = '1';
+                if (card) card.style.opacity = '1';
                 moveBtn.disabled = false;
-                moveBtn.textContent = 'Mover a Siguiente Sector';
             });
         }
     });
