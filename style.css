@@ -525,3 +525,13 @@ address { font-style: normal; line-height: 1.6; }
         font-size: 1.5rem;
     }
 }
+
+/* ==========================================================================
+   ESTILOS PARA PESTAÑAS (TABS)
+   ========================================================================== */
+.tab-content {
+    display: none; /* Oculta todos los paneles por defecto */
+}
+.tab-content.is-active {
+    display: block; /* Muestra solo el panel activo */
+}

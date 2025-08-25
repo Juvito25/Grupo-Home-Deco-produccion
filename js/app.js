@@ -193,3 +193,30 @@ if (searchFilter) { // Si los filtros existen, añadimos los listeners
         applyFilters();
     });
 }
+
+// --- LÓGICA PARA LAS PESTAÑAS EN LA PÁGINA DE DETALLES ---
+const orderNav = document.querySelector('.ghd-order-nav');
+
+if (orderNav) {
+    const tabLinks = orderNav.querySelectorAll('a');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    tabLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            const targetTabId = this.dataset.tab;
+
+            // Ocultar todas las pestañas y contenidos
+            tabLinks.forEach(item => item.classList.remove('active'));
+            tabContents.forEach(content => content.classList.remove('is-active'));
+
+            // Mostrar la pestaña y contenido seleccionados
+            this.classList.add('active');
+            const targetContent = document.getElementById('tab-content-' + targetTabId);
+            if (targetContent) {
+                targetContent.classList.add('is-active');
+            }
+        });
+    });
+}

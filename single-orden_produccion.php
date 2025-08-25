@@ -61,32 +61,60 @@ if (current_user_can('manage_options')) {
         </header>
 
         <nav class="ghd-order-nav">
-            <a href="#" class="active"><i class="fa-solid fa-user"></i> Customer Information</a>
-            <a href="#"><i class="fa-solid fa-box"></i> Product Specifications</a>
-            <a href="#"><i class="fa-solid fa-timeline"></i> Production Timeline</a>
+            <a href="#" class="active" data-tab="info-general"><i class="fa-solid fa-user"></i> Información General</a>
+            <a href="#" data-tab="linea-tiempo"><i class="fa-solid fa-timeline"></i> Línea de Tiempo</a>
+            <a href="#" data-tab="documentos"><i class="fa-solid fa-file-lines"></i> Documentos</a>
         </nav>
 
         <div class="ghd-order-details-grid">
             <!-- Columna Principal (Izquierda) -->
+            <!-- INICIO DEL BLOQUE COMPLETO Y FINAL PARA LA COLUMNA PRINCIPAL -->
             <div class="order-details-main">
-                <div class="ghd-card">
-                    <div class="card-split-content">
-                        <div class="customer-details">
-                            <h3 class="card-section-title">Detalles del Cliente</h3>
-                            <?php echo get_avatar(get_field('cliente_email'), 64); ?>
-                            <p class="customer-name"><?php echo esc_html(get_field('nombre_cliente')); ?></p>
-                            <p><strong>Email:</strong> <?php echo esc_html(get_field('cliente_email')); ?></p>
-                            <p><strong>Teléfono:</strong> <?php echo esc_html(get_field('cliente_telefono')); ?></p>
-                            <p><strong>ID Cliente:</strong> <?php echo esc_html(get_field('id_de_cliente')); ?></p>
-                        </div>
-                        <div class="delivery-address">
-                            <h3 class="card-section-title">Dirección de Entrega</h3>
-                            <address><?php echo nl2br(esc_html(get_field('direccion_de_entrega'))); ?></address>
-                            <p><strong>Instrucciones:</strong> <?php echo esc_html(get_field('instrucciones_de_entrega')); ?></p>
+
+                <!-- Panel 1: Información General (Visible por defecto) -->
+                <div id="tab-content-info-general" class="tab-content is-active">
+                    <div class="ghd-card">
+                        <div class="card-split-content">
+                            <div class="customer-details">
+                                <h3 class="card-section-title">Detalles del Cliente</h3>
+                                <?php 
+                                $cliente_email = get_field('cliente_email');
+                                if ($cliente_email) {
+                                    echo get_avatar($cliente_email, 64); 
+                                }
+                                ?>
+                                <p class="customer-name"><?php echo esc_html(get_field('nombre_cliente')); ?></p>
+                                <p><strong>Email:</strong> <?php echo esc_html($cliente_email); ?></p>
+                                <p><strong>Teléfono:</strong> <?php echo esc_html(get_field('cliente_telefono')); ?></p>
+                                <p><strong>ID Cliente:</strong> <?php echo esc_html(get_field('id_de_cliente')); ?></p>
+                            </div>
+                            <div class="delivery-address">
+                                <h3 class="card-section-title">Dirección de Entrega</h3>
+                                <address><?php echo nl2br(esc_html(get_field('direccion_de_entrega'))); ?></address>
+                                <p><strong>Instrucciones:</strong> <?php echo esc_html(get_field('instrucciones_de_entrega')); ?></p>
+                            </div>
                         </div>
                     </div>
                 </div>
+
+                <!-- Panel 2: Línea de Tiempo (Oculto por defecto) -->
+                <div id="tab-content-linea-tiempo" class="tab-content">
+                    <div class="ghd-card">
+                        <h3 class="card-section-title">Historial de Producción</h3>
+                        <p><em>(Funcionalidad futura: Aquí se mostrará el historial de paso por cada sector.)</em></p>
+                    </div>
+                </div>
+
+                <!-- Panel 3: Documentos (Oculto por defecto) -->
+                <div id="tab-content-documentos" class="tab-content">
+                    <div class="ghd-card">
+                        <h3 class="card-section-title">Documentos Adjuntos</h3>
+                        <p><em>(Funcionalidad futura: Aquí se podrán ver los remitos generados y otros archivos.)</em></p>
+                    </div>
+                </div>
+
             </div>
+            <!-- FIN DEL BLOQUE COMPLETO -->
 
             <!-- Columna Lateral (Derecha) -->
             <div class="order-details-sidebar">
