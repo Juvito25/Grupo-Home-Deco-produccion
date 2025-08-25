@@ -1,7 +1,7 @@
 <?php
 /**
  * El header para nuestro tema.
- * Versión V2 con cabecera profesional.
+ * Versión V2.1 con lógica condicional para mostrarse solo en la aplicación.
  */
 ?>
 <!doctype html>
@@ -14,15 +14,20 @@
 <body <?php body_class(); ?>>
 <?php wp_body_open(); ?>
 
-<!-- INICIO DE LA NUEVA CABECERA PROFESIONAL -->
+<?php
+// --- LÓGICA CONDICIONAL ---
+// Comprobamos si la página actual es una de nuestras plantillas de la aplicación.
+if ( is_page_template('template-admin-dashboard.php') || is_page_template('template-sector-dashboard.php') || is_singular('orden_produccion') ) :
+?>
+
+<!-- INICIO DE LA CABECERA PROFESIONAL (SOLO PARA LA APP) -->
 <header class="ghd-pro-header">
     <div class="header-logo-title">
         <img src="<?php echo get_stylesheet_directory_uri(); ?>/img/logo.png" alt="Logo Grupo Home Deco" class="header-logo">
         <div class="header-title-group">
             <span class="main-title">Gestor de Flujo de Producción</span>
             <?php 
-            // Lógica para mostrar el subtítulo correcto según la página
-            $sub_title = 'Panel de Control'; // Por defecto
+            $sub_title = 'Panel de Control';
             if (is_page_template('template-sector-dashboard.php')) {
                 $current_user = wp_get_current_user();
                 $user_roles = $current_user->roles;
@@ -52,4 +57,8 @@
         <?php endif; ?>
     </div>
 </header>
-<!-- FIN DE LA NUEVA CABECERA PROFESIONAL -->
+<!-- FIN DE LA CABECERA PROFESIONAL -->
+
+<?php 
+endif; // Fin de la condición
+?>

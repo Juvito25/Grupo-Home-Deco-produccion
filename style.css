@@ -289,6 +289,9 @@ body {
     justify-content: space-between;
     align-items: center;
     flex-shrink: 0; /* Evita que se encoja */
+    position: sticky;
+    top: 33px;
+    z-index: 1010; /* Un z-index alto para que esté por encima de todo */
 }
 
 .header-logo-title {
