@@ -421,3 +421,86 @@ body {
     background-color: var(--color-fondo-app);
     color: var(--texto-principal);
 }
+
+/* ==========================================================================
+   NUEVOS ESTILOS - PÁGINA DE DETALLES V2
+   ========================================================================== */
+
+.ghd-order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+.ghd-order-header h1 {
+    margin: 0;
+    font-size: 1.8rem;
+}
+.order-header-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.ghd-order-nav {
+    display: flex;
+    gap: 1.5rem;
+    border-bottom: 1px solid var(--color-borde);
+    margin-bottom: 1.5rem;
+}
+.ghd-order-nav a {
+    padding: 0.75rem 0.25rem;
+    text-decoration: none;
+    color: var(--texto-secundario);
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+}
+.ghd-order-nav a.active, .ghd-order-nav a:hover {
+    color: var(--color-primario);
+    border-bottom-color: var(--color-primario);
+}
+
+.ghd-order-details-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 1.5rem;
+    align-items: flex-start;
+}
+
+.order-details-main {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.order-details-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.card-section-title {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-borde);
+    font-size: 1.1rem;
+}
+
+.quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+.quick-actions .ghd-btn {
+    width: 100%;
+}
+
+/* Responsive para la página de detalles */
+@media (max-width: 900px) {
+    .ghd-order-details-grid {
+        grid-template-columns: 1fr;
+    }
+}
