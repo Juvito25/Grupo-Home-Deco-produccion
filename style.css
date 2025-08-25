@@ -145,7 +145,7 @@ body {
 }
 
 .sidebar-content-wrapper {
-    width: 20%;
+    width: auto;
     min-height: 100%;
     max-height: 100%;
     /*background-color: var(--color-primario);*/ 

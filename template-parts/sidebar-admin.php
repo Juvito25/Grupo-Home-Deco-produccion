@@ -27,6 +27,8 @@ if (!empty($admin_pages)) {
         <li><a href="#"><i class="fa-solid fa-users"></i> <span>Clientes</span></a></li>
         <li><a href="#"><i class="fa-solid fa-chart-pie"></i> <span>Reportes</span></a></li>
         <li><a href="#"><i class="fa-solid fa-gear"></i> <span>Configuración</span></a></li>
+        
+        <!-- LÍNEA CORREGIDA: Añadida la etiqueta <a> de apertura -->
         <li><a href="<?php echo wp_logout_url(home_url()); ?>"><i class="fa-solid fa-sign-out-alt"></i> <span>Cerrar Sesión</span></a></li>
     </ul>
 </nav>
