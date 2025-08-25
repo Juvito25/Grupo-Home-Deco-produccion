@@ -148,13 +148,14 @@ body {
     width: auto;
     min-height: 100%;
     max-height: 100%;
-    /*background-color: var(--color-primario);*/ 
+    background-color: var(--texto-principal); 
     padding: 1.5rem;
     display: flex;
     flex-direction: column;
 }
 .sidebar-header{
     padding: 5%;
+    color: var(--texto-claro)
 }
 .ghd-sidebar .sidebar-header {
     margin-bottom: 2rem;
@@ -502,5 +503,73 @@ body {
 @media (max-width: 900px) {
     .ghd-order-details-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+/* ==========================================================================
+   ESTILOS PARA KPIs DEL PANEL DE SECTOR
+   ========================================================================== */
+
+.ghd-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.ghd-kpi-card {
+    background-color: var(--color-fondo-claro);
+    border-radius: 8px;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid var(--color-borde);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.kpi-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    color: white;
+    flex-shrink: 0;
+}
+.kpi-icon.icon-blue { background-color: #3b82f6; }
+.kpi-icon.icon-red { background-color: #ef4444; }
+.kpi-icon.icon-green { background-color: #22c55e; }
+.kpi-icon.icon-yellow { background-color: #f59e0b; }
+
+.kpi-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.kpi-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--texto-principal);
+}
+
+.kpi-label {
+    font-size: 0.9rem;
+    color: var(--texto-secundario);
+}
+
+/* Pequeño ajuste responsive para los KPIs */
+@media (max-width: 480px) {
+    .ghd-kpi-grid {
+        grid-template-columns: 1fr 1fr; /* Dos columnas en móviles pequeños */
+    }
+    .ghd-kpi-card {
+        padding: 1rem;
+    }
+    .kpi-value {
+        font-size: 1.5rem;
     }
 }
