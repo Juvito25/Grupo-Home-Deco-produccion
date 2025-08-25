@@ -42,7 +42,21 @@ if (current_user_can('manage_options')) {
             </div>
             <div class="header-actions">
                 <button class="ghd-btn ghd-btn-secondary"><i class="fa-solid fa-pen"></i> Editar Pedido</button>
-                <button class="ghd-btn ghd-btn-primary"><i class="fa-solid fa-file-invoice"></i> Generar Factura</button>
+                
+                <?php
+                // --- LÓGICA CONDICIONAL PARA MOSTRAR EL BOTÓN DE REMITO ---
+                $sector_actual = get_field('sector_actual', get_the_ID());
+                $sectores_permitidos = array('Tapicería', 'Logística');
+
+                // Mostramos el botón si el usuario es admin O si el pedido está en un sector permitido.
+                if (current_user_can('manage_options') || in_array($sector_actual, $sectores_permitidos)) :
+                ?>
+                    <a href="<?php echo get_stylesheet_directory_uri(); ?>/generar-remito.php?pedido_id=<?php echo get_the_ID(); ?>" 
+                    class="ghd-btn ghd-btn-primary" 
+                    target="_blank">
+                    <i class="fa-solid fa-file-pdf"></i> Generar Remito
+                    </a>
+                <?php endif; ?>
             </div>
         </header>
 

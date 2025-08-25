@@ -114,7 +114,7 @@ body {
 }
 .ghd-btn i { margin-right: 8px; }
 .ghd-btn-primary { background-color: var(--color-primario); color: white; }
-.ghd-btn-primary:hover { background-color: var(--color-primario-hover); }
+.ghd-btn-primary:hover { background-color: var(--color-primario-hover); color: var(--texto-claro)}
 .ghd-btn-secondary { background-color: var(--color-fondo-claro); color: var(--texto-principal); border: 1px solid var(--color-borde); }
 .ghd-btn-secondary:hover { background-color: var(--color-fondo); color: var(--texto-secundario)}
 .ghd-btn-tertiary { background-color: transparent; color: var(--texto-secundario); }
