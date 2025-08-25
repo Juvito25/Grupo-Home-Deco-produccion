@@ -95,7 +95,25 @@ $completadas_hoy = 0; // Mantenemos este como estático por ahora
                 </div>
                 <div class="card-footer">
                     <a href="<?php the_permalink(); ?>" class="ghd-btn ghd-btn-secondary">Detalles</a>
-                    <button class="ghd-btn ghd-btn-primary move-to-next-sector-btn" data-order-id="<?php echo get_the_ID(); ?>" data-nonce="<?php echo wp_create_nonce('ghd-ajax-nonce'); ?>">Mover</button>
+                    
+                    <?php
+                    // --- LÓGICA CONDICIONAL PARA MOSTRAR EL BOTÓN DE REMITO ---
+                    $sector_actual_tarjeta = get_field('sector_actual', get_the_ID());
+                    $sectores_permitidos_tarjeta = array('Tapicería', 'Logística');
+
+                    // Mostramos el botón de Remito si el pedido está en un sector permitido.
+                    if (in_array($sector_actual_tarjeta, $sectores_permitidos_tarjeta)) :
+                    ?>
+                        <a href="<?php echo get_stylesheet_directory_uri(); ?>/generar-remito.php?pedido_id=<?php echo get_the_ID(); ?>" 
+                        class="ghd-btn ghd-btn-secondary" 
+                        target="_blank">
+                        Generar Remito
+                        </a>
+                    <?php endif; ?>
+
+                    <button class="ghd-btn ghd-btn-primary move-to-next-sector-btn" data-order-id="<?php echo get_the_ID(); ?>" data-nonce="<?php echo wp_create_nonce('ghd_move_order_nonce'); ?>">
+                        Mover
+                    </button>
                 </div>
             </div>
             <?php endwhile; else: echo '<p>No tienes tareas asignadas.</p>'; endif; wp_reset_postdata(); ?>
