@@ -116,9 +116,9 @@ body {
 .ghd-btn-primary { background-color: var(--color-primario); color: white; }
 .ghd-btn-primary:hover { background-color: var(--color-primario-hover); }
 .ghd-btn-secondary { background-color: var(--color-fondo-claro); color: var(--texto-principal); border: 1px solid var(--color-borde); }
-.ghd-btn-secondary:hover { background-color: var(--color-fondo); }
+.ghd-btn-secondary:hover { background-color: var(--color-fondo); color: var(--texto-secundario)}
 .ghd-btn-tertiary { background-color: transparent; color: var(--texto-secundario); }
-.ghd-btn-tertiary:hover { background-color: var(--color-fondo); }
+.ghd-btn-tertiary:hover { background-color: var(--color-amarillo); color: var(--texto-claro)}
 .ghd-btn-icon { background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--texto-secundario); }
 
 /* Etiquetas (Tags) */
@@ -428,84 +428,36 @@ body {
    ========================================================================== */
 
 .ghd-order-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
-    gap: 1rem;
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;
 }
-.ghd-order-header h1 {
-    margin: 0;
-    font-size: 1.8rem;
-}
-.order-header-info {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
+.ghd-order-header h1 { margin: 0; font-size: 1.8rem; }
+.order-header-info { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.order-meta-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--texto-secundario); }
 
-.ghd-order-nav {
-    display: flex;
-    gap: 1.5rem;
-    border-bottom: 1px solid var(--color-borde);
-    margin-bottom: 1.5rem;
-}
-.ghd-order-nav a {
-    padding: 0.75rem 0.25rem;
-    text-decoration: none;
-    color: var(--texto-secundario);
-    font-weight: 500;
-    border-bottom: 2px solid transparent;
-}
-.ghd-order-nav a.active, .ghd-order-nav a:hover {
-    color: var(--color-primario);
-    border-bottom-color: var(--color-primario);
-}
+.ghd-order-nav { display: flex; gap: 1.5rem; border-bottom: 1px solid var(--color-borde); margin-bottom: 1.5rem; }
+.ghd-order-nav a { padding: 0.75rem 0.25rem; text-decoration: none; color: var(--texto-secundario); font-weight: 500; border-bottom: 2px solid transparent; display: flex; align-items: center; gap: 0.5rem; }
+.ghd-order-nav a.active, .ghd-order-nav a:hover { color: var(--color-primario); border-bottom-color: var(--color-primario); }
 
-.ghd-order-details-grid {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 1.5rem;
-    align-items: flex-start;
-}
+.ghd-order-details-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; align-items: flex-start; }
+.order-details-main { display: flex; flex-direction: column; gap: 1.5rem; }
+.order-details-sidebar { display: flex; flex-direction: column; gap: 1.5rem; }
+.card-section-title { margin-top: 0; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--color-borde); font-size: 1.1rem; }
 
-.order-details-main {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
+.card-split-content { display: flex; gap: 2rem; }
+.customer-details, .delivery-address { flex: 1; }
+.customer-details img { border-radius: 50%; margin-bottom: 1rem; }
+.customer-name { font-size: 1.2rem; font-weight: 600; margin: 0 0 0.5rem; }
+address { font-style: normal; line-height: 1.6; }
 
-.order-details-sidebar {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
+.summary-item { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
 
-.card-section-title {
-    margin-top: 0;
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--color-borde);
-    font-size: 1.1rem;
-}
-
-.quick-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-.quick-actions .ghd-btn {
-    width: 100%;
-}
-
-/* Responsive para la página de detalles */
 @media (max-width: 900px) {
-    .ghd-order-details-grid {
-        grid-template-columns: 1fr;
-    }
+    .ghd-order-details-grid { grid-template-columns: 1fr; }
 }
-
+@media (max-width: 768px) {
+    .card-split-content { flex-direction: column; }
+}
 /* ==========================================================================
    ESTILOS PARA KPIs DEL PANEL DE SECTOR
    ========================================================================== */
