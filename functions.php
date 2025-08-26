@@ -92,38 +92,83 @@ add_action('wp_ajax_ghd_move_to_next_sector', function() {
     }
 });
 
-add_action('wp_ajax_ghd_refresh_tasks', function() {
-    check_ajax_referer('ghd-ajax-nonce', 'nonce'); if (!current_user_can('read')) wp_send_json_error();
-    $user = wp_get_current_user(); $role = $user->roles[0] ?? '';
-    // CORRECCIÓN CLAVE 2: Usamos el mapa de roles para obtener el nombre correcto del sector con acento.
+// --- REEMPLAZA ESTA FUNCIÓN COMPLETA EN TU functions.php ---
+
+add_action('wp_ajax_ghd_refresh_tasks', 'ghd_refresh_tasks_callback');
+function ghd_refresh_tasks_callback() {
+    // Seguridad
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+    if (!current_user_can('read')) {
+        wp_send_json_error();
+    }
+
+    // Obtener datos del usuario actual para filtrar
+    $user = wp_get_current_user();
+    $role = $user->roles[0] ?? '';
     $role_to_sector_map = ['rol_carpinteria' => 'Carpintería', 'rol_costura' => 'Costura', 'rol_tapiceria' => 'Tapicería', 'rol_logistica' => 'Logística'];
     $sector = $role_to_sector_map[$role] ?? '';
-    if (empty($sector)) { wp_send_json_error(); }
 
-    $query = new WP_Query(['post_type' => 'orden_produccion', 'posts_per_page' => -1, 'meta_query' => [['key' => 'sector_actual', 'value' => $sector]]]);
-    ob_start();
+    if (empty($sector)) {
+        wp_send_json_error();
+    }
+
+    // Ejecutar la misma consulta que en la plantilla
+    $query = new WP_Query([
+        'post_type' => 'orden_produccion',
+        'posts_per_page' => -1,
+        'meta_query' => [['key' => 'sector_actual', 'value' => $sector]]
+    ]);
+
+    ob_start(); // Iniciar captura de HTML
+
     if ($query->have_posts()) {
         while ($query->have_posts()) {
             $query->the_post();
-            $p = get_field('prioridad_pedido'); $pc = ($p == 'Alta') ? 'tag-red' : (($p == 'Media') ? 'tag-yellow' : 'tag-green');
+            $p = get_field('prioridad_pedido');
+            $pc = ($p == 'Alta') ? 'tag-red' : (($p == 'Media') ? 'tag-yellow' : 'tag-green');
             ?>
             <div class="ghd-task-card" id="order-<?php echo get_the_ID(); ?>">
-                <div class="card-header"><h3><?php the_title(); ?></h3><span class="ghd-tag <?php echo $pc; ?>"><?php echo esc_html($p); ?></span></div>
+                <div class="card-header">
+                    <h3><?php the_title(); ?></h3>
+                    <span class="ghd-tag <?php echo $pc; ?>"><?php echo esc_html($p); ?></span>
+                </div>
                 <div class="card-body">
                     <p><strong>Cliente:</strong> <?php echo esc_html(get_field('nombre_cliente')); ?></p>
                     <p><strong>Producto:</strong> <?php echo esc_html(get_field('nombre_producto')); ?></p>
                 </div>
                 <div class="card-footer">
                     <a href="<?php the_permalink(); ?>" class="ghd-btn ghd-btn-secondary">Detalles</a>
-                    <button class="ghd-btn ghd-btn-primary move-to-next-sector-btn" data-order-id="<?php echo get_the_ID(); ?>" data-nonce="<?php echo wp_create_nonce('ghd_move_order_nonce'); ?>">Mover</button>
+                    
+                    <?php
+                    // --- LÓGICA CORREGIDA Y AÑADIDA AQUÍ ---
+                    // Añadimos la misma comprobación que en la plantilla principal.
+                    $sector_actual_tarjeta = get_field('sector_actual', get_the_ID());
+                    $sectores_permitidos_tarjeta = array('Tapicería', 'Logística');
+
+                    if (in_array($sector_actual_tarjeta, $sectores_permitidos_tarjeta)) :
+                    ?>
+                        <a href="<?php echo get_stylesheet_directory_uri(); ?>/generar-remito.php?pedido_id=<?php echo get_the_ID(); ?>" 
+                           class="ghd-btn ghd-btn-secondary" 
+                           target="_blank">
+                           Generar Remito
+                        </a>
+                    <?php endif; ?>
+
+                    <button class="ghd-btn ghd-btn-primary move-to-next-sector-btn" data-order-id="<?php echo get_the_ID(); ?>" data-nonce="<?php echo wp_create_nonce('ghd_move_order_nonce'); ?>">
+                        Mover
+                    </button>
                 </div>
             </div>
             <?php
         }
-    } else { echo '<p>No tienes tareas asignadas.</p>'; }
+    } else {
+        echo '<p>No tienes tareas asignadas.</p>';
+    }
     wp_reset_postdata();
+
+    // Enviar el HTML capturado de vuelta al navegador
     wp_send_json_success(['html' => ob_get_clean()]);
-});
+}
 
 // --- MANEJADOR AJAX PARA FILTRAR PEDIDOS EN EL PANEL DE ADMIN ---
 
