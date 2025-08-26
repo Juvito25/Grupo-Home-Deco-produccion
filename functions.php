@@ -249,3 +249,42 @@ function ghd_registrar_cpt_historial() {
     );
     register_post_type('ghd_historial', $args);
 }
+
+// --- LÓGICA PARA UNA EXPERIENCIA DE LOGIN/LOGOUT PERSONALIZADA ---
+
+// 1. Ocultar la barra de admin para todos excepto los administradores.
+add_action('after_setup_theme', 'ghd_hide_admin_bar');
+function ghd_hide_admin_bar() {
+    if (!current_user_can('manage_options')) {
+        show_admin_bar(false);
+    }
+}
+
+// 2. Redirigir todas las peticiones de login a nuestra página personalizada.
+add_filter('login_url', 'ghd_custom_login_url', 10, 3);
+function ghd_custom_login_url($login_url, $redirect, $force_reauth) {
+    return home_url('/iniciar-sesion/?redirect_to=' . $redirect);
+}
+
+// 3. Si el login falla, redirigir de vuelta a nuestra página con un error.
+add_action('wp_login_failed', 'ghd_login_fail_redirect');
+function ghd_login_fail_redirect($username) {
+    $referrer = $_SERVER['HTTP_REFERER'];
+    if (!empty($referrer) && !strstr($referrer, 'wp-login') && !strstr($referrer, 'wp-admin')) {
+        wp_redirect(home_url('/iniciar-sesion/?login=failed'));
+        exit;
+    }
+}
+
+// 4. Redirigir al usuario al panel correcto DESPUÉS de iniciar sesión.
+add_filter('login_redirect', 'ghd_custom_login_redirect', 10, 3);
+function ghd_custom_login_redirect($redirect_to, $request, $user) {
+    if (isset($user->roles) && is_array($user->roles)) {
+        if (in_array('administrator', $user->roles)) {
+            return home_url('/panel-de-control/');
+        } else {
+            return home_url('/mis-tareas/');
+        }
+    }
+    return $redirect_to;
+}
