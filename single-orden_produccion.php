@@ -101,10 +101,41 @@ if (current_user_can('manage_options')) {
                 <div id="tab-content-linea-tiempo" class="tab-content">
                     <div class="ghd-card">
                         <h3 class="card-section-title">Historial de Producción</h3>
-                        <p><em>(Funcionalidad futura: Aquí se mostrará el historial de paso por cada sector.)</em></p>
+                        
+                        <?php
+                        // Hacemos una consulta para buscar todos los "posts" de historial
+                        // que estén vinculados a esta orden de producción.
+                        $historial_query = new WP_Query(array(
+                            'post_type' => 'ghd_historial',
+                            'posts_per_page' => -1,
+                            'orderby' => 'date',
+                            'order' => 'ASC', // Del más antiguo al más nuevo
+                            'meta_query' => array(
+                                array(
+                                    'key' => '_orden_produccion_id',
+                                    'value' => get_the_ID(),
+                                )
+                            )
+                        ));
+
+                        if ($historial_query->have_posts()) : ?>
+                            <ul class="production-timeline">
+                                <?php while ($historial_query->have_posts()) : $historial_query->the_post(); ?>
+                                    <li>
+                                        <div class="timeline-dot"></div>
+                                        <div class="timeline-content">
+                                            <span class="timeline-title"><?php the_title(); ?></span>
+                                            <span class="timeline-date"><?php echo get_the_date('d/m/Y H:i'); ?></span>
+                                        </div>
+                                    </li>
+                                <?php endwhile; ?>
+                            </ul>
+                        <?php else : ?>
+                            <p>Aún no hay eventos en el historial de este pedido.</p>
+                        <?php endif; wp_reset_postdata(); ?>
+
                     </div>
                 </div>
-
                 <!-- Panel 3: Documentos (Oculto por defecto) -->
                 <div id="tab-content-documentos" class="tab-content">
                     <div class="ghd-card">
