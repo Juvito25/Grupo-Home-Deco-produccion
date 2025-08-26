@@ -15,7 +15,7 @@ if (!empty($admin_pages)) {
     $admin_dashboard_url = get_permalink($admin_pages[0]);
 }
 ?>
-
+<div class="sidebar-content-wrapper">
 <div class="sidebar-header">
     <h1 class="logo">Gestor de Producción</h1>
 </div>
@@ -32,3 +32,4 @@ if (!empty($admin_pages)) {
         <li><a href="<?php echo wp_logout_url(home_url()); ?>"><i class="fa-solid fa-sign-out-alt"></i> <span>Cerrar Sesión</span></a></li>
     </ul>
 </nav>
+</div>

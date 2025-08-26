@@ -126,7 +126,6 @@ add_action('wp_ajax_ghd_refresh_tasks', function() {
 });
 
 // --- MANEJADOR AJAX PARA FILTRAR PEDIDOS EN EL PANEL DE ADMIN ---
-// --- REEMPLAZA ESTA FUNCIÓN COMPLETA EN TU functions.php ---
 
 add_action('wp_ajax_ghd_filter_orders', 'ghd_filter_orders_callback');
 function ghd_filter_orders_callback() {

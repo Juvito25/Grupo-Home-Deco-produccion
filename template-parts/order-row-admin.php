@@ -22,8 +22,19 @@ if (!isset($args) || !is_array($args)) {
     <td><?php echo esc_html($args['sector_actual']); ?></td>
     <td><?php echo esc_html($args['fecha_del_pedido']); ?></td>
     <td class="actions-cell">
+        <!-- Botón para Ver Detalles -->
+        <a href="<?php echo get_permalink($args['post_id']); ?>" class="ghd-btn-icon" title="Ver Detalles del Pedido">
+            <i class="fa-solid fa-eye"></i>
+        </a>
+        
+        <!-- Botón para Generar Remito -->
+        <a href="<?php echo get_stylesheet_directory_uri(); ?>/generar-remito.php?pedido_id=<?php echo esc_attr($args['post_id']); ?>" class="ghd-btn-icon" title="Generar Remito" target="_blank">
+            <i class="fa-solid fa-file-pdf"></i>
+        </a>
+
+        <!-- Menú desplegable existente -->
         <div class="actions-dropdown">
-            <button class="ghd-btn-icon actions-toggle" data-order-id="<?php echo esc_attr($args['post_id']); ?>">
+            <button class="ghd-btn-icon actions-toggle" data-order-id="<?php echo esc_attr($args['post_id']); ?>" title="Más acciones">
                 <i class="fa-solid fa-ellipsis-vertical"></i>
             </button>
             <div class="actions-menu">
