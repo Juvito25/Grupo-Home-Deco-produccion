@@ -34,21 +34,62 @@ function ghd_prepare_order_row_data($post_id) {
 }
 
 // --- 3. LÓGICA AJAX ---
+// --- REEMPLAZA ESTA FUNCIÓN COMPLETA ---
 add_action('wp_ajax_ghd_update_order', function() {
-    check_ajax_referer('ghd-ajax-nonce', 'nonce'); if (!current_user_can('edit_posts')) wp_send_json_error();
-    $id = intval($_POST['order_id']); $field = sanitize_key($_POST['field']); $value = sanitize_text_field($_POST['value']);
-    update_field($field, $value, $id); if ($field === 'sector_actual') update_field('estado_pedido', $value, $id);
-    ob_start(); get_template_part('template-parts/order-row-admin', null, ghd_prepare_order_row_data($id));
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+    if (!current_user_can('edit_posts')) { wp_send_json_error(); }
+
+    $id = intval($_POST['order_id']);
+    $field = sanitize_key($_POST['field']);
+    $value = sanitize_text_field($_POST['value']);
+
+    update_field($field, $value, $id);
+    if ($field === 'sector_actual') {
+        update_field('estado_pedido', $value, $id);
+
+        // --- LÓGICA NUEVA: Crear un post de historial ---
+        $historial_post_id = wp_insert_post(array(
+            'post_title'   => 'Asignado a: ' . $value,
+            'post_type'    => 'ghd_historial',
+            'post_status'  => 'publish',
+        ));
+        // Vinculamos el evento de historial con la orden de producción
+        if ($historial_post_id) {
+            add_post_meta($historial_post_id, '_orden_produccion_id', $id);
+        }
+    }
+    
+    ob_start();
+    get_template_part('template-parts/order-row-admin', null, ghd_prepare_order_row_data($id));
     wp_send_json_success(['html' => ob_get_clean()]);
 });
 
 add_action('wp_ajax_ghd_move_to_next_sector', function() {
-    // CORRECCIÓN CLAVE 1: El nonce que verificamos debe ser el específico de esta acción.
-    check_ajax_referer('ghd_move_order_nonce', 'nonce'); 
-    if (!current_user_can('read')) wp_send_json_error();
-    $id = intval($_POST['order_id']); $next = ghd_get_next_sector(get_field('sector_actual', $id));
-    if ($next) { update_field('sector_actual', $next, $id); update_field('estado_pedido', $next, $id); wp_send_json_success(['message' => 'Pedido movido.']); } 
-    else { wp_send_json_error(['message' => 'No se pudo mover el pedido.']); }
+    check_ajax_referer('ghd_move_order_nonce', 'nonce');
+    if (!current_user_can('read')) { wp_send_json_error(); }
+
+    $id = intval($_POST['order_id']);
+    $next = ghd_get_next_sector(get_field('sector_actual', $id));
+
+    if ($next) {
+        update_field('sector_actual', $next, $id);
+        update_field('estado_pedido', $next, $id);
+
+        // --- LÓGICA NUEVA: Crear un post de historial ---
+        $historial_post_id = wp_insert_post(array(
+            'post_title'   => 'Movido a: ' . $next,
+            'post_type'    => 'ghd_historial',
+            'post_status'  => 'publish',
+        ));
+        // Vinculamos el evento de historial con la orden de producción
+        if ($historial_post_id) {
+            add_post_meta($historial_post_id, '_orden_produccion_id', $id);
+        }
+
+        wp_send_json_success(['message' => 'Pedido movido.']);
+    } else {
+        wp_send_json_error(['message' => 'No se pudo mover el pedido.']);
+    }
 });
 
 add_action('wp_ajax_ghd_refresh_tasks', function() {
@@ -147,4 +188,20 @@ function ghd_filter_orders_callback() {
     wp_reset_postdata();
     
     wp_send_json_success(array('html' => ob_get_clean()));
+}
+
+// --- REGISTRO DEL CUSTOM POST TYPE PARA EL HISTORIAL DE PRODUCCIÓN ---
+add_action('init', 'ghd_registrar_cpt_historial');
+function ghd_registrar_cpt_historial() {
+    $args = array(
+        'labels'        => array('name' => 'Historial de Producción'),
+        'public'        => false, // No es visible en el frontend del sitio
+        'publicly_queryable' => false,
+        'show_ui'       => true,  // Sí lo queremos ver en el panel de admin
+        'show_in_menu'  => 'edit.php?post_type=orden_produccion', // Lo anidamos bajo "Órdenes de Producción"
+        'supports'      => array('title', 'editor'), // Usaremos el título para el evento y el editor para notas
+        'capability_type' => 'post',
+        'rewrite'       => false,
+    );
+    register_post_type('ghd_historial', $args);
 }
