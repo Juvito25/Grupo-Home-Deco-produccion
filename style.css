@@ -291,7 +291,7 @@ body {
     align-items: center;
     flex-shrink: 0; /* Evita que se encoja */
     position: sticky;
-    top: 33px;
+    top: 0;
     z-index: 1010; /* Un z-index alto para que esté por encima de todo */
 }
 
@@ -564,3 +564,43 @@ address { font-style: normal; line-height: 1.6; }
     border-color: var(--color-borde);
     color: var(--texto-principal);
 }
+
+/* ==========================================================================
+   ESTILOS PARA LA PÁGINA DE LOGIN PERSONALIZADA
+   ========================================================================== */
+.ghd-login-page {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--color-fondo-app);
+}
+.ghd-login-box {
+    background-color: var(--color-fondo-claro);
+    padding: 2.5rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+}
+.login-title { margin: 0 0 0.5rem; font-size: 1.5rem; }
+.login-subtitle { margin: 0 0 1.5rem; color: var(--texto-secundario); }
+.login-error { background-color: #fff5f5; color: #c53030; border: 1px solid #fc8181; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; }
+
+/* Estilos para el formulario de wp_login_form */
+.ghd-login-box #loginform p { display: flex; flex-direction: column; text-align: left; }
+.ghd-login-box #loginform label { font-weight: 500; margin-bottom: 0.5rem; }
+.ghd-login-box #loginform input[type="text"],
+.ghd-login-box #loginform input[type="password"] {
+    padding: 0.75rem; border: 1px solid var(--color-borde); border-radius: 6px;
+}
+.ghd-login-box #loginform .login-remember { margin-top: 1rem; }
+.ghd-login-box #loginform .login-remember label { flex-direction: row; align-items: center; }
+.ghd-login-box #loginform input[type="submit"] {
+    width: 100%; margin-top: 1.5rem; padding: 0.75rem; border: none; border-radius: 6px;
+    background-color: var(--color-primario); color: white; font-weight: 600; cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+.ghd-login-box #loginform input[type="submit"]:hover { background-color: var(--color-primario-hover); }
