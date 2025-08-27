@@ -10,7 +10,7 @@ if (!is_user_logged_in()) {
 }
 // Un usuario que no es administrador NO DEBE VER esta página.
 if (!current_user_can('manage_options')) {
-    wp_redirect(home_url('/mi-puesto/'));
+    wp_redirect(home_url('/mis-tareas/'));
     exit;
 }
 
@@ -33,29 +33,34 @@ get_header(); // <-- ESTA LÍNEA AHORA ESTÁ EN SU LUGAR CORRECTO
 
         <div class="ghd-sector-card-grid">
             <?php
+            // Obtenemos la URL base del panel de sector una sola vez para ser eficientes.
+            $panel_sector_url = home_url('/mis-tareas/');
+
             // Usamos nuestra función de ayuda para obtener la lista de sectores
             $sectores = ghd_get_sectores_produccion();
             
             foreach ($sectores as $sector) :
                 // Hacemos una consulta rápida para contar los pedidos en este sector
                 $query = new WP_Query([
-                    'post_type' => 'orden_produccion',
-                    'post_status' => 'publish',
-                    'meta_key' => 'sector_actual',
-                    'meta_value' => $sector,
-                    'posts_per_page' => -1
+                    'post_type'      => 'orden_produccion',
+                    'post_status'    => 'publish',
+                    'posts_per_page' => -1, // Contamos todos
+                    'meta_key'       => 'sector_actual',
+                    'meta_value'     => $sector
                 ]);
                 $pedidos_en_sector = $query->post_count;
                 wp_reset_postdata();
+
+                // Creamos la URL correcta con el parámetro del sector.
+                $link_al_panel = add_query_arg('sector', urlencode($sector), $panel_sector_url);
             ?>
                 <div class="ghd-sector-card">
                     <h3 class="sector-card-title"><?php echo esc_html($sector); ?></h3>
                     <p class="sector-card-stat">Pedidos Activos: <?php echo $pedidos_en_sector; ?></p>
-                    <a href="#" class="ghd-btn ghd-btn-secondary">Ver Panel</a>
+                    <a href="<?php echo esc_url($link_al_panel); ?>" class="ghd-btn ghd-btn-secondary">Ver Panel</a>
                 </div>
             <?php endforeach; ?>
         </div>
-
     </main>
 </div>
 <?php get_footer(); ?>
