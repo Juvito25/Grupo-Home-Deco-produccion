@@ -17,7 +17,8 @@ $login_url = home_url('/iniciar-sesion/'); // Obtenemos la URL de nuestra págin
         <li><a href="#"><i class="fa-solid fa-plus"></i> <span>Nuevo Pedido</span></a></li>
         <!-- <li><a href="#"><i class="fa-solid fa-cubes"></i> <span>Sectores</span></a></li> -->
         <li><a href="<?php echo home_url('/sectores-de-produccion/'); ?>"><i class="fa-solid fa-cubes"></i> <span>Sectores de Producción</span></a></li>
-        <li><a href="#"><i class="fa-solid fa-users"></i> <span>Clientes</span></a></li>
+        <!-- <li><a href="#"><i class="fa-solid fa-users"></i> <span>Clientes</span></a></li> -->
+        <li><a href="<?php echo home_url('/clientes/'); ?>"><i class="fa-solid fa-users"></i> <span>Clientes</span></a></li>
         <li><a href="#"><i class="fa-solid fa-chart-pie"></i> <span>Reportes</span></a></li>
         <li><a href="#"><i class="fa-solid fa-gear"></i> <span>Configuración</span></a></li>
         <li>

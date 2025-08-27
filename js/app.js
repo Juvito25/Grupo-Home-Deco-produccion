@@ -220,3 +220,20 @@ if (orderNav) {
         });
     });
 }
+
+// --- LÓGICA PARA LEER EL FILTRO DESDE LA URL (PANEL ADMIN) ---
+window.addEventListener('load', function() {
+    const searchFilterInput = document.getElementById('ghd-search-filter');
+    if (!searchFilterInput) return;
+
+    if (window.location.hash && window.location.hash.startsWith('#buscar=')) {
+        let searchTerm = decodeURIComponent(window.location.hash.substring(8));
+        
+        // CORRECCIÓN CLAVE: Reemplazamos todos los '+' por espacios.
+        searchTerm = searchTerm.replace(/\+/g, ' ');
+
+        searchFilterInput.value = searchTerm;
+        applyFilters();
+        history.pushState("", document.title, window.location.pathname + window.location.search);
+    }
+});
