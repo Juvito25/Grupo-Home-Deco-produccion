@@ -604,3 +604,35 @@ address { font-style: normal; line-height: 1.6; }
     transition: background-color 0.2s ease;
 }
 .ghd-login-box #loginform input[type="submit"]:hover { background-color: var(--color-primario-hover); }
+
+/* ==========================================================================
+   ESTILOS PARA LA PÁGINA DE SECTORES
+   ========================================================================== */
+
+.ghd-sector-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.5rem;
+}
+
+.ghd-sector-card {
+    background-color: var(--color-fondo-claro);
+    border-radius: 8px;
+    border: 1px solid var(--color-borde);
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    text-align: center;
+}
+
+.sector-card-title {
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    font-size: 1.2rem;
+}
+
+.sector-card-stat {
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+    color: var(--texto-secundario);
+    font-size: 0.9rem;
+}
