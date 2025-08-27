@@ -1,7 +1,7 @@
 <?php
 /**
  * El header para nuestro tema.
- * Versión V2.1 con lógica condicional para mostrarse solo en la aplicación.
+ * Versión V2.2 - Añadida la plantilla de Sectores a la lógica condicional.
  */
 ?>
 <!doctype html>
@@ -15,9 +15,14 @@
 <?php wp_body_open(); ?>
 
 <?php
-// --- LÓGICA CONDICIONAL ---
-// Comprobamos si la página actual es una de nuestras plantillas de la aplicación.
-if ( is_page_template('template-admin-dashboard.php') || is_page_template('template-sector-dashboard.php') || is_singular('orden_produccion') ) :
+// --- LÓGICA CONDICIONAL CORREGIDA ---
+// Añadimos la nueva plantilla 'template-sectores.php' a la lista.
+if ( 
+    is_page_template('template-admin-dashboard.php') || 
+    is_page_template('template-sector-dashboard.php') || 
+    is_page_template('template-sectores.php') || // <-- LÍNEA AÑADIDA
+    is_singular('orden_produccion') 
+) :
 ?>
 
 <!-- INICIO DE LA CABECERA PROFESIONAL (SOLO PARA LA APP) -->
@@ -27,7 +32,7 @@ if ( is_page_template('template-admin-dashboard.php') || is_page_template('templ
         <div class="header-title-group">
             <span class="main-title">Gestor de Flujo de Producción</span>
             <?php 
-            $sub_title = 'Panel de Control';
+            $sub_title = 'Panel de Control'; // Por defecto
             if (is_page_template('template-sector-dashboard.php')) {
                 $current_user = wp_get_current_user();
                 $user_roles = $current_user->roles;
@@ -37,6 +42,8 @@ if ( is_page_template('template-admin-dashboard.php') || is_page_template('templ
                 $sub_title = $sector_name . ' Dashboard';
             } elseif (is_singular('orden_produccion')) {
                 $sub_title = 'Detalles del Pedido';
+            } elseif (is_page_template('template-sectores.php')) {
+                $sub_title = 'Vista de Sectores';
             }
             ?>
             <span class="sub-title"><?php echo esc_html($sub_title); ?></span>
