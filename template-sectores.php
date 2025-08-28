@@ -1,21 +1,13 @@
 <?php
 /**
  * Template Name: GHD - Vista de Sectores
- * Versión 2.1 - Añadida la cabecera principal.
+ * Versión final y funcional.
  */
 
-// --- CONTROL DE ACCESO ---
-if (!is_user_logged_in()) {
+if (!is_user_logged_in() || !current_user_can('manage_options')) {
     auth_redirect();
 }
-// Un usuario que no es administrador NO DEBE VER esta página.
-if (!current_user_can('manage_options')) {
-    wp_redirect(home_url('/mis-tareas/'));
-    exit;
-}
-
-// --- COMIENZO DE LA VISTA ---
-get_header(); // <-- ESTA LÍNEA AHORA ESTÁ EN SU LUGAR CORRECTO
+get_header(); 
 ?>
 
 <div class="ghd-app-wrapper">
@@ -33,25 +25,32 @@ get_header(); // <-- ESTA LÍNEA AHORA ESTÁ EN SU LUGAR CORRECTO
 
         <div class="ghd-sector-card-grid">
             <?php
-            // Obtenemos la URL base del panel de sector una sola vez para ser eficientes.
             $panel_sector_url = home_url('/mis-tareas/');
-
-            // Usamos nuestra función de ayuda para obtener la lista de sectores
-            $sectores = ghd_get_sectores_produccion();
+            
+            // CORRECCIÓN CLAVE 1: Usamos el nombre de función correcto y unificado: ghd_get_sectores()
+            $sectores = ghd_get_sectores();
             
             foreach ($sectores as $sector) :
-                // Hacemos una consulta rápida para contar los pedidos en este sector
+                // La lógica para construir el nombre del campo a partir del nombre del sector
+                $clean_sector_name = strtolower($sector);
+                $clean_sector_name = str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $clean_sector_name);
+                $campo_estado = 'estado_' . $clean_sector_name;
+
+                // CORRECCIÓN CLAVE 2: La consulta ahora cuenta 'Pendiente' y 'En Progreso'
                 $query = new WP_Query([
                     'post_type'      => 'orden_produccion',
-                    'post_status'    => 'publish',
-                    'posts_per_page' => -1, // Contamos todos
-                    'meta_key'       => 'sector_actual',
-                    'meta_value'     => $sector
+                    'posts_per_page' => -1,
+                    'meta_query'     => [
+                        [
+                            'key'     => $campo_estado,
+                            'value'   => ['Pendiente', 'En Progreso'],
+                            'compare' => 'IN',
+                        ]
+                    ]
                 ]);
                 $pedidos_en_sector = $query->post_count;
                 wp_reset_postdata();
 
-                // Creamos la URL correcta con el parámetro del sector.
                 $link_al_panel = add_query_arg('sector', urlencode($sector), $panel_sector_url);
             ?>
                 <div class="ghd-sector-card">
