@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // --- LÓGICA DEL MENÚ MÓVIL (Estable) ---
+    // Lógica del menú móvil (igual que antes)
     const menuToggle = document.getElementById('mobile-menu-toggle');
     const sidebar = document.querySelector('.ghd-sidebar');
     if (menuToggle && sidebar) {
@@ -11,321 +11,66 @@ document.addEventListener('DOMContentLoaded', function() {
         overlay.addEventListener('click', closeMenu);
     }
 
-    // --- LÓGICA DEL PANEL DE ADMINISTRADOR (Corregida y Robusta) ---
+    // --- LÓGICA DEL PANEL DE ADMINISTRADOR ---
     const adminTableBody = document.querySelector('.ghd-table tbody');
     if (adminTableBody) {
+        // Usamos delegación de eventos para manejar todos los clics dentro de la tabla
         adminTableBody.addEventListener('click', function(e) {
-            const toggle = e.target.closest('.actions-toggle');
-            if (toggle) {
-                e.stopPropagation();
-                const menu = toggle.nextElementSibling;
-                const wasOpen = menu.classList.contains('is-open');
-                document.querySelectorAll('.actions-menu.is-open').forEach(m => m.classList.remove('is-open'));
-                if (!wasOpen) menu.classList.add('is-open');
-            }
-
-            const actionLink = e.target.closest('.action-link');
-            if (actionLink) {
+            
+            // --- NUEVO: LÓGICA PARA EL BOTÓN "INICIAR PRODUCCIÓN" ---
+            const startBtn = e.target.closest('.start-production-btn');
+            if (startBtn) {
                 e.preventDefault();
-                const row = actionLink.closest('tr');
+                if (!confirm('¿Iniciar la producción de este pedido?')) return;
+                
+                const row = startBtn.closest('tr');
+                const orderId = startBtn.dataset.orderId;
+                
                 row.style.opacity = '0.5';
+                startBtn.disabled = true;
+                startBtn.textContent = 'Iniciando...';
+                
                 const params = new URLSearchParams({
-                    action: 'ghd_update_order', nonce: ghd_ajax.nonce, order_id: actionLink.closest('.actions-dropdown').querySelector('.actions-toggle').dataset.orderId,
-                    field: actionLink.dataset.action === 'change_priority' ? 'prioridad_pedido' : 'sector_actual',
-                    value: actionLink.dataset.value
+                    action: 'ghd_admin_action',
+                    nonce: ghd_ajax.nonce,
+                    order_id: orderId,
+                    type: 'start_production'
                 });
+                
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                     .then(res => res.json())
                     .then(data => {
                         if (data.success) {
-                            row.outerHTML = data.data.html;
+                            // Si tiene éxito, eliminamos la fila de la vista de pendientes
+                            row.remove();
                         } else {
-                            alert('Error al actualizar.');
-                        }
-                    })
-                    .catch(error => console.error('Error:', error))
-                    .finally(() => {
-                        // CORRECCIÓN CLAVE: Siempre restauramos la opacidad.
-                        if (row) { // Comprobamos si la fila todavía existe
-                           row.style.opacity = '1';
+                            alert('Error: ' + (data.data?.message || 'No se pudo iniciar la producción.'));
+                            row.style.opacity = '1';
+                            startBtn.disabled = false;
+                            startBtn.textContent = 'Iniciar Producción';
                         }
                     });
             }
         });
-        document.addEventListener('click', () => document.querySelectorAll('.actions-menu.is-open').forEach(m => m.classList.remove('is-open')));
     }
 
-    // --- LÓGICA DEL PANEL DE SECTOR (Estable) ---
-    const sectorGrid = document.querySelector('.ghd-sector-tasks-grid');
-    if (sectorGrid) {
-        // ... (código del panel de sector que ya funcionaba) ...
-    }
-    
-    // --- LÓGICA PARA EL BOTÓN DE REFRESCAR (Estable) ---
-    const refreshBtn = document.getElementById('ghd-refresh-tasks');
-    if (refreshBtn && sectorGrid) {
-        refreshBtn.addEventListener('click', function() {
-            const icon = this.querySelector('i');
-            if (icon) icon.classList.add('fa-spin');
-            sectorGrid.style.opacity = '0.5';
-            const params = new URLSearchParams({ action: 'ghd_refresh_tasks', nonce: ghd_ajax.nonce });
-            fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
-                .then(res => res.json())
-                .then(data => { if (data.success) sectorGrid.innerHTML = data.data.html; })
-                .finally(() => {
-                    if (icon) icon.classList.remove('fa-spin');
-                    sectorGrid.style.opacity = '1';
+    const tasksList = document.querySelector('.ghd-sector-tasks-list');
+    if (tasksList) {
+        tasksList.addEventListener('click', function(e) {
+            const actionButton = e.target.closest('.action-button');
+            if (actionButton) {
+                const card = actionButton.closest('.ghd-order-card');
+                card.style.opacity = '0.5';
+                const params = new URLSearchParams({
+                    action: 'ghd_update_task_status', nonce: ghd_ajax.nonce,
+                    order_id: actionButton.dataset.orderId,
+                    field: actionButton.dataset.field,
+                    value: actionButton.dataset.value
                 });
-        });
-    }
-});
-
-// --- LÓGICA PARA EL BOTÓN "MOVER A SIGUIENTE SECTOR" (UNIVERSAL) ---
-// Esta lógica ahora funcionará tanto en el panel de sector como en la página de detalles.
-const mainContent = document.querySelector('.ghd-main-content');
-
-if (mainContent) {
-    mainContent.addEventListener('click', function(e) {
-        const moveBtn = e.target.closest('.move-to-next-sector-btn');
-        
-        if (moveBtn) {
-            e.preventDefault();
-            
-            if (!confirm('¿Estás seguro de que quieres mover este pedido al siguiente sector?')) {
-                return;
-            }
-
-            const orderId = moveBtn.dataset.orderId;
-            const nonce = moveBtn.dataset.nonce;
-            const card = moveBtn.closest('.ghd-task-card') || moveBtn.closest('.ghd-card'); // Busca el contenedor padre
-
-            // Feedback visual
-            if (card) card.style.opacity = '0.5';
-            moveBtn.disabled = true;
-            moveBtn.textContent = 'Moviendo...';
-
-            const params = new URLSearchParams({
-                action: 'ghd_move_to_next_sector',
-                nonce: nonce,
-                order_id: orderId,
-            });
-
-            fetch(ghd_ajax.ajax_url, {
-                method: 'POST',
-                body: params
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Si tiene éxito, redirigimos o eliminamos la tarjeta
-                    if (card && card.classList.contains('ghd-task-card')) {
-                        card.remove(); // Si estamos en el panel de sector, eliminamos la tarjeta
-                    } else {
-                        alert('¡Pedido movido con éxito!');
-                        location.reload(); // Si estamos en la página de detalles, la recargamos
-                    }
-                } else {
-                    alert('Error: ' + (data.data.message || 'No se pudo mover el pedido.'));
-                    if (card) card.style.opacity = '1';
-                    moveBtn.disabled = false;
-                    // (Aquí podrías restaurar el texto original del botón si quisieras)
-                }
-            })
-            .catch(error => {
-                console.error('Error de red:', error);
-                alert('Ocurrió un error de red. Inténtalo de nuevo.');
-                if (card) card.style.opacity = '1';
-                moveBtn.disabled = false;
-            });
-        }
-    });
-}
-
-// --- LÓGICA DE FILTROS PARA EL PANEL DE ADMIN ---
-const searchFilter = document.getElementById('ghd-search-filter');
-const statusFilter = document.getElementById('ghd-status-filter');
-const priorityFilter = document.getElementById('ghd-priority-filter');
-const resetFiltersBtn = document.getElementById('ghd-reset-filters');
-const tableBody = document.getElementById('ghd-orders-table-body');
-
-function applyFilters() {
-    if (!tableBody) return; // Salir si no estamos en la página del admin
-    
-    tableBody.style.opacity = '0.5';
-
-    const params = new URLSearchParams({
-        action: 'ghd_filter_orders',
-        nonce: ghd_ajax.nonce,
-        search: searchFilter.value,
-        status: statusFilter.value,
-        priority: priorityFilter.value,
-    });
-
-    fetch(ghd_ajax.ajax_url, {
-        method: 'POST',
-        body: params
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            tableBody.innerHTML = data.data.html;
-        }
-    })
-    .finally(() => {
-        tableBody.style.opacity = '1';
-    });
-}
-
-if (searchFilter) { // Si los filtros existen, añadimos los listeners
-    let searchTimeout;
-    searchFilter.addEventListener('keyup', () => {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(applyFilters, 500); // Espera 500ms después de teclear
-    });
-    
-    statusFilter.addEventListener('change', applyFilters);
-    priorityFilter.addEventListener('change', applyFilters);
-    
-    resetFiltersBtn.addEventListener('click', () => {
-        searchFilter.value = '';
-        statusFilter.value = '';
-        priorityFilter.value = '';
-        applyFilters();
-    });
-}
-
-// --- LÓGICA PARA LAS PESTAÑAS EN LA PÁGINA DE DETALLES ---
-const orderNav = document.querySelector('.ghd-order-nav');
-
-if (orderNav) {
-    const tabLinks = orderNav.querySelectorAll('a');
-    const tabContents = document.querySelectorAll('.tab-content');
-
-    tabLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            
-            const targetTabId = this.dataset.tab;
-
-            // Ocultar todas las pestañas y contenidos
-            tabLinks.forEach(item => item.classList.remove('active'));
-            tabContents.forEach(content => content.classList.remove('is-active'));
-
-            // Mostrar la pestaña y contenido seleccionados
-            this.classList.add('active');
-            const targetContent = document.getElementById('tab-content-' + targetTabId);
-            if (targetContent) {
-                targetContent.classList.add('is-active');
+                fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+                    .then(res => res.json())
+                    .then(data => { if (data.success) card.remove(); else { card.style.opacity = '1'; alert('Error.'); } });
             }
         });
-    });
-}
-
-// --- LÓGICA PARA LEER EL FILTRO DESDE LA URL (PANEL ADMIN) ---
-window.addEventListener('load', function() {
-    const searchFilterInput = document.getElementById('ghd-search-filter');
-    if (!searchFilterInput) return;
-
-    if (window.location.hash && window.location.hash.startsWith('#buscar=')) {
-        let searchTerm = decodeURIComponent(window.location.hash.substring(8));
-        
-        // CORRECCIÓN CLAVE: Reemplazamos todos los '+' por espacios.
-        searchTerm = searchTerm.replace(/\+/g, ' ');
-
-        searchFilterInput.value = searchTerm;
-        applyFilters();
-        history.pushState("", document.title, window.location.pathname + window.location.search);
-    }
-});
-
-////////////////////////////////////////////////////////////////////////////////////////////////
-// --- LÓGICA PARA LOS GRÁFICOS DE LA PÁGINA DE REPORTES ---
-document.addEventListener('DOMContentLoaded', function() {
-    // Verificamos si estamos en la página de reportes y si los datos existen
-    if (typeof ghd_reports_data !== 'undefined' && document.querySelector('.ghd-reports-grid')) {
-        
-        // --- GRÁFICO 1: PEDIDOS POR ESTADO (BARRAS) ---
-        const pedidosChartCtx = document.getElementById('pedidosPorEstadoChart');
-        if (pedidosChartCtx) {
-            new Chart(pedidosChartCtx, {
-                type: 'bar',
-                data: {
-                    labels: ghd_reports_data.sector.labels, 
-                    datasets: [{
-                        label: 'Nº de Pedidos Activos',
-                        data: ghd_reports_data.sector.data,
-                        // CORRECCIÓN: Colores añadidos
-                        backgroundColor: [
-                            'rgba(54, 162, 235, 0.6)',
-                            'rgba(153, 102, 255, 0.6)',
-                            'rgba(255, 159, 64, 0.6)',
-                            'rgba(255, 99, 132, 0.6)'
-                        ],
-                        borderColor: [
-                            'rgba(54, 162, 235, 1)',
-                            'rgba(153, 102, 255, 1)',
-                            'rgba(255, 159, 64, 1)',
-                            'rgba(255, 99, 132, 1)'
-                        ],
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
-                    plugins: { legend: { display: true } } // Activamos la leyenda para claridad
-                }
-            });
-        }
-
-        // --- GRÁFICO 2: CARGA DE TRABAJO (DONA) ---
-        const cargaChartCtx = document.getElementById('cargaPorSectorChart');
-        if (cargaChartCtx) {
-            new Chart(cargaChartCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: ghd_reports_data.sector.labels,
-                    datasets: [{
-                        label: 'Carga de Trabajo',
-                        data: ghd_reports_data.sector.data,
-                        // CORRECCIÓN: Colores añadidos
-                        backgroundColor: [
-                            'rgba(54, 162, 235, 0.8)',
-                            'rgba(153, 102, 255, 0.8)',
-                            'rgba(255, 159, 64, 0.8)',
-                            'rgba(255, 99, 132, 0.8)'
-                        ],
-                        hoverOffset: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: { legend: { position: 'bottom' } }
-                }
-            });
-        }
-
-        // --- GRÁFICO 3: PEDIDOS POR PRIORIDAD (POLAR) ---
-        const prioridadChartCtx = document.getElementById('pedidosPorPrioridadChart');
-        if (prioridadChartCtx) {
-            new Chart(prioridadChartCtx, {
-                type: 'polarArea',
-                data: {
-                    labels: ghd_reports_data.prioridad.labels,
-                    datasets: [{
-                        label: 'Nº de Pedidos',
-                        data: ghd_reports_data.prioridad.data,
-                        backgroundColor: [
-                            'rgba(239, 68, 68, 0.7)',
-                            'rgba(245, 158, 11, 0.7)',
-                            'rgba(34, 197, 94, 0.7)'
-                        ]
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: { legend: { position: 'bottom' } }
-                }
-            });
-        }
     }
 });

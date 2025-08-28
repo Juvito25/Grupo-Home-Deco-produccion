@@ -1,13 +1,3 @@
-/*
-Theme Name: Grupo Home Deco - Producción
-Theme URI: https://gruphomedeco.com/
-Author: Juvi Web | Automatización y Desarrollo Web
-Author URI: https://instagram.com/juviweb
-Description: Tema personalizado para el Gestor de Flujo de Producción.
-Version: 1.2
-Template: hello-elementor
-*/
-
 /* ==========================================================================
    1. VARIABLES Y ESTILOS GLOBALES
    ========================================================================== */
@@ -22,560 +12,166 @@ Template: hello-elementor
     --color-primario-hover: #3a6347;
     --color-rojo: #B34A49;
     --color-amarillo: #F59E0B;
-    --color-gris: #9CA3AF;
-    --font-family-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-family-sans: 'Inter', sans-serif;
 }
-
 body {
     background-color: var(--color-fondo-app);
     font-family: var(--font-family-sans);
     color: var(--texto-principal);
     margin: 0;
-    font-size: 16px;
-    line-height: 1.5;
     display: flex;
     flex-direction: column;
     min-height: 100vh;
 }
-
-* {
-    box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 /* ==========================================================================
-   2. ESTRUCTURA PRINCIPAL DE LA APLICACIÓN
+   2. ESTRUCTURA PRINCIPAL
    ========================================================================== */
-.ghd-site-header {
-    background-color: var(--color-fondo-claro);
-    padding: 1rem 2rem;
-    border-bottom: 1px solid var(--color-borde);
-    text-align: center;
-}
-
-.ghd-site-header h1 {
-    margin: 0;
-    font-size: 1.8rem;
-    font-weight: 700;
-    color: var(--color-rojo);
-}
-
-.ghd-app-wrapper {
-    display: flex;
-    flex-grow: 1;
-}
-
-.ghd-sidebar {
-    width: 260px;
-    background-color: var(--texto-principal);
-    color: var(--texto-claro);
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    transition: transform 0.3s ease-in-out;
-    flex-shrink: 0;
-}
-
-.ghd-main-content {
-    flex-grow: 1;
-    padding: 2rem;
-    overflow-y: auto;
-    max-width: 1400px;
-    margin-left: auto;
-    margin-right: auto;
-    background-color: var(--color-fondo-app);
-}
+.ghd-pro-header { background-color: var(--color-fondo-claro); padding: 0.75rem 2rem; border-bottom: 1px solid var(--color-borde); display: flex; justify-content: space-between; align-items: center; }
+.header-logo-title { display: flex; align-items: center; gap: 1rem; }
+.header-logo { height: 40px; }
+.header-title-group { display: flex; flex-direction: column; }
+.main-title { font-weight: 600; }
+.sub-title { font-size: 0.85rem; color: var(--texto-secundario); }
+.header-user-profile { display: flex; align-items: center; gap: 1rem; }
+.user-info { display: flex; flex-direction: column; text-align: right; }
+.user-name { font-weight: 600; }
+.user-role { font-size: 0.85rem; color: var(--texto-secundario); }
+.user-avatar img { border-radius: 50%; }
+.ghd-app-wrapper { display: flex; flex-grow: 1; }
+.ghd-sidebar { width: 260px; background-color: var(--texto-principal); color: var(--texto-claro); padding: 1.5rem; display: flex; flex-direction: column; }
+.ghd-sidebar .sidebar-header { margin-bottom: 2rem; }
+.ghd-sidebar .sidebar-header .logo { font-size: 1.5rem; font-weight: 700; color: var(--texto-claro); margin: 0; }
+.sidebar-nav ul { list-style: none; padding: 0; margin: 0; }
+.sidebar-nav li a { display: flex; align-items: center; padding: 0.75rem 1rem; border-radius: 6px; text-decoration: none; color: #a7a7a7; }
+.sidebar-nav li.active a { background-color: var(--color-primario); color: white; }
+.sidebar-nav li a i { width: 20px; margin-right: 12px; }
+.ghd-main-content { flex-grow: 1; padding: 2rem; }
+.ghd-main-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+.ghd-main-header h2 { font-size: 1.8rem; margin: 0; }
 
 /* ==========================================================================
    3. COMPONENTES REUTILIZABLES
    ========================================================================== */
-/* Tarjetas */
-.ghd-card {
-    background-color: var(--color-fondo-claro);
-    border-radius: 8px;
-    border: 1px solid var(--color-borde);
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-/* Botones */
-.ghd-btn {
-    padding: clamp(0.5rem, 2vw, 0.6rem) clamp(0.8rem, 3vw, 1.2rem);
-    font-size: clamp(0.8rem, 2.5vw, 0.9rem);
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    white-space: nowrap;
-}
-.ghd-btn i { margin-right: 8px; }
+.ghd-card { background-color: var(--color-fondo-claro); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid var(--color-borde); }
+.ghd-btn { padding: 0.6rem 1.2rem; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; justify-content: center; }
 .ghd-btn-primary { background-color: var(--color-primario); color: white; }
-.ghd-btn-primary:hover { background-color: var(--color-primario-hover); color: var(--texto-claro)}
-.ghd-btn-secondary { background-color: var(--color-fondo-claro); color: var(--texto-principal); border: 1px solid var(--color-borde); }
-.ghd-btn-secondary:hover { background-color: var(--color-fondo); color: var(--texto-secundario)}
-.ghd-btn-tertiary { background-color: transparent; color: var(--texto-secundario); }
-.ghd-btn-tertiary:hover { background-color: var(--color-amarillo); color: var(--texto-claro)}
-.ghd-btn-icon { background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: var(--texto-secundario); }
-
-/* Etiquetas (Tags) */
 .ghd-tag { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: 500; }
-.tag-blue { background-color: #DBEAFE; color: #1E40AF; }
 .tag-red { background-color: #FEE2E2; color: #991B1B; }
 .tag-yellow { background-color: #FEF3C7; color: #92400E; }
 .tag-green { background-color: #D1FAE5; color: #065F46; }
-.tag-gray { background-color: #F3F4F6; color: #4B5563; }
 
 /* ==========================================================================
+
    4. SECCIONES ESPECÍFICAS
    ========================================================================== */
-
-/* --- SIDEBAR (ESTRUCTURA FINAL CON WRAPPER INTERNO) --- */
-.ghd-sidebar {
-    width: 260px;
-    background-color: var(--texto-principal);
-    color: var(--texto-claro);
-    padding: 0; /* El padding ahora lo controla el wrapper */
-    display: flex; /* Asegura que el wrapper pueda crecer */
-    transition: transform 0.3s ease-in-out;
-    flex-shrink: 0;
-}
-
-.sidebar-content-wrapper {
-    width: auto;
-    min-height: 100%;
-    max-height: 100%;
-    background-color: var(--texto-principal); 
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-}
-.sidebar-header{
-    padding: 5%;
-    color: var(--texto-claro)
-}
-.ghd-sidebar .sidebar-header {
-    margin-bottom: 2rem;
-    flex-shrink: 0; /* Evita que el header se encoja */
-}
-
-.ghd-sidebar .sidebar-header .logo {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--texto-claro);
-    margin: 0;
-    padding: 0;
-    line-height: 1.2;
-}
-
-.sidebar-nav {
-    flex-grow: 1; /* Permite que la navegación ocupe el espacio restante */
-}
-
-.sidebar-nav ul { 
-    list-style: none; 
-    padding: 0; 
-    margin: 0; 
-}
-
-.sidebar-nav li a { 
-    display: flex; 
-    align-items: center; 
-    padding: 0.75rem 1rem; 
-    border-radius: 6px; 
-    text-decoration: none; 
-    color: #a7a7a7; 
-    font-weight: 500; 
-    margin-bottom: 0.25rem; 
-    transition: all 0.2s ease; 
-}
-
-.sidebar-nav li a i { 
-    width: 20px; 
-    margin-right: 12px; 
-    text-align: center; 
-}
-
-.sidebar-nav li a:hover { 
-    background-color: rgba(255, 255, 255, 0.05); 
-    color: var(--texto-claro); 
-}
-
-.sidebar-nav li.active a { 
-    background-color: var(--color-primario); 
-    color: white; 
-}
-
-/* Encabezado Principal */
-.ghd-main-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; gap: 1rem; }
-.ghd-main-header h2 { font-size: clamp(1.25rem, 4vw, 1.8rem); font-weight: 700; margin: 0; white-space: nowrap; }
-.header-title-wrapper { display: flex; align-items: center; gap: 1rem; }
-.header-actions { display: flex; gap: clamp(0.5rem, 2vw, 1rem); flex-shrink: 0; }
-
-/* Filtros */
-.ghd-filters { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
-.ghd-filters input, .ghd-filters select { padding: 0.6rem; border-radius: 6px; border: 1px solid var(--color-borde); background-color: var(--color-fondo-claro); }
-.ghd-filters input { flex-grow: 1; }
-
-/* Tabla */
+/* --- PANEL DE ADMINISTRADOR --- */
 .ghd-table { width: 100%; border-collapse: collapse; }
 .ghd-table th, .ghd-table td { padding: 0.8rem 1rem; text-align: left; border-bottom: 1px solid var(--color-borde); }
-.ghd-table th { font-weight: 600; color: var(--texto-secundario); font-size: 0.8rem; text-transform: uppercase; }
-.ghd-table tbody tr:hover { background-color: var(--color-fondo); }
 
-/* Menú de Acciones */
-.actions-cell { position: relative; }
-.actions-dropdown .actions-toggle { width: 32px; height: 32px; border-radius: 50%; }
-.actions-dropdown .actions-toggle:hover { background-color: var(--color-fondo); }
-.actions-menu { display: none; position: absolute; right: 30px; top: 10px; background-color: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 10; width: 200px; padding: 0.5rem; border: 1px solid var(--color-borde); }
-.actions-menu.is-open { display: block; }
-.actions-menu-group { padding: 0.5rem 0; border-bottom: 1px solid var(--color-borde); }
-.actions-menu-group:last-child { border-bottom: none; }
-.actions-menu-title { display: block; padding: 0.5rem 0.75rem; font-size: 0.8rem; font-weight: 600; color: var(--texto-secundario); }
-.actions-menu .action-link { display: block; padding: 0.5rem 0.75rem; text-decoration: none; color: var(--texto-principal); border-radius: 4px; }
-.actions-menu .action-link:hover { background-color: var(--color-fondo); }
-.actions-menu .action-link.is-current { color: var(--texto-secundario); font-weight: 600; background-color: var(--color-fondo); pointer-events: none; cursor: default; }
-
-/* Panel de Sector y Tarjetas de Tarea */
-.ghd-sector-tasks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; border: 1px dashed var(--color-borde); background-color: rgba(255, 255, 255, 0.5); border-radius: 8px; padding: 1.5rem; min-height: 300px; }
-.ghd-task-card { background-color: var(--color-fondo-claro); border: 1px solid var(--color-borde); border-radius: 8px; display: flex; flex-direction: column; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); }
-.ghd-task-card .card-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid var(--color-borde); }
-.ghd-task-card .card-header h3 { margin: 0; font-size: 1.1rem; }
-.ghd-task-card .card-body { padding: 1.5rem; flex-grow: 1; display: flex; flex-direction: column; gap: 0.75rem; }
-.ghd-task-card .card-info-group { display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.75rem; border-bottom: 1px solid var(--color-borde); }
-.ghd-task-card .card-info-group:last-child { border-bottom: none; }
-.ghd-task-card .info-label { font-weight: 600; color: var(--texto-secundario); font-size: 0.9rem; }
-.ghd-task-card .info-value { font-weight: 500; text-align: right; }
-.ghd-task-card .card-footer { padding: 1rem 1.5rem; background-color: var(--color-fondo); border-top: 1px solid var(--color-borde); display: flex; justify-content: flex-end; gap: 1rem; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
-.ghd-task-card .card-footer .ghd-btn { text-decoration: none; text-align: center; }
+/* --- PANEL DE SECTOR (NUEVO DISEÑO V2) --- */
+.ghd-kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; }
+.ghd-kpi-card { background-color: var(--color-fondo-claro); border-radius: 8px; padding: 1.5rem; display: flex; align-items: center; gap: 1rem; }
+.kpi-icon { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; color: white; }
+.kpi-icon.icon-blue { background-color: #3b82f6; } .kpi-icon.icon-red { background-color: #ef4444; } .kpi-icon.icon-green { background-color: #22c55e; } .kpi-icon.icon-yellow { background-color: #f59e0b; }
+.kpi-info { display: flex; flex-direction: column; } .kpi-value { font-size: 1.75rem; font-weight: 700; } .kpi-label { font-size: 0.9rem; color: var(--texto-secundario); }
+.ghd-sector-tasks-list { display: flex; flex-direction: column; gap: 1.5rem; }
+.ghd-order-card { display: flex; background-color: var(--color-fondo-claro); border-radius: 8px; border: 1px solid var(--color-borde); overflow: hidden; }
+.order-card-main { flex-grow: 1; }
+.order-card-header { display: flex; justify-content: space-between; padding: 1rem 1.5rem; border-bottom: 1px solid var(--color-borde); }
+.order-card-body { padding: 1.5rem; }
+.order-card-actions { display: flex; flex-direction: column; gap: 0.75rem; padding: 1.5rem; border-left: 1px solid var(--color-borde); width: 220px; }
 
 /* ==========================================================================
-   5. RESPONSIVE Y UI MÓVIL
-   ========================================================================== */
-#mobile-menu-toggle { display: none; }
-.ghd-sidebar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); z-index: 999; opacity: 0; visibility: hidden; transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out; }
-.ghd-sidebar-overlay.is-visible { opacity: 1; visibility: visible; }
-
-@media (max-width: 1024px) {
-    .ghd-sidebar { position: fixed; top: 0; left: 0; height: 100%; z-index: 1000; transform: translateX(-100%); box-shadow: 0 0 20px rgba(0, 0, 0, 0.2); }
-    .ghd-sidebar.sidebar-visible { transform: translateX(0); }
-    .ghd-main-content { margin-left: 0; width: 100%; }
-    #mobile-menu-toggle { display: block !important; }
-}
-
-@media (max-width: 820px) {
-    .ghd-main-header { flex-wrap: wrap; }
-}
-
-@media (max-width: 768px) {
-    .ghd-main-content { padding: 1rem; }
-    .ghd-main-header { flex-direction: column; align-items: flex-start; }
-    .ghd-main-header .header-actions { width: 100%; justify-content: flex-end; }
-    .ghd-filters { flex-direction: column; align-items: stretch; }
-    .ghd-table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-    .ghd-table { min-width: 800px; }
-}
-
-/* ==========================================================================
-   NUEVO HEADER PROFESIONAL (V3)
-   ========================================================================== */
-.ghd-pro-header {
-    background-color: var(--color-fondo-claro);
-    padding: 0.75rem 2rem;
-    border-bottom: 1px solid var(--color-borde);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-shrink: 0; /* Evita que se encoja */
-    position: sticky;
-    top: 0;
-    z-index: 1010; /* Un z-index alto para que esté por encima de todo */
-}
-
-.header-logo-title {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-.header-logo {
-    height: 40px;
-    width: auto;
-}
-
-.header-title-group {
-    display: flex;
-    flex-direction: column;
-}
-
-.main-title {
-    font-weight: 600;
-    color: var(--texto-principal);
-}
-
-.sub-title {
-    font-size: 0.85rem;
-    color: var(--texto-secundario);
-}
-
-.header-user-profile {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-.user-info {
-    display: flex;
-    flex-direction: column;
-    text-align: right;
-}
-
-.user-name {
-    font-weight: 600;
-}
-
-.user-role {
-    font-size: 0.85rem;
-    color: var(--texto-secundario);
-}
-
-.user-avatar img {
-    border-radius: 50%;
-}
-
-/* Ajuste responsive para el header */
-@media (max-width: 600px) {
-    .header-title-group, .user-info {
-        display: none; /* Ocultamos texto en pantallas muy pequeñas */
-    }
-}
-
-/* ==========================================================================
-   NUEVOS ESTILOS - FILTROS DEL PANEL DE ADMIN V2
+   ESTILOS PARA LA PÁGINA DE DETALLES
    ========================================================================== */
 
-/* Contenedor principal de los filtros */
-.ghd-filters-wrapper {
-    display: flex;
-    flex-wrap: wrap; /* Permite que los filtros salten a la siguiente línea en pantallas pequeñas */
+.ghd-details-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
     gap: 1.5rem;
-    align-items: flex-end; /* Alinea los elementos por la parte inferior */
-    justify-content: space-between;
-    padding: 1.5rem;
-    background-color: var(--color-fondo-claro);
-    border-radius: 8px;
-    border: 1px solid var(--color-borde);
-    margin-bottom: 1.5rem;
+    align-items: flex-start;
 }
-
-/* Grupo para cada filtro (etiqueta + input) */
-.filter-group {
+.details-main, .details-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+.card-section-title {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-borde);
+    font-size: 1.1rem;
+}
+.sub-status-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    width: 300px; 
 }
-
-.filter-group label {
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--texto-secundario);
-}
-
-/* Estilo para los campos de input y select dentro de los filtros */
-.ghd-filters-wrapper input,
-.ghd-filters-wrapper select {
-    padding: 0.6rem;
-    border-radius: 6px;
-    border: 1px solid var(--color-borde);
-    background-color: var(--color-fondo-claro);
-    min-width: 180px; /* Ancho mínimo para los desplegables */
-}
-
-.ghd-filters-wrapper input[type="search"] {
-    flex-grow: 1; /* Permite que el campo de búsqueda crezca */
-    min-width: 250px;
-}
-
-/* Estilo específico para el botón de restablecer */
-.ghd-filters-wrapper .ghd-btn-icon {
-    height: 44.19px;
-    width: 44.19px;
-    border: 1px solid var(--color-borde);
-    border-radius: 6px;
-    color: var(--texto-secundario);
-    transition: all 0.2s ease;
-
-    /* --- LÍNEAS CORREGIDAS Y AÑADIDAS --- */
-    background-color: var(--color-fondo-claro); /* Fondo blanco como los otros campos */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0; /* Elimina el padding por defecto del botón */
-    font-size: 1rem; /* Ajusta el tamaño del icono si es necesario */
-    cursor: pointer;
-}
-.ghd-filters-wrapper .ghd-btn-icon:hover {
-    background-color: var(--color-fondo-app);
-    color: var(--texto-principal);
-}
-
-/* ==========================================================================
-   NUEVOS ESTILOS - PÁGINA DE DETALLES V2
-   ========================================================================== */
-
-.ghd-order-header {
-    display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;
-}
-.ghd-order-header h1 { margin: 0; font-size: 1.8rem; }
-.order-header-info { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
-.order-meta-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; color: var(--texto-secundario); }
-
-.ghd-order-nav { display: flex; gap: 1.5rem; border-bottom: 1px solid var(--color-borde); margin-bottom: 1.5rem; }
-.ghd-order-nav a { padding: 0.75rem 0.25rem; text-decoration: none; color: var(--texto-secundario); font-weight: 500; border-bottom: 2px solid transparent; display: flex; align-items: center; gap: 0.5rem; }
-.ghd-order-nav a.active, .ghd-order-nav a:hover { color: var(--color-primario); border-bottom-color: var(--color-primario); }
-
-.ghd-order-details-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; align-items: flex-start; }
-.order-details-main { display: flex; flex-direction: column; gap: 1.5rem; }
-.order-details-sidebar { display: flex; flex-direction: column; gap: 1.5rem; }
-.card-section-title { margin-top: 0; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--color-borde); font-size: 1.1rem; }
-
-.card-split-content { display: flex; gap: 2rem; }
-.customer-details, .delivery-address { flex: 1; }
-.customer-details img { border-radius: 50%; margin-bottom: 1rem; }
-.customer-name { font-size: 1.2rem; font-weight: 600; margin: 0 0 0.5rem; }
-address { font-style: normal; line-height: 1.6; }
-
-.summary-item { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
 
 @media (max-width: 900px) {
-    .ghd-order-details-grid { grid-template-columns: 1fr; }
-}
-@media (max-width: 768px) {
-    .card-split-content { flex-direction: column; }
-}
-/* ==========================================================================
-   ESTILOS PARA KPIs DEL PANEL DE SECTOR
-   ========================================================================== */
-
-.ghd-kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 1.5rem;
-}
-
-.ghd-kpi-card {
-    background-color: var(--color-fondo-claro);
-    border-radius: 8px;
-    padding: 1.5rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    border: 1px solid var(--color-borde);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-
-.kpi-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.25rem;
-    color: white;
-    flex-shrink: 0;
-}
-.kpi-icon.icon-blue { background-color: #3b82f6; }
-.kpi-icon.icon-red { background-color: #ef4444; }
-.kpi-icon.icon-green { background-color: #22c55e; }
-.kpi-icon.icon-yellow { background-color: #f59e0b; }
-
-.kpi-info {
-    display: flex;
-    flex-direction: column;
-}
-
-.kpi-value {
-    font-size: 1.75rem;
-    font-weight: 700;
-    line-height: 1;
-    color: var(--texto-principal);
-}
-
-.kpi-label {
-    font-size: 0.9rem;
-    color: var(--texto-secundario);
-}
-
-/* Pequeño ajuste responsive para los KPIs */
-@media (max-width: 480px) {
-    .ghd-kpi-grid {
-        grid-template-columns: 1fr 1fr; /* Dos columnas en móviles pequeños */
-    }
-    .ghd-kpi-card {
-        padding: 1rem;
-    }
-    .kpi-value {
-        font-size: 1.5rem;
+    .ghd-details-grid {
+        grid-template-columns: 1fr;
     }
 }
 
 /* ==========================================================================
-   ESTILOS PARA PESTAÑAS (TABS)
-   ========================================================================== */
-.tab-content {
-    display: none; /* Oculta todos los paneles por defecto */
-}
-.tab-content.is-active {
-    display: block; /* Muestra solo el panel activo */
-}
-
-/* ==========================================================================
-   MEJORAS DE ESTILO - ACCIONES EN TABLA DE ADMIN
+   ESTILOS PARA LA PÁGINA DE LOGIN (V3 - DISEÑO REFINADO)
    ========================================================================== */
 
-/* Hacemos que la celda de acciones sea un contenedor flex */
-.actions-cell {
+/* El contenedor flex que crea las dos columnas */
+.ghd-login-split-layout {
     display: flex;
-    align-items: center;
-    gap: 0.5rem; /* Espacio entre los botones */
-}
-
-/* Estilo para los nuevos botones de icono */
-.actions-cell > .ghd-btn-icon {
-    width: 32px;
-    height: 32px;
-    border: 1px solid transparent; /* Borde invisible para mantener el tamaño */
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-}
-
-.actions-cell > .ghd-btn-icon:hover {
-    background-color: var(--color-fondo-app);
-    border-color: var(--color-borde);
-    color: var(--texto-principal);
-}
-
-/* ==========================================================================
-   ESTILOS PARA LA PÁGINA DE LOGIN PERSONALIZADA
-   ========================================================================== */
-.ghd-login-page {
+    height: 100%;
     width: 100%;
-    min-height: 100vh;
+}
+
+/* El panel de la imagen (50% del ancho) */
+.login-image-panel {
+    flex: 1;
+    background-image: url('./img/login-bg.jpg');
+    background-size: cover;
+    background-position: center;
+    position: relative; /* Necesario para posicionar la capa superpuesta */
+    height: 100%;
+}
+
+/* --- NUEVO: Capa de color semitransparente --- */
+.login-image-panel::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--color-primario); /* Verde corporativo */
+    opacity: 0.5; /* Ajusta este valor para más o menos transparencia */
+    z-index: 1;
+}
+
+/* --- NUEVO: Imagen en blanco y negro --- */
+/* Esta regla se aplica a la imagen de fondo real */
+.login-image-panel {
+    filter: grayscale(100%);
+    height: 100%;
+}
+
+/* El panel del formulario (50% del ancho) */
+.login-form-panel {
+    flex: 1;
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 2rem;
     background-color: var(--color-fondo-app);
 }
+
+/* La caja blanca del formulario (sin cambios) */
 .ghd-login-box {
     background-color: var(--color-fondo-claro);
     padding: 2.5rem;
@@ -585,121 +181,75 @@ address { font-style: normal; line-height: 1.6; }
     max-width: 400px;
     text-align: center;
 }
-.login-title { margin: 0 0 0.5rem; font-size: 1.5rem; }
-.login-subtitle { margin: 0 0 1.5rem; color: var(--texto-secundario); }
-.login-error { background-color: #fff5f5; color: #c53030; border: 1px solid #fc8181; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; }
+.login-form-box .login-title { margin: 0 0 0.5rem; font-size: 1.5rem; }
+.login-form-box .login-subtitle { margin: 0 0 1.5rem; color: var(--texto-secundario); }
+.login-form-box .login-error { background-color: #fff5f5; color: #c53030; border: 1px solid #fc8181; padding: 1rem; border-radius: 6px; }
 
-/* Estilos para el formulario de wp_login_form */
-.ghd-login-box #loginform p { display: flex; flex-direction: column; text-align: left; }
-.ghd-login-box #loginform label { font-weight: 500; margin-bottom: 0.5rem; }
-.ghd-login-box #loginform input[type="text"],
-.ghd-login-box #loginform input[type="password"] {
-    padding: 0.75rem; border: 1px solid var(--color-borde); border-radius: 6px;
-}
-.ghd-login-box #loginform .login-remember { margin-top: 1rem; }
-.ghd-login-box #loginform .login-remember label { flex-direction: row; align-items: center; }
-.ghd-login-box #loginform input[type="submit"] {
-    width: 100%; margin-top: 1.5rem; padding: 0.75rem; border: none; border-radius: 6px;
-    background-color: var(--color-primario); color: white; font-weight: 600; cursor: pointer;
-    transition: background-color 0.2s ease;
-}
-.ghd-login-box #loginform input[type="submit"]:hover { background-color: var(--color-primario-hover); }
+/* Estilos para los campos del formulario (sin cambios) */
+.login-form-box #loginform p { display: flex; flex-direction: column; text-align: left; margin-bottom: 1rem; }
+.login-form-box #loginform label { font-weight: 500; margin-bottom: 0.5rem; }
+.login-form-box #loginform input[type="text"],
+.login-form-box #loginform input[type="password"] { padding: 0.75rem; border: 1px solid var(--color-borde); border-radius: 6px; }
+.login-form-box #loginform .login-remember { flex-direction: row; align-items: center; gap: 0.5rem; }
 
-/* ==========================================================================
-   ESTILOS PARA LA PÁGINA DE SECTORES
-   ========================================================================== */
-
-.ghd-sector-card-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 1.5rem;
-}
-
-.ghd-sector-card {
-    background-color: var(--color-fondo-claro);
-    border-radius: 8px;
-    border: 1px solid var(--color-borde);
-    padding: 1.5rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-    text-align: center;
-}
-
-.sector-card-title {
-    margin-top: 0;
-    margin-bottom: 0.5rem;
-    font-size: 1.2rem;
-}
-
-.sector-card-stat {
-    margin-top: 0;
-    margin-bottom: 1.5rem;
-    color: var(--texto-secundario);
-    font-size: 0.9rem;
-}
-
-/* ==========================================================================
-   ESTILOS PARA LA PÁGINA DE CLIENTES
-   ========================================================================== */
-
-.client-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.client-list-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    border: 1px solid var(--color-borde);
-    border-radius: 6px;
-    transition: background-color 0.2s ease;
-}
-
-.client-list-item:hover {
-    background-color: var(--color-fondo-app);
-}
-
-.client-name {
-    font-weight: 600;
-}
-
-/* ================================================================================================================================================*/
-/* ==========================================================================
-   ESTILOS PARA LA PÁGINA DE REPORTES (V2)
-   ========================================================================== */
-
-.ghd-reports-grid {
-    display: grid;
-    grid-template-columns: 2fr 1fr; /* Columna principal 2/3, lateral 1/3 */
-    gap: 1.5rem;
-    align-items: flex-start;
-}
-
-.report-main {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-.report-sidebar {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-/* Contenedor para que el gráfico sea responsive */
-.chart-container {
-    position: relative;
+/* --- CORREGIDO: Botón de Iniciar Sesión --- */
+/*.login-form-box #loginform input[type="submit"]#wp-submit{
     width: 100%;
-    height: auto;
-    min-height: 300px; /* Altura mínima para que no se colapse */
+    margin-top: 1.5rem;
+    padding: 0.75rem;
+    border: none;
+    border-radius: 6px;
+    background-color: var(--color-primario) !important; /* Verde corporativo 
+    color: white;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+.login-form-box #loginform input[type="submit"]:hover {
+    background-color: var(--color-primario-hover); 
+} */
+input[type="submit"].button-primary{
+    width: 100%;
+    margin-top: 1.5rem;
+    padding: 0.75rem;
+    border: 1px solid var(--color-primario);
+    border-radius: 6px;
+    background-color: transparent; /* Verde corporativo */ 
+    color: var(--color-primario);
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+input[type="submit"].button-primary:hover{
+    background-color: var(--color-primario-hover);
+    color: var(--texto-claro);
+}
+/* --- RESPONSIVE PARA EL LOGIN (sin cambios) --- */
+@media (max-width: 768px) {
+    .login-image-panel {
+        display: none;
+    }
+    .login-form-panel {
+        width: 100%;
+        flex: auto;
+    }
 }
 
-/* Responsive para la página de reportes */
-@media (max-width: 900px) {
-    .ghd-reports-grid {
-        grid-template-columns: 1fr; /* Apila las columnas en pantallas pequeñas */
-    }
+/* ==========================================================================
+   CORRECCIÓN FINAL - LAYOUT DE LOGIN SIN SCROLL
+   ========================================================================== */
+
+/* Targeta el BODY solo en la página de login */
+body.page-template-template-login {
+    height: 100vh;
+    overflow: hidden; /* Previene el scrollbar bajo cualquier circunstancia */
+}
+
+/* Ajusta nuestro contenedor principal para que llene el body */
+.page-template-template-login .ghd-login-split-layout {
+    min-height: 100%;
+    max-height: 100%;
+    /* min-height: initial;  Resetea la regla anterior para evitar conflictos */
 }

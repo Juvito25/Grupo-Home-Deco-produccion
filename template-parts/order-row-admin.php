@@ -45,17 +45,10 @@ if (!isset($args) || !is_array($args)) {
                     <a href="#" class="action-link" data-action="change_priority" data-value="Baja">Baja</a>
                 </div>
                 <div class="actions-menu-group">
-                    <span class="actions-menu-title">Asignar Sector</span>
-                    <?php
-                    $sectores = ghd_get_sectores_produccion();
-                    foreach ($sectores as $sector) {
-                        if ($sector === $args['sector_actual']) {
-                            echo '<span class="action-link is-current">' . esc_html($sector) . ' (Actual)</span>';
-                        } else {
-                            echo '<a href="#" class="action-link" data-action="change_sector" data-value="' . esc_attr($sector) . '">' . esc_html($sector) . '</a>';
-                        }
-                    }
-                    ?>
+                    <span class="actions-menu-title">Iniciar Producción</span>
+                    <a href="#" class="action-link" data-action="start_production">
+                        Enviar a Carpintería / Corte
+                    </a>
                 </div>
             </div>
         </div>
