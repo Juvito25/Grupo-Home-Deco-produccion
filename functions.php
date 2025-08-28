@@ -142,3 +142,42 @@ function ghd_filter_orders_posts_where($where) {
     $where = str_replace("(`{$wpdb->postmeta}`.`meta_key` = 'ID' AND `{$wpdb->postmeta}`.`meta_value` IN", "(`{$wpdb->posts}`.`ID` IN", $where);
     return $where;
 }
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// --- LÓGICA PARA PREPARAR DATOS PARA LA PÁGINA DE REPORTES ---
+add_action('wp_enqueue_scripts', 'ghd_enqueue_reports_scripts');
+function ghd_enqueue_reports_scripts() {
+    if (is_page_template('template-reportes.php')) {
+        
+        wp_enqueue_script('chart-js', 'https://cdn.jsdelivr.net/npm/chart.js', array(), '4.4.0', true);
+
+        // --- Datos para el Gráfico 1 y 2 (Pedidos por Sector) ---
+        $sectores = ghd_get_sectores_produccion();
+        $pedidos_por_sector = array();
+        foreach ($sectores as $sector) {
+            $query = new WP_Query(['post_type' => 'orden_produccion', 'posts_per_page' => -1, 'meta_key' => 'sector_actual', 'meta_value' => $sector, 'fields' => 'ids']);
+            $pedidos_por_sector[$sector] = $query->post_count;
+        }
+        
+        // --- NUEVO: Datos para el Gráfico 3 (Pedidos por Prioridad) ---
+        $prioridades = array('Alta', 'Media', 'Baja');
+        $pedidos_por_prioridad = array();
+        foreach ($prioridades as $prioridad) {
+            $query = new WP_Query(['post_type' => 'orden_produccion', 'posts_per_page' => -1, 'meta_key' => 'prioridad_pedido', 'meta_value' => $prioridad, 'fields' => 'ids']);
+            $pedidos_por_prioridad[$prioridad] = $query->post_count;
+        }
+
+        // --- Unificamos todos los datos para pasarlos a JavaScript ---
+        $chart_data = array(
+            'sector' => array(
+                'labels' => array_keys($pedidos_por_sector),
+                'data'   => array_values($pedidos_por_sector)
+            ),
+            'prioridad' => array(
+                'labels' => array_keys($pedidos_por_prioridad),
+                'data'   => array_values($pedidos_por_prioridad)
+            )
+        );
+
+        wp_localize_script('ghd-app', 'ghd_reports_data', $chart_data);
+    }
+}

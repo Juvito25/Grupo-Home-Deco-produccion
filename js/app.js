@@ -237,3 +237,95 @@ window.addEventListener('load', function() {
         history.pushState("", document.title, window.location.pathname + window.location.search);
     }
 });
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+// --- LÓGICA PARA LOS GRÁFICOS DE LA PÁGINA DE REPORTES ---
+document.addEventListener('DOMContentLoaded', function() {
+    // Verificamos si estamos en la página de reportes y si los datos existen
+    if (typeof ghd_reports_data !== 'undefined' && document.querySelector('.ghd-reports-grid')) {
+        
+        // --- GRÁFICO 1: PEDIDOS POR ESTADO (BARRAS) ---
+        const pedidosChartCtx = document.getElementById('pedidosPorEstadoChart');
+        if (pedidosChartCtx) {
+            new Chart(pedidosChartCtx, {
+                type: 'bar',
+                data: {
+                    labels: ghd_reports_data.sector.labels, 
+                    datasets: [{
+                        label: 'Nº de Pedidos Activos',
+                        data: ghd_reports_data.sector.data,
+                        // CORRECCIÓN: Colores añadidos
+                        backgroundColor: [
+                            'rgba(54, 162, 235, 0.6)',
+                            'rgba(153, 102, 255, 0.6)',
+                            'rgba(255, 159, 64, 0.6)',
+                            'rgba(255, 99, 132, 0.6)'
+                        ],
+                        borderColor: [
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(153, 102, 255, 1)',
+                            'rgba(255, 159, 64, 1)',
+                            'rgba(255, 99, 132, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+                    plugins: { legend: { display: true } } // Activamos la leyenda para claridad
+                }
+            });
+        }
+
+        // --- GRÁFICO 2: CARGA DE TRABAJO (DONA) ---
+        const cargaChartCtx = document.getElementById('cargaPorSectorChart');
+        if (cargaChartCtx) {
+            new Chart(cargaChartCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ghd_reports_data.sector.labels,
+                    datasets: [{
+                        label: 'Carga de Trabajo',
+                        data: ghd_reports_data.sector.data,
+                        // CORRECCIÓN: Colores añadidos
+                        backgroundColor: [
+                            'rgba(54, 162, 235, 0.8)',
+                            'rgba(153, 102, 255, 0.8)',
+                            'rgba(255, 159, 64, 0.8)',
+                            'rgba(255, 99, 132, 0.8)'
+                        ],
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        }
+
+        // --- GRÁFICO 3: PEDIDOS POR PRIORIDAD (POLAR) ---
+        const prioridadChartCtx = document.getElementById('pedidosPorPrioridadChart');
+        if (prioridadChartCtx) {
+            new Chart(prioridadChartCtx, {
+                type: 'polarArea',
+                data: {
+                    labels: ghd_reports_data.prioridad.labels,
+                    datasets: [{
+                        label: 'Nº de Pedidos',
+                        data: ghd_reports_data.prioridad.data,
+                        backgroundColor: [
+                            'rgba(239, 68, 68, 0.7)',
+                            'rgba(245, 158, 11, 0.7)',
+                            'rgba(34, 197, 94, 0.7)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        }
+    }
+});

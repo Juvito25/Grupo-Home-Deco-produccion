@@ -664,3 +664,42 @@ address { font-style: normal; line-height: 1.6; }
 .client-name {
     font-weight: 600;
 }
+
+/* ================================================================================================================================================*/
+/* ==========================================================================
+   ESTILOS PARA LA PÁGINA DE REPORTES (V2)
+   ========================================================================== */
+
+.ghd-reports-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr; /* Columna principal 2/3, lateral 1/3 */
+    gap: 1.5rem;
+    align-items: flex-start;
+}
+
+.report-main {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.report-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Contenedor para que el gráfico sea responsive */
+.chart-container {
+    position: relative;
+    width: 100%;
+    height: auto;
+    min-height: 300px; /* Altura mínima para que no se colapse */
+}
+
+/* Responsive para la página de reportes */
+@media (max-width: 900px) {
+    .ghd-reports-grid {
+        grid-template-columns: 1fr; /* Apila las columnas en pantallas pequeñas */
+    }
+}
