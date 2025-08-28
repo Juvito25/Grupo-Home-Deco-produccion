@@ -55,8 +55,11 @@ body {
    3. COMPONENTES REUTILIZABLES
    ========================================================================== */
 .ghd-card { background-color: var(--color-fondo-claro); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid var(--color-borde); }
-.ghd-btn { padding: 0.6rem 1.2rem; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; justify-content: center; }
-.ghd-btn-primary { background-color: var(--color-primario); color: white; }
+.ghd-btn { padding: 0.6rem 1.2rem; border: none;  border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; justify-content: center; }
+.action-button{
+    border: 1px solid var(--color-rojo);
+}
+.ghd-btn-primary { background-color: var(--color-primario); color: white; border: none;}
 .ghd-tag { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: 500; }
 .tag-red { background-color: #FEE2E2; color: #991B1B; }
 .tag-yellow { background-color: #FEF3C7; color: #92400E; }
