@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Lógica del menú móvil (igual que antes)
+    // --- LÓGICA DEL MENÚ MÓVIL (Estable) ---
     const menuToggle = document.getElementById('mobile-menu-toggle');
     const sidebar = document.querySelector('.ghd-sidebar');
     if (menuToggle && sidebar) {
@@ -14,10 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- LÓGICA DEL PANEL DE ADMINISTRADOR ---
     const adminTableBody = document.querySelector('.ghd-table tbody');
     if (adminTableBody) {
-        // Usamos delegación de eventos para manejar todos los clics dentro de la tabla
         adminTableBody.addEventListener('click', function(e) {
-            
-            // --- NUEVO: LÓGICA PARA EL BOTÓN "INICIAR PRODUCCIÓN" ---
             const startBtn = e.target.closest('.start-production-btn');
             if (startBtn) {
                 e.preventDefault();
@@ -31,17 +28,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 startBtn.textContent = 'Iniciando...';
                 
                 const params = new URLSearchParams({
-                    action: 'ghd_admin_action',
-                    nonce: ghd_ajax.nonce,
-                    order_id: orderId,
-                    type: 'start_production'
+                    action: 'ghd_admin_action', nonce: ghd_ajax.nonce,
+                    order_id: orderId, type: 'start_production'
                 });
                 
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                     .then(res => res.json())
                     .then(data => {
                         if (data.success) {
-                            // Si tiene éxito, eliminamos la fila de la vista de pendientes
                             row.remove();
                         } else {
                             alert('Error: ' + (data.data?.message || 'No se pudo iniciar la producción.'));
@@ -54,23 +48,98 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // --- LÓGICA DEL PANEL DE SECTOR ---
     const tasksList = document.querySelector('.ghd-sector-tasks-list');
     if (tasksList) {
         tasksList.addEventListener('click', function(e) {
             const actionButton = e.target.closest('.action-button');
             if (actionButton) {
+                e.preventDefault();
                 const card = actionButton.closest('.ghd-order-card');
                 card.style.opacity = '0.5';
+                
                 const params = new URLSearchParams({
                     action: 'ghd_update_task_status', nonce: ghd_ajax.nonce,
                     order_id: actionButton.dataset.orderId,
                     field: actionButton.dataset.field,
                     value: actionButton.dataset.value
                 });
+
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                     .then(res => res.json())
-                    .then(data => { if (data.success) card.remove(); else { card.style.opacity = '1'; alert('Error.'); } });
+                    .then(data => {
+                        if (data.success) {
+                            if (actionButton.dataset.value === 'Completado') {
+                                card.remove();
+                            } else {
+                                card.outerHTML = data.data.html;
+                            }
+                        } else {
+                            alert('Error al actualizar el estado.');
+                        }
+                    })
+                    .catch(error => console.error('Error:', error))
+                    .finally(() => {
+                        const finalCard = document.getElementById(card.id);
+                        if (finalCard) {
+                            finalCard.style.opacity = '1';
+                        }
+                    });
             }
         });
     }
+
+    // --- BLOQUE AÑADIDO: LÓGICA DE FILTROS (PANEL ADMIN) ---
+    const searchFilter = document.getElementById('ghd-search-filter');
+    if (searchFilter) {
+        const statusFilter = document.getElementById('ghd-status-filter');
+        const priorityFilter = document.getElementById('ghd-priority-filter');
+        const resetFiltersBtn = document.getElementById('ghd-reset-filters');
+        
+        const applyFilters = () => {
+            if (!adminTableBody) return;
+            adminTableBody.style.opacity = '0.5';
+            const params = new URLSearchParams({ 
+                action: 'ghd_filter_orders', 
+                nonce: ghd_ajax.nonce, 
+                search: searchFilter.value, 
+                status: statusFilter.value, 
+                priority: priorityFilter.value 
+            });
+            fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+                .then(res => res.json())
+                .then(data => { if (data.success) adminTableBody.innerHTML = data.data.html; })
+                .finally(() => adminTableBody.style.opacity = '1');
+        };
+
+        let searchTimeout;
+        searchFilter.addEventListener('keyup', () => { clearTimeout(searchTimeout); searchTimeout = setTimeout(applyFilters, 500); });
+        statusFilter.addEventListener('change', applyFilters);
+        priorityFilter.addEventListener('change', applyFilters);
+        resetFiltersBtn.addEventListener('click', () => { 
+            searchFilter.value = ''; statusFilter.value = ''; priorityFilter.value = ''; 
+            applyFilters(); 
+        });
+    }
+
+    // --- BLOQUE AÑADIDO: LÓGICA PARA LEER EL FILTRO DESDE LA URL ---
+    window.addEventListener('load', function() {
+        const searchFilterInput = document.getElementById('ghd-search-filter');
+        if (!searchFilterInput) return;
+
+        if (window.location.hash && window.location.hash.startsWith('#buscar=')) {
+            let searchTerm = decodeURIComponent(window.location.hash.substring(8));
+            searchTerm = searchTerm.replace(/\+/g, ' ');
+
+            searchFilterInput.value = searchTerm;
+            
+            // Reutilizamos la función que ya existe para aplicar los filtros
+            if (typeof applyFilters === 'function') {
+                applyFilters();
+            }
+
+            history.pushState("", document.title, window.location.pathname + window.location.search);
+        }
+    });
+
 });
