@@ -1,11 +1,11 @@
 <?php
 /**
  * Template Part para el sidebar del panel de sector.
- * Versión final con logout corregido.
+ * Versión final con clase 'active' dinámica.
  */
 $current_user = wp_get_current_user();
-$sector_dashboard_url = home_url('/mi-puesto/');
-$login_url = home_url('/iniciar-sesion/'); // Obtenemos la URL de nuestra página de login
+$sector_dashboard_url = home_url('/mis-tareas/');
+$login_url = home_url('/iniciar-sesion/');
 ?>
 
 <div class="ghd-sidebar">
@@ -14,7 +14,7 @@ $login_url = home_url('/iniciar-sesion/'); // Obtenemos la URL de nuestra págin
 </div>
 <nav class="sidebar-nav">
     <ul>
-        <li class="active">
+        <li class="<?php if (is_page('mis-tareas') || is_singular('orden_produccion')) echo 'active'; ?>">
             <a href="<?php echo esc_url($sector_dashboard_url); ?>">
                 <i class="fa-solid fa-inbox"></i>
                 <span>Mis Tareas</span>
@@ -27,7 +27,6 @@ $login_url = home_url('/iniciar-sesion/'); // Obtenemos la URL de nuestra págin
             </a>
         </li>
         <li>
-            <!-- CORRECCIÓN CLAVE: Redirige a nuestra página de login personalizada -->
             <a href="<?php echo wp_logout_url($login_url); ?>">
                 <i class="fa-solid fa-sign-out-alt"></i>
                 <span>Cerrar Sesión</span>
