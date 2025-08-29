@@ -133,7 +133,7 @@ $pedidos_query = new WP_Query([
     else { get_template_part('template-parts/sidebar-sector'); } 
     ?>
 
-    <main class="ghd-main-content">
+    <main class="ghd-main-content" data-campo-estado="<?php echo esc_attr($campo_estado); ?>">
         <header class="ghd-main-header">
             <div class="header-title-wrapper">
                 <button id="mobile-menu-toggle" class="ghd-btn-icon"><i class="fa-solid fa-bars"></i></button>
@@ -153,8 +153,6 @@ $pedidos_query = new WP_Query([
         <div class="ghd-sector-tasks-list">
             <?php if ($pedidos_query->have_posts()) : while ($pedidos_query->have_posts()) : $pedidos_query->the_post();
                 
-                // Ahora, todos los roles que usan este template (excepto el admin viendo otros)
-                // usarán la misma tarjeta de tarea.
                 $current_order_id = get_the_ID();
                 $current_status = get_field($campo_estado, $current_order_id);
                 $prioridad_pedido = get_field('prioridad_pedido', $current_order_id);

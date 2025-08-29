@@ -52,7 +52,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (archiveBtn && !document.body.classList.contains('is-admin-sector-panel')) { 
 =======
             // Lógica para el botón "Archivar Pedido" (versión NO-ADMIN-DASHBOARD)
-            // Esto es para paneles de sector que NO son el Admin principal.
             const archiveBtnGeneral = e.target.closest('.archive-order-btn');
             if (archiveBtnGeneral && !document.body.classList.contains('is-admin-dashboard-panel')) { 
 >>>>>>> 2dac4e9 (Feat: completado del flujo de trabajo)
@@ -72,8 +71,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     .then(data => {
                         if (data.success) {
                             container.remove();
-                            // Aquí no actualizamos KPIs porque este bloque es para paneles de sector no administrativos
-                            // o si el admin ve otro sector, los KPIs que se ven no son los de su propio panel.
                         } else {
                             alert('Error: ' + (data.data?.message || 'No se pudo archivar.'));
                             container.style.opacity = '1';
@@ -147,8 +144,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     .then(data => {
                         if (data.success) {
                             rowToRemove.remove(); 
-                            // Podrías añadir lógica aquí para actualizar los KPIs de "Pedidos Pendientes de Asignación"
-                            // si tuvieras una sección KPI dedicada para ellos. Por ahora, solo se elimina la fila.
                         } else {
                             alert('Error: ' + (data.data?.message || 'No se pudo iniciar la producción.'));
                             rowToRemove.style.opacity = '1';
@@ -165,10 +160,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
             }
 
-            // --- NUEVA LÓGICA: BOTÓN "Archivar Pedido" en la sección de Cierre del Admin principal ---
-            // Aseguramos que solo se active si estamos en el panel principal del Admin
-            const archiveClosureBtn = e.target.closest('.archive-order-btn'); // Mismo selector de clase que antes
-            const isWithinClosureTable = e.target.closest('#ghd-closure-table-body'); // Nuevo selector para la tabla específica
+            // --- LÓGICA: BOTÓN "Archivar Pedido" en la sección de Cierre del Admin principal ---
+            const archiveClosureBtn = e.target.closest('.archive-order-btn');
+            const isWithinClosureTable = e.target.closest('#ghd-closure-table-body');
             
             if (archiveClosureBtn && isWithinClosureTable && document.body.classList.contains('is-admin-dashboard-panel')) {
                 e.preventDefault();
@@ -191,9 +185,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
-                            rowToArchive.remove(); // Elimina la fila del pedido archivado
+                            rowToArchive.remove();
                             if (data.data.kpi_data) {
-                                updateAdminClosureKPIs(data.data.kpi_data); // Actualiza los KPIs de cierre del Admin
+                                updateAdminClosureKPIs(data.data.kpi_data);
                             }
                         } else {
                             alert('Error: ' + (data.data.message || 'No se pudo archivar.'));
@@ -212,10 +206,106 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
         }); // Fin del mainContent.addEventListener('click')
+    } // Fin del if(mainContent)
+
+
+    // --- LÓGICA PARA EL BOTÓN "REFRESCAR" EN PANELES DE SECTOR ---
+    const refreshTasksBtn = document.getElementById('ghd-refresh-tasks');
+    if (refreshTasksBtn) {
+        refreshTasksBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const sectorTasksList = document.querySelector('.ghd-sector-tasks-list');
+            const mainContentEl = document.querySelector('.ghd-main-content'); // Obtener el elemento main
+            const campoEstado = mainContentEl ? mainContentEl.dataset.campoEstado : ''; // Obtener campo_estado del data attribute
+
+            if (!sectorTasksList || !campoEstado) {
+                console.error("No se encontró la lista de tareas del sector o el campo_estado.");
+                return;
+            }
+
+            sectorTasksList.style.opacity = '0.5'; // Efecto visual de carga
+            refreshTasksBtn.disabled = true;
+
+            const params = new URLSearchParams({
+                action: 'ghd_refresh_sector_tasks',
+                nonce: ghd_ajax.nonce,
+                campo_estado: campoEstado // Pasar el campo_estado del sector actual
+            });
+
+            fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        sectorTasksList.innerHTML = data.data.tasks_html;
+                        if (data.data.kpi_data) {
+                            updateSectorKPIs(data.data.kpi_data); // Actualizar los KPIs
+                        }
+                    } else {
+                        alert('Error al refrescar tareas: ' + (data.data?.message || ''));
+                        sectorTasksList.innerHTML = '<p class="no-tasks-message">Error al cargar tareas.</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error("Error en la petición AJAX de refresco de sector:", error);
+                    alert('Error de red al refrescar tareas.');
+                    sectorTasksList.innerHTML = '<p class="no-tasks-message">Error de red. Inténtalo de nuevo.</p>';
+                })
+                .finally(() => {
+                    sectorTasksList.style.opacity = '1';
+                    refreshTasksBtn.disabled = false;
+                });
+        });
     }
 
+    // --- LÓGICA PARA EL BOTÓN "REFRESCAR" EN LA SECCIÓN DE CIERRE DEL ADMIN PRINCIPAL ---
+    const refreshClosureTasksBtn = document.getElementById('ghd-refresh-closure-tasks');
+    if (refreshClosureTasksBtn && document.body.classList.contains('is-admin-dashboard-panel')) {
+        refreshClosureTasksBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const closureTasksContainer = document.getElementById('admin-closure-tasks-container');
+            const closureTableBody = document.getElementById('ghd-closure-table-body');
+
+            if (!closureTasksContainer || !closureTableBody) {
+                console.error("No se encontró el contenedor de tareas de cierre.");
+                return;
+            }
+            
+            closureTasksContainer.style.opacity = '0.5'; // Efecto visual de carga
+            refreshClosureTasksBtn.disabled = true;
+
+            const params = new URLSearchParams({
+                action: 'ghd_refresh_admin_closure_section',
+                nonce: ghd_ajax.nonce
+            });
+
+            fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        closureTableBody.innerHTML = data.data.table_html;
+                        if (data.data.kpi_data) {
+                            updateAdminClosureKPIs(data.data.kpi_data); // Actualizar los KPIs de cierre
+                        }
+                    } else {
+                        alert('Error al refrescar pedidos de cierre: ' + (data.data?.message || ''));
+                        closureTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Error al cargar pedidos de cierre.</td></tr>';
+                    }
+                })
+                .catch(error => {
+                    console.error("Error en la petición AJAX de refresco de cierre:", error);
+                    alert('Error de red al refrescar pedidos de cierre.');
+                    closureTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Error de red. Inténtalo de nuevo.</td></tr>';
+                })
+                .finally(() => {
+                    closureTasksContainer.style.opacity = '1';
+                    refreshClosureTasksBtn.disabled = false;
+                });
+        });
+    }
+
+
     // --- LÓGICA DE FILTROS Y BÚSQUEDA PARA EL PANEL DE ADMINISTRADOR (EXISTENTE) ---
-    // (Este bloque no tiene cambios)
+    // (Este bloque no tiene cambios, se mantiene como estaba)
     const adminDashboard = document.querySelector('.page-template-template-admin-dashboard');
 
     if (adminDashboard) {

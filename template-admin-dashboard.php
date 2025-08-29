@@ -86,7 +86,11 @@ get_header();
             </table>
         </div>
 
-        <h2 style="margin-top: 40px;">Pedidos Pendientes de Cierre</h2>
+        <div class="header-title-wrapper" style="margin-top: 40px;">
+            <h2>Pedidos Pendientes de Cierre</h2>
+            <button id="ghd-refresh-closure-tasks" class="ghd-btn ghd-btn-secondary"><i class="fa-solid fa-sync"></i> <span>Refrescar</span></button>
+        </div>
+
 
         <?php 
         // Calcular KPIs para Pedidos Pendientes de Cierre
@@ -101,7 +105,7 @@ get_header();
         </div>
 
         <!-- TABLA DE PEDIDOS PENDIENTES DE CIERRE (ADMINISTRATIVO) -->
-        <div class="ghd-card ghd-table-wrapper">
+        <div class="ghd-card ghd-table-wrapper" id="admin-closure-tasks-container"> <!-- ID para identificar este contenedor en JS -->
             <table class="ghd-table">
                 <thead>
                     <tr>
@@ -112,7 +116,7 @@ get_header();
                         <th>Acciones</th>
                     </tr>
                 </thead>
-                <tbody id="ghd-closure-table-body"> <!-- Nuevo ID para el tbody de cierre -->
+                <tbody id="ghd-closure-table-body">
                     <?php
                     $args_cierre = array(
                         'post_type'      => 'orden_produccion',
@@ -120,7 +124,7 @@ get_header();
                         'meta_query'     => array(
                             array(
                                 'key'     => 'estado_pedido',
-                                'value'   => 'Pendiente de Cierre Admin', // Nuevo estado
+                                'value'   => 'Pendiente de Cierre Admin',
                                 'compare' => '=',
                             ),
                         ),
@@ -132,7 +136,7 @@ get_header();
                     if ($pedidos_cierre_query->have_posts()) :
                         while ($pedidos_cierre_query->have_posts()) : $pedidos_cierre_query->the_post();
                     ?>
-                        <tr id="order-row-closure-<?php echo get_the_ID(); ?>"> <!-- ID específico para filas de cierre -->
+                        <tr id="order-row-closure-<?php echo get_the_ID(); ?>">
                             <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
                             <td><?php echo esc_html(get_field('nombre_cliente')); ?></td>
                             <td><?php echo esc_html(get_field('nombre_producto')); ?></td>

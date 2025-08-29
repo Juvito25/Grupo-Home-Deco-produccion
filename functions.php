@@ -340,3 +340,135 @@ function ghd_archive_order_callback() {
     wp_send_json_success(['message' => 'Pedido archivado con éxito.']);
     wp_die();
 }
+
+// --- NUEVOS MANEJADORES AJAX PARA REFRESCO ---
+
+/**
+ * AJAX Handler para refrescar las tareas y KPIs de un sector específico.
+ */
+add_action('wp_ajax_ghd_refresh_sector_tasks', 'ghd_refresh_sector_tasks_callback');
+function ghd_refresh_sector_tasks_callback() {
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+    if (!current_user_can('read')) wp_send_json_error(['message' => 'No tienes permisos.']);
+
+    $campo_estado = sanitize_key($_POST['campo_estado']);
+    if (empty($campo_estado)) {
+        wp_send_json_error(['message' => 'Campo de estado no proporcionado.']);
+    }
+
+    // 1. Recalcular KPIs para el sector
+    $sector_kpi_data = ghd_calculate_sector_kpis($campo_estado);
+
+    // 2. Regenerar el HTML de las tareas
+    ob_start();
+    $pedidos_query = new WP_Query([
+        'post_type'      => 'orden_produccion', 
+        'posts_per_page' => -1, 
+        'meta_query'     => [
+            [
+                'key'     => $campo_estado, 
+                'value'   => ['Pendiente', 'En Progreso'], 
+                'compare' => 'IN'
+            ]
+        ]
+    ]);
+
+    if ($pedidos_query->have_posts()) : 
+        while ($pedidos_query->have_posts()) : $pedidos_query->the_post();
+            $current_order_id = get_the_ID();
+            $current_status = get_field($campo_estado, $current_order_id);
+            $prioridad_pedido = get_field('prioridad_pedido', $current_order_id);
+            $prioridad_class = '';
+            if ($prioridad_pedido === 'Alta') {
+                $prioridad_class = 'prioridad-alta';
+            } elseif ($prioridad_pedido === 'Media') {
+                $prioridad_class = 'prioridad-media';
+            } else {
+                $prioridad_class = 'prioridad-baja';
+            }
+
+            $task_card_args = [
+                'post_id'         => $current_order_id,
+                'titulo'          => get_the_title($current_order_id),
+                'prioridad_class' => $prioridad_class,
+                'prioridad'       => $prioridad_pedido,
+                'nombre_cliente'  => get_field('nombre_cliente', $current_order_id),
+                'nombre_producto' => get_field('nombre_producto', $current_order_id),
+                'permalink'       => get_permalink($current_order_id),
+                'campo_estado'    => $campo_estado,
+                'estado_actual'   => $current_status,
+            ];
+            get_template_part('template-parts/task-card', null, $task_card_args);
+        endwhile;
+    else: ?>
+        <p class="no-tasks-message">No tienes tareas pendientes.</p>
+    <?php endif; wp_reset_postdata(); 
+    $tasks_html = ob_get_clean();
+
+    wp_send_json_success([
+        'message'  => 'Tareas de sector actualizadas.',
+        'tasks_html' => $tasks_html,
+        'kpi_data' => $sector_kpi_data
+    ]);
+    wp_die();
+}
+
+/**
+ * AJAX Handler para refrescar la sección de Pedidos Pendientes de Cierre y sus KPIs del Admin principal.
+ */
+add_action('wp_ajax_ghd_refresh_admin_closure_section', 'ghd_refresh_admin_closure_section_callback');
+function ghd_refresh_admin_closure_section_callback() {
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+    if (!current_user_can('manage_options')) wp_send_json_error(['message' => 'No tienes permisos.']);
+
+    // 1. Recalcular KPIs para la sección de cierre
+    $admin_closure_kpis = ghd_calculate_admin_closure_kpis();
+
+    // 2. Regenerar el HTML de la tabla de cierre
+    ob_start();
+    $args_cierre = array(
+        'post_type'      => 'orden_produccion',
+        'posts_per_page' => -1,
+        'meta_query'     => array(
+            array(
+                'key'     => 'estado_pedido',
+                'value'   => 'Pendiente de Cierre Admin',
+                'compare' => '=',
+            ),
+        ),
+        'orderby' => 'date',
+        'order'   => 'ASC',
+    );
+    $pedidos_cierre_query = new WP_Query($args_cierre);
+
+    if ($pedidos_cierre_query->have_posts()) :
+        while ($pedidos_cierre_query->have_posts()) : $pedidos_cierre_query->the_post();
+        ?>
+            <tr id="order-row-closure-<?php echo get_the_ID(); ?>">
+                <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
+                <td><?php echo esc_html(get_field('nombre_cliente')); ?></td>
+                <td><?php echo esc_html(get_field('nombre_producto')); ?></td>
+                <td><?php echo get_the_date(); ?></td>
+                <td>
+                    <button class="ghd-btn ghd-btn-primary archive-order-btn" data-order-id="<?php echo get_the_ID(); ?>">
+                        Archivar Pedido
+                    </button>
+                </td>
+            </tr>
+        <?php
+        endwhile;
+    else: 
+    ?>
+        <tr><td colspan="5" style="text-align:center;">No hay pedidos pendientes de cierre.</td></tr>
+    <?php
+    endif;
+    wp_reset_postdata(); 
+    $closure_table_html = ob_get_clean();
+
+    wp_send_json_success([
+        'message'          => 'Sección de cierre actualizada.',
+        'table_html'       => $closure_table_html,
+        'kpi_data'         => $admin_closure_kpis
+    ]);
+    wp_die();
+}
