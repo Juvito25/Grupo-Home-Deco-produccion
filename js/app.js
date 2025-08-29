@@ -11,100 +11,61 @@ document.addEventListener('DOMContentLoaded', function() {
         overlay.addEventListener('click', closeMenu);
     }
 
-    // --- LÓGICA DEL PANEL DE ADMINISTRADOR ---
-    const adminTableBody = document.querySelector('.ghd-table tbody');
-    if (adminTableBody) {
-        adminTableBody.addEventListener('click', function(e) {
-            const startBtn = e.target.closest('.start-production-btn');
-            if (startBtn) {
+    // --- LÓGICA UNIVERSAL DE CLICS EN EL CONTENIDO PRINCIPAL ---
+    const mainContent = document.querySelector('.ghd-main-content');
+    if (mainContent) {
+        mainContent.addEventListener('click', function(e) {
+            
+            // Lógica para el botón "Archivar Pedido"
+            const archiveBtn = e.target.closest('.archive-order-btn');
+            if (archiveBtn) {
                 e.preventDefault();
-                if (!confirm('¿Iniciar la producción de este pedido?')) return;
+                if (!confirm('¿Archivar este pedido? Esta acción es final.')) return;
+
+                const orderId = archiveBtn.dataset.orderId;
+                const container = archiveBtn.closest('tr') || archiveBtn.closest('.ghd-order-card');
                 
-                const row = startBtn.closest('tr');
-                const orderId = startBtn.dataset.orderId;
-                
-                row.style.opacity = '0.5';
-                startBtn.disabled = true;
-                startBtn.textContent = 'Iniciando...';
-                
-                const params = new URLSearchParams({
-                    action: 'ghd_admin_action', nonce: ghd_ajax.nonce,
-                    order_id: orderId, type: 'start_production'
-                });
-                
+                container.style.opacity = '0.5';
+                archiveBtn.disabled = true;
+                archiveBtn.textContent = 'Archivando...';
+
+                const params = new URLSearchParams({ action: 'ghd_archive_order', nonce: ghd_ajax.nonce, order_id: orderId });
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                     .then(res => res.json())
                     .then(data => {
                         if (data.success) {
-                            row.remove();
+                            container.remove();
                         } else {
-                            alert('Error: ' + (data.data?.message || 'No se pudo iniciar la producción.'));
-                            row.style.opacity = '1';
-                            startBtn.disabled = false;
-                            startBtn.textContent = 'Iniciar Producción';
+                            alert('Error: ' + (data.data?.message || 'No se pudo archivar.'));
+                            container.style.opacity = '1';
+                            archiveBtn.disabled = false;
+                            archiveBtn.textContent = 'Archivar Pedido';
                         }
+                    });
+            }
+
+            // Lógica para los botones de estado del panel de sector
+            const actionButton = e.target.closest('.action-button');
+            if (actionButton) {
+                e.preventDefault();
+                const card = actionButton.closest('.ghd-order-card');
+                card.style.opacity = '0.5';
+                const params = new URLSearchParams({ action: 'ghd_update_task_status', nonce: ghd_ajax.nonce, order_id: actionButton.dataset.orderId, field: actionButton.dataset.field, value: actionButton.dataset.value });
+                fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            if (actionButton.dataset.value === 'Completado') { card.remove(); } 
+                            else { card.outerHTML = data.data.html; }
+                        } else { alert('Error al actualizar.'); }
+                    })
+                    .finally(() => {
+                        const finalCard = document.getElementById(card.id);
+                        if (finalCard) { finalCard.style.opacity = '1'; }
                     });
             }
         });
     }
-
-// --- REEMPLAZA ESTE BLOQUE COMPLETO EN js/app.js ---
-
-// --- LÓGICA DEL PANEL DE SECTOR (CON ACTUALIZACIÓN DE UI EN EL CLIENTE) ---
-const tasksList = document.querySelector('.ghd-sector-tasks-list');
-if (tasksList) {
-    tasksList.addEventListener('click', function(e) {
-        const actionButton = e.target.closest('.action-button');
-        if (actionButton) {
-            e.preventDefault();
-            
-            const card = actionButton.closest('.ghd-order-card');
-            card.style.opacity = '0.5';
-            
-            const params = new URLSearchParams({
-                action: 'ghd_update_task_status', nonce: ghd_ajax.nonce,
-                order_id: actionButton.dataset.orderId,
-                field: actionButton.dataset.field,
-                value: actionButton.dataset.value
-            });
-
-            fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        // Si la acción fue 'Completado', eliminamos la tarjeta.
-                        if (actionButton.dataset.value === 'Completado') {
-                            card.remove();
-                        } 
-                        // SI LA ACCIÓN FUE 'EN PROGRESO', ACTUALIZAMOS LA TARJETA MANUALMENTE.
-                        else if (actionButton.dataset.value === 'En Progreso') {
-                            // 1. Cambiamos el botón
-                            actionButton.textContent = 'Marcar Completa';
-                            actionButton.dataset.value = 'Completado';
-
-                            // 2. Añadimos la etiqueta "En Progreso"
-                            const tagsContainer = card.querySelector('.order-tags');
-                            if (tagsContainer) {
-                                const newTag = document.createElement('span');
-                                newTag.className = 'ghd-tag tag-blue';
-                                newTag.textContent = 'En Progreso';
-                                tagsContainer.appendChild(newTag);
-                            }
-                        }
-                    } else {
-                        alert('Error al actualizar el estado.');
-                    }
-                })
-                .catch(error => console.error('Error:', error))
-                .finally(() => {
-                    // Nos aseguramos de que la tarjeta vuelva a ser visible si no se eliminó.
-                    if (document.body.contains(card)) {
-                        card.style.opacity = '1';
-                    }
-                });
-        }
-    });
-}
 
 // --- LÓGICA DE FILTROS Y BÚSQUEDA PARA EL PANEL DE ADMINISTRADOR ---
 const adminDashboard = document.querySelector('.page-template-template-admin-dashboard');
@@ -224,8 +185,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 })
 });
-
-// --- AÑADE ESTE BLOQUE COMPLETO AL FINAL DE js/app.js ---
 
 // LÓGICA PARA ACTIVAR EL FILTRO DESDE LA URL AL CARGAR LA PÁGINA
 window.addEventListener('load', function() {
