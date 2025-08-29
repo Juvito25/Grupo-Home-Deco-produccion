@@ -121,31 +121,77 @@ add_action('wp_ajax_ghd_update_task_status', function() {
 // --- MANEJADOR AJAX PARA ARCHIVAR PEDIDOS DESDE EL PANEL ADMINISTRATIVO ---
 add_action('wp_ajax_ghd_archive_order', 'ghd_archive_order_callback');
 function ghd_archive_order_callback() {
-    // 1. Seguridad: Verificar nonce y permisos
+    // 1. Seguridad y Validación (sin cambios)
     check_ajax_referer('ghd-ajax-nonce', 'nonce');
     if (!current_user_can('manage_options') && !current_user_can('rol_administrativo')) {
         wp_send_json_error(['message' => 'No tienes permisos.']);
     }
-
-    // 2. Validación de Datos
     $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
     if (!$order_id) {
         wp_send_json_error(['message' => 'ID de pedido no válido.']);
     }
 
-    // 3. Actualizar los campos para cerrar el pedido
+    // 2. Actualizar los campos (sin cambios)
     update_field('estado_administrativo', 'Archivado', $order_id);
     update_field('estado_pedido', 'Completado y Archivado', $order_id);
+    wp_insert_post([ 'post_title' => 'Pedido Cerrado y Archivado', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id] ]);
 
-    // 4. Añadir la entrada final al historial
-    wp_insert_post([
-        'post_title'   => 'Pedido Cerrado y Archivado',
-        'post_type'    => 'ghd_historial',
-        'post_status'  => 'publish',
-        'meta_input'   => ['_orden_produccion_id' => $order_id]
-    ]);
+    // --- NUEVA LÓGICA: RECALCULAR Y DEVOLVER KPIs ---
+    // KPIs para pedidos PENDIENTES de administrativo
+    $kpi_args = [
+        'post_type' => 'orden_produccion', 'posts_per_page' => -1,
+        'meta_query' => [['key' => 'estado_administrativo', 'value' => 'Pendiente', 'compare' => '=']]
+    ];
+    $kpi_query = new WP_Query($kpi_args);
+    
+    $kpi_data = [
+        'total_pedidos' => $kpi_query->post_count,
+        'total_prioridad_alta' => 0,
+        'tiempo_promedio_str' => '0.0h',
+        'completadas_hoy' => 0 // <-- Añadimos este campo
+    ];
+    
+    $total_tiempo_espera = 0;
+    $ahora = current_time('U'); // Obtener el tiempo actual en formato UNIX (GMT por defecto en WP)
 
-    // 5. Enviar respuesta de éxito
-    wp_send_json_success(['message' => 'Pedido archivado con éxito.']);
+    if ($kpi_query->have_posts()) {
+        foreach ($kpi_query->posts as $pedido) {
+            if (get_field('prioridad_pedido', $pedido->ID) === 'Alta') { $kpi_data['total_prioridad_alta']++; }
+            $total_tiempo_espera += $ahora - get_the_modified_time('U', $pedido->ID);
+        }
+    }
+    if ($kpi_data['total_pedidos'] > 0) {
+        $promedio_horas = ($total_tiempo_espera / $kpi_data['total_pedidos']) / 3600;
+        $kpi_data['tiempo_promedio_str'] = number_format($promedio_horas, 1) . 'h';
+    }
+
+    // --- Lógica para calcular 'Completadas Hoy' ---
+    // Esto consulta pedidos ARCHIVADOS HOY
+    $today_start = strtotime('today', current_time('timestamp', true)); // Inicio de hoy en timestamp GMT
+    $today_end   = strtotime('tomorrow - 1 second', current_time('timestamp', true)); // Fin de hoy en timestamp GMT
+
+    $completadas_hoy_args = [
+        'post_type'      => 'orden_produccion',
+        'posts_per_page' => -1,
+        'meta_query'     => [
+            [
+                'key'     => 'estado_administrativo',
+                'value'   => 'Archivado',
+                'compare' => '=',
+            ],
+        ],
+        // Filtra por la fecha de última modificación (cuando se archivó)
+        'date_query' => [ 
+            'after'     => date('Y-m-d H:i:s', $today_start),
+            'before'    => date('Y-m-d H:i:s', $today_end),
+            'inclusive' => true,
+            'column'    => 'post_modified_gmt', // Usar la columna de modificación en GMT
+        ],
+    ];
+    $completadas_hoy_query = new WP_Query($completadas_hoy_args);
+    $kpi_data['completadas_hoy'] = $completadas_hoy_query->post_count; // Asignamos el conteo al KPI
+
+    // 3. Enviar respuesta de éxito CON los nuevos datos de KPIs
+    wp_send_json_success(['message' => 'Pedido archivado con éxito.', 'kpi_data' => $kpi_data]);
     wp_die();
 }

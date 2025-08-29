@@ -17,8 +17,11 @@ document.addEventListener('DOMContentLoaded', function() {
         mainContent.addEventListener('click', function(e) {
             
             // Lógica para el botón "Archivar Pedido"
+            // Esta lógica DEBE evitar ser el controlador principal del panel administrativo
+            // ya que el panel administrativo tiene su propia lógica de archivo con actualización de KPIs.
+            // Usamos la nueva clase 'is-admin-sector-panel' para diferenciarlo.
             const archiveBtn = e.target.closest('.archive-order-btn');
-            if (archiveBtn) {
+            if (archiveBtn && !document.body.classList.contains('is-admin-sector-panel')) { 
                 e.preventDefault();
                 if (!confirm('¿Archivar este pedido? Esta acción es final.')) return;
 
@@ -35,6 +38,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     .then(data => {
                         if (data.success) {
                             container.remove();
+                            // Aquí no actualizamos KPIs porque este bloque es para paneles de sector no administrativos
+                            // o si el admin ve otro sector, los KPIs que se ven no son los de su propio panel.
                         } else {
                             alert('Error: ' + (data.data?.message || 'No se pudo archivar.'));
                             container.style.opacity = '1';
@@ -133,133 +138,140 @@ if (adminDashboard) {
     }
 }
 // --- LÓGICA PARA LOS GRÁFICOS DE LA PÁGINA DE REPORTES ---
-document.addEventListener('DOMContentLoaded', function() {
-    if (typeof ghd_reports_data !== 'undefined' && document.querySelector('.ghd-reports-grid')) {
-        
-        // GRÁFICO 1: PEDIDOS POR ESTADO (BARRAS)
-        const pedidosCtx = document.getElementById('pedidosPorEstadoChart');
-        if (pedidosCtx) {
-            new Chart(pedidosCtx, {
-                type: 'bar',
-                data: {
-                    labels: ghd_reports_data.sector.labels,
-                    datasets: [{
-                        label: 'Pedidos Activos',
-                        data: ghd_reports_data.sector.data,
-                        backgroundColor: 'rgba(74, 124, 89, 0.7)' // Verde corporativo
-                    }]
-                },
-                options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
-            });
-        }
-        
-        // GRÁFICO 2: CARGA POR SECTOR (DONA)
-        const cargaCtx = document.getElementById('cargaPorSectorChart');
-        if (cargaCtx) {
-            new Chart(cargaCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: ghd_reports_data.sector.labels,
-                    datasets: [{
-                        data: ghd_reports_data.sector.data,
-                        backgroundColor: ['#4A7C59', '#B34A49', '#F59E0B', '#6B7280', '#3E3E3E']
-                    }]
-                }
-            });
-        }
-        
-        // GRÁFICO 3: PEDIDOS POR PRIORIDAD (POLAR)
-        const prioridadCtx = document.getElementById('pedidosPorPrioridadChart');
-        if (prioridadCtx) {
-            new Chart(prioridadCtx, {
-                type: 'polarArea',
-                data: {
-                    labels: ghd_reports_data.prioridad.labels,
-                    datasets: [{
-                        data: ghd_reports_data.prioridad.data,
-                        backgroundColor: ['rgba(179, 74, 73, 0.7)', 'rgba(245, 158, 11, 0.7)', 'rgba(74, 124, 89, 0.7)']
-                    }]
-                }
-            });
-        }
+// Este bloque fue movido para estar dentro del DOMContentLoaded principal
+if (typeof ghd_reports_data !== 'undefined' && document.querySelector('.ghd-reports-grid')) {
+    
+    // GRÁFICO 1: PEDIDOS POR ESTADO (BARRAS)
+    const pedidosCtx = document.getElementById('pedidosPorEstadoChart');
+    if (pedidosCtx) {
+        new Chart(pedidosCtx, {
+            type: 'bar',
+            data: {
+                labels: ghd_reports_data.sector.labels,
+                datasets: [{
+                    label: 'Pedidos Activos',
+                    data: ghd_reports_data.sector.data,
+                    backgroundColor: 'rgba(74, 124, 89, 0.7)' // Verde corporativo
+                }]
+            },
+            options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+        });
     }
-})
-});
+    
+    // GRÁFICO 2: CARGA POR SECTOR (DONA)
+    const cargaCtx = document.getElementById('cargaPorSectorChart');
+    if (cargaCtx) {
+        new Chart(cargaCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ghd_reports_data.sector.labels,
+                datasets: [{
+                    data: ghd_reports_data.sector.data,
+                    backgroundColor: ['#4A7C59', '#B34A49', '#F59E0B', '#6B7280', '#3E3E3E']
+                }]
+            }
+        });
+    }
+    
+    // GRÁFICO 3: PEDIDOS POR PRIORIDAD (POLAR)
+    const prioridadCtx = document.getElementById('pedidosPorPrioridadChart');
+    if (prioridadCtx) {
+        new Chart(prioridadCtx, {
+            type: 'polarArea',
+            data: {
+                labels: ghd_reports_data.prioridad.labels,
+                datasets: [{
+                    data: ghd_reports_data.prioridad.data,
+                    backgroundColor: ['rgba(179, 74, 73, 0.7)', 'rgba(245, 158, 11, 0.7)', 'rgba(74, 124, 89, 0.7)']
+                }]
+            }
+        });
+    }
+}
+
+
+// --- LÓGICA DEL PANEL ADMINISTRATIVO (ARCHIVAR CON KPIs) ---
+// Este bloque debe estar dentro del DOMContentLoaded principal y usar el selector correcto.
+const adminPanel = document.querySelector('.is-admin-sector-panel'); // <--- SELECTOR CORREGIDO
+if (adminPanel) {
+    // Si la tabla usa .ghd-table tbody, o si usa .ghd-sector-tasks-list (para las tarjetas)
+    const containerForEvents = adminPanel.querySelector('.ghd-table tbody') || adminPanel.querySelector('.ghd-sector-tasks-list'); 
+    
+    // Función para actualizar los KPIs en la UI
+    const updateAdminKPIs = (kpiData) => {
+        const activasEl = document.getElementById('kpi-activas');
+        const prioridadEl = document.getElementById('kpi-prioridad-alta');
+        const completadasHoyEl = document.getElementById('kpi-completadas-hoy'); 
+        const tiempoEl = document.getElementById('kpi-tiempo-promedio');
+
+        if (activasEl) activasEl.textContent = kpiData.total_pedidos;
+        if (prioridadEl) prioridadEl.textContent = kpiData.total_prioridad_alta;
+        if (completadasHoyEl) completadasHoyEl.textContent = kpiData.completadas_hoy;
+        if (tiempoEl) tiempoEl.textContent = kpiData.tiempo_promedio_str;
+    };
+
+    if (containerForEvents) { 
+        containerForEvents.addEventListener('click', function(e) {
+            const archiveBtn = e.target.closest('.archive-order-btn');
+            if (archiveBtn) {
+                e.preventDefault();
+                if (!confirm('¿Archivar este pedido? Esta acción es final.')) return;
+
+                const orderId = archiveBtn.dataset.orderId;
+                // El elemento a remover es la tarjeta completa en el ghd-sector-tasks-list
+                const containerToRemove = archiveBtn.closest('.ghd-order-card');
+                
+                containerToRemove.style.opacity = '0.5';
+                archiveBtn.disabled = true;
+                archiveBtn.textContent = 'Archivando...';
+
+                const params = new URLSearchParams({ action: 'ghd_archive_order', nonce: ghd_ajax.nonce, order_id: orderId });
+                fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            containerToRemove.remove();
+                            // Actualizamos los KPIs con los datos que nos devuelve el servidor
+                            if (data.data.kpi_data) {
+                                updateAdminKPIs(data.data.kpi_data);
+                            }
+                        } else {
+                            alert('Error: ' + (data.data.message || 'No se pudo archivar.'));
+                            containerToRemove.style.opacity = '1';
+                            archiveBtn.disabled = false;
+                            archiveBtn.textContent = 'Archivar Pedido';
+                        }
+                    })
+                    .catch(error => { // Añadir manejo de errores de red
+                        console.error("Error en la petición AJAX:", error);
+                        alert('Error de red. No se pudo archivar el pedido.');
+                        containerToRemove.style.opacity = '1';
+                        archiveBtn.disabled = false;
+                        archiveBtn.textContent = 'Archivar Pedido';
+                    });
+            }
+        });
+    }
+}
+}); // Cierre del document.addEventListener('DOMContentLoaded', function() original
 
 // LÓGICA PARA ACTIVAR EL FILTRO DESDE LA URL AL CARGAR LA PÁGINA
 window.addEventListener('load', function() {
     const searchFilterInput = document.getElementById('ghd-search-filter');
     if (!searchFilterInput) return; // Solo se ejecuta en el panel de admin
 
-    // Usamos URLSearchParams para leer los parámetros de la URL (ej: ?buscar=Jorge+Garcia)
     const urlParams = new URLSearchParams(window.location.search);
     const searchTerm = urlParams.get('buscar');
 
-    // Si encontramos el parámetro 'buscar' en la URL...
     if (searchTerm) {
-        // ...lo ponemos en el campo de búsqueda...
         searchFilterInput.value = searchTerm;
-        
-        // ...y disparamos la función de filtrado que ya existe.
-        if (typeof applyFilters === 'function') {
-            applyFilters();
-        }
+        // Para que applyFilters funcione aquí, debería estar definida en un scope más amplio o
+        // se debe replicar la lógica. Para evitar duplicación, asumo que applyFilters puede ser llamada
+        // si el adminDashboard (que la contiene) existe. Si no, necesitarías mover applyFilters a un scope global
+        // o pasar los parámetros necesarios para re-ejecutar el filtro.
+        // Por la estructura actual, la forma más simple es re-trigger el evento keyup o un "click" en un botón de filtro si existe.
+        const event = new Event('keyup');
+        searchFilterInput.dispatchEvent(event); // Esto simulará el keyup y disparará applyFilters vía setTimeout
+        history.pushState("", document.title, window.location.pathname + window.location.search);
     }
 });
-
-// --- LÓGICA PARA EL BOTÓN "ARCHIVAR PEDIDO" (PANEL ADMINISTRATIVO) ---
-const adminPanel = document.querySelector('.page-template-template-administrativo');
-
-if (adminPanel) {
-    const tableBody = adminPanel.querySelector('.ghd-table tbody');
-    
-    tableBody.addEventListener('click', function(e) {
-        const archiveBtn = e.target.closest('.archive-order-btn');
-        
-        if (archiveBtn) {
-            e.preventDefault();
-            
-            if (!confirm('¿Estás seguro de que quieres archivar este pedido? Esta acción es final.')) {
-                return;
-            }
-
-            const orderId = archiveBtn.dataset.orderId;
-            const row = archiveBtn.closest('tr');
-
-            // Feedback visual
-            row.style.opacity = '0.5';
-            archiveBtn.disabled = true;
-            archiveBtn.textContent = 'Archivando...';
-
-            const params = new URLSearchParams({
-                action: 'ghd_archive_order',
-                nonce: ghd_ajax.nonce,
-                order_id: orderId,
-            });
-
-            fetch(ghd_ajax.ajax_url, {
-                method: 'POST',
-                body: params
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Si tiene éxito, eliminamos la fila de la vista
-                    row.remove();
-                } else {
-                    alert('Error: ' + (data.data.message || 'No se pudo archivar el pedido.'));
-                    row.style.opacity = '1';
-                    archiveBtn.disabled = false;
-                    archiveBtn.textContent = 'Archivar Pedido';
-                }
-            })
-            .catch(error => {
-                console.error('Error de red:', error);
-                alert('Ocurrió un error de red.');
-                row.style.opacity = '1';
-                archiveBtn.disabled = false;
-                archiveBtn.textContent = 'Archivar Pedido';
-            });
-        }
-    });
-}

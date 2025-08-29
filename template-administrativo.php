@@ -24,7 +24,36 @@ get_header();
                 <h2>Pedidos Pendientes de Cierre</h2>
             </div> 
         </header>
-
+        <div class="ghd-kpi-grid">
+            <div class="ghd-kpi-card">
+                <div class="kpi-icon icon-blue"><i class="fa-solid fa-list-check"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-value" id="kpi-activas"><?php echo $total_pedidos; ?></span>
+                    <span class="kpi-label">Activas</span>
+                </div>
+            </div>
+            <div class="ghd-kpi-card">
+                <div class="kpi-icon icon-red"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-value" id="kpi-prioridad-alta"><?php echo $total_prioridad_alta; ?></span>
+                    <span class="kpi-label">Prioridad Alta</span>
+                </div>
+            </div>
+            <div class="ghd-kpi-card">
+                <div class="kpi-icon icon-green"><i class="fa-solid fa-check"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-value" id="kpi-completadas-hoy">0</span>
+                    <span class="kpi-label">Completadas Hoy</span>
+                </div>
+            </div>
+            <div class="ghd-kpi-card">
+                <div class="kpi-icon icon-yellow"><i class="fa-solid fa-clock"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-value" id="kpi-tiempo-promedio"><?php echo esc_html($tiempo_promedio_str); ?></span>
+                    <span class="kpi-label">Tiempo Promedio</span>
+                </div>
+            </div>
+        </div>
         <div class="ghd-card ghd-table-wrapper">
             <table class="ghd-table">
                 <thead>

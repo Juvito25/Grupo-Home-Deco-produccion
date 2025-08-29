@@ -1,9 +1,10 @@
 <?php
+/*
+Template Name: Panel de Tareas (Sector)
+*/
 
 if (!is_user_logged_in()) { auth_redirect(); }
-get_header();
 
-// --- 1. LÓGICA DE CONTEXTO Y ACCESO (Estable) ---
 $current_user = wp_get_current_user();
 $is_admin_viewing = false;
 $user_roles = $current_user->roles;
@@ -28,6 +29,16 @@ else {
     exit;
 }
 
+// --- AÑADIR CLASE AL BODY SI ES EL PANEL ADMINISTRATIVO ---
+if ($user_role === 'rol_administrativo' && !$is_admin_viewing) { // Aseguramos que sea el admin viendo su propio panel, no un admin viendo otro sector
+    add_filter('body_class', function($classes) {
+        $classes[] = 'is-admin-sector-panel';
+        return $classes;
+    });
+}
+
+get_header(); // get_header() debe estar después de add_filter('body_class')
+
 // --- 2. CONSULTA Y KPIs (Estable) ---
 $pedidos_args = ['post_type' => 'orden_produccion', 'posts_per_page' => -1, 'meta_query' => [['key' => $campo_estado, 'value' => ['Pendiente', 'En Progreso'], 'compare' => 'IN']], 'orderby'  => ['prioridad_pedido' => 'ASC', 'date' => 'ASC'], 'meta_key' => 'prioridad_pedido' ];
 $pedidos_query = new WP_Query($pedidos_args);
@@ -44,7 +55,34 @@ if ($total_pedidos > 0) {
     $promedio_horas = ($total_tiempo_espera / $total_pedidos) / 3600;
     $tiempo_promedio_str = number_format($promedio_horas, 1) . 'h';
 }
+
+// Calcular 'Completadas Hoy' para la carga inicial del dashboard
 $completadas_hoy = 0;
+// Obtener el inicio y fin del día actual en GMT para la consulta
+$today_start = strtotime('today', current_time('timestamp', true)); // Inicio de hoy en timestamp GMT
+$today_end   = strtotime('tomorrow - 1 second', current_time('timestamp', true)); // Fin de hoy en timestamp GMT
+
+$completadas_hoy_args = [
+    'post_type'      => 'orden_produccion',
+    'posts_per_page' => -1,
+    'meta_query'     => [
+        [
+            'key'     => 'estado_administrativo',
+            'value'   => 'Archivado',
+            'compare' => '=',
+        ],
+    ],
+    'date_query' => [ 
+        'after'     => date('Y-m-d H:i:s', $today_start),
+        'before'    => date('Y-m-d H:i:s', $today_end),
+        'inclusive' => true,
+        'column'    => 'post_modified_gmt',
+    ],
+];
+$completadas_hoy_query = new WP_Query($completadas_hoy_args);
+$completadas_hoy = $completadas_hoy_query->post_count;
+
+
 ?>
 
 <div class="ghd-app-wrapper">
@@ -65,10 +103,10 @@ $completadas_hoy = 0;
         </header>
 
         <div class="ghd-kpi-grid">
-            <div class="ghd-kpi-card"><div class="kpi-icon icon-blue"><i class="fa-solid fa-list-check"></i></div><div class="kpi-info"><span class="kpi-value"><?php echo $total_pedidos; ?></span><span class="kpi-label">Activas</span></div></div>
-            <div class="ghd-kpi-card"><div class="kpi-icon icon-red"><i class="fa-solid fa-triangle-exclamation"></i></div><div class="kpi-info"><span class="kpi-value"><?php echo $total_prioridad_alta; ?></span><span class="kpi-label">Prioridad Alta</span></div></div>
-            <div class="ghd-kpi-card"><div class="kpi-icon icon-green"><i class="fa-solid fa-check"></i></div><div class="kpi-info"><span class="kpi-value"><?php echo $completadas_hoy; ?></span><span class="kpi-label">Completadas Hoy</span></div></div>
-            <div class="ghd-kpi-card"><div class="kpi-icon icon-yellow"><i class="fa-solid fa-clock"></i></div><div class="kpi-info"><span class="kpi-value"><?php echo esc_html($tiempo_promedio_str); ?></span><span class="kpi-label">Tiempo Promedio</span></div></div>
+            <div class="ghd-kpi-card"><div class="kpi-icon icon-blue"><i class="fa-solid fa-list-check"></i></div><div class="kpi-info"><span id="kpi-activas" class="kpi-value"><?php echo $total_pedidos; ?></span><span class="kpi-label">Activas</span></div></div>
+            <div class="ghd-kpi-card"><div class="kpi-icon icon-red"><i class="fa-solid fa-triangle-exclamation"></i></div><div class="kpi-info"><span id="kpi-prioridad-alta" class="kpi-value"><?php echo $total_prioridad_alta; ?></span><span class="kpi-label">Prioridad Alta</span></div></div>
+            <div class="ghd-kpi-card"><div class="kpi-icon icon-green"><i class="fa-solid fa-check"></i></div><div class="kpi-info"><span id="kpi-completadas-hoy" class="kpi-value"><?php echo $completadas_hoy; ?></span><span class="kpi-label">Completadas Hoy</span></div></div>
+            <div class="ghd-kpi-card"><div class="kpi-icon icon-yellow"><i class="fa-solid fa-clock"></i></div><div class="kpi-info"><span id="kpi-tiempo-promedio" class="kpi-value"><?php echo esc_html($tiempo_promedio_str); ?></span><span class="kpi-label">Tiempo Promedio</span></div></div>
         </div>
         <div class="ghd-sector-tasks-list">
             <?php if ($pedidos_query->have_posts()) : while ($pedidos_query->have_posts()) : $pedidos_query->the_post();
