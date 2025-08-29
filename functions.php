@@ -85,3 +85,35 @@ add_action('wp_ajax_ghd_update_task_status', function() {
     }
     wp_die();
 });
+
+// --- MANEJADOR AJAX PARA ARCHIVAR PEDIDOS DESDE EL PANEL ADMINISTRATIVO ---
+add_action('wp_ajax_ghd_archive_order', 'ghd_archive_order_callback');
+function ghd_archive_order_callback() {
+    // 1. Seguridad: Verificar nonce y permisos
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+    if (!current_user_can('manage_options') && !current_user_can('rol_administrativo')) {
+        wp_send_json_error(['message' => 'No tienes permisos.']);
+    }
+
+    // 2. Validación de Datos
+    $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
+    if (!$order_id) {
+        wp_send_json_error(['message' => 'ID de pedido no válido.']);
+    }
+
+    // 3. Actualizar los campos para cerrar el pedido
+    update_field('estado_administrativo', 'Archivado', $order_id);
+    update_field('estado_pedido', 'Completado y Archivado', $order_id);
+
+    // 4. Añadir la entrada final al historial
+    wp_insert_post([
+        'post_title'   => 'Pedido Cerrado y Archivado',
+        'post_type'    => 'ghd_historial',
+        'post_status'  => 'publish',
+        'meta_input'   => ['_orden_produccion_id' => $order_id]
+    ]);
+
+    // 5. Enviar respuesta de éxito
+    wp_send_json_success(['message' => 'Pedido archivado con éxito.']);
+    wp_die();
+}

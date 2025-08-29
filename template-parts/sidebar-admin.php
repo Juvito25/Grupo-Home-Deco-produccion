@@ -18,6 +18,9 @@ $reportes_url = home_url('/reportes/');
         <li class="<?php if (is_page('panel-de-control')) echo 'active'; ?>">
             <a href="<?php echo esc_url($admin_dashboard_url); ?>"><i class="fa-solid fa-table-columns"></i> <span>Panel de Control</span></a>
         </li>
+        <li class="<?php if (is_page('panel-administrativo')) echo 'active'; ?>">
+            <a href="<?php echo home_url('/panel-administrativo/'); ?>"><i class="fa-solid fa-file-invoice-dollar"></i> <span>Administrativo</span></a>
+        </li>
         <li><a href="#"><i class="fa-solid fa-plus"></i> <span>Nuevo Pedido</span></a></li>
         <li class="<?php if (is_page('sectores-de-produccion')) echo 'active'; ?>">
             <a href="<?php echo esc_url($sectores_url); ?>"><i class="fa-solid fa-cubes"></i> <span>Sectores de Producción</span></a>

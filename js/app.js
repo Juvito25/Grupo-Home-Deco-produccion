@@ -247,3 +247,60 @@ window.addEventListener('load', function() {
         }
     }
 });
+
+// --- LÓGICA PARA EL BOTÓN "ARCHIVAR PEDIDO" (PANEL ADMINISTRATIVO) ---
+const adminPanel = document.querySelector('.page-template-template-administrativo');
+
+if (adminPanel) {
+    const tableBody = adminPanel.querySelector('.ghd-table tbody');
+    
+    tableBody.addEventListener('click', function(e) {
+        const archiveBtn = e.target.closest('.archive-order-btn');
+        
+        if (archiveBtn) {
+            e.preventDefault();
+            
+            if (!confirm('¿Estás seguro de que quieres archivar este pedido? Esta acción es final.')) {
+                return;
+            }
+
+            const orderId = archiveBtn.dataset.orderId;
+            const row = archiveBtn.closest('tr');
+
+            // Feedback visual
+            row.style.opacity = '0.5';
+            archiveBtn.disabled = true;
+            archiveBtn.textContent = 'Archivando...';
+
+            const params = new URLSearchParams({
+                action: 'ghd_archive_order',
+                nonce: ghd_ajax.nonce,
+                order_id: orderId,
+            });
+
+            fetch(ghd_ajax.ajax_url, {
+                method: 'POST',
+                body: params
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Si tiene éxito, eliminamos la fila de la vista
+                    row.remove();
+                } else {
+                    alert('Error: ' + (data.data.message || 'No se pudo archivar el pedido.'));
+                    row.style.opacity = '1';
+                    archiveBtn.disabled = false;
+                    archiveBtn.textContent = 'Archivar Pedido';
+                }
+            })
+            .catch(error => {
+                console.error('Error de red:', error);
+                alert('Ocurrió un error de red.');
+                row.style.opacity = '1';
+                archiveBtn.disabled = false;
+                archiveBtn.textContent = 'Archivar Pedido';
+            });
+        }
+    });
+}
