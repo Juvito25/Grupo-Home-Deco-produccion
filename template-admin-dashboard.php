@@ -1,12 +1,18 @@
 <?php
 /**
  * Template Name: GHD - Panel de Administrador
- * Versión V2 - Definitiva y Funcional
+ * Versión V3 - Consolidación Administrativa
  */
 
 if (!is_user_logged_in() || !current_user_can('manage_options')) {
     auth_redirect();
 }
+
+// Añadir una clase al body para identificar este panel en JS
+add_filter('body_class', function($classes) {
+    $classes[] = 'is-admin-dashboard-panel';
+    return $classes;
+});
 
 get_header(); 
 ?>
@@ -28,7 +34,7 @@ get_header();
             </div>
         </header>
 
-        <!-- TABLA DE PEDIDOS -->
+        <!-- TABLA DE PEDIDOS PENDIENTES DE ASIGNACIÓN -->
         <div class="ghd-card ghd-table-wrapper">
             <table class="ghd-table">
                 <thead>
@@ -41,8 +47,7 @@ get_header();
                 </thead>
                 <tbody id="ghd-orders-table-body">
                     <?php
-                    // CONSULTA CORREGIDA: Busca solo los pedidos pendientes de asignación
-                    $args = array(
+                    $args_asignacion = array(
                         'post_type'      => 'orden_produccion',
                         'posts_per_page' => -1,
                         'meta_query'     => array(
@@ -53,10 +58,10 @@ get_header();
                             ),
                         ),
                     );
-                    $pedidos_query = new WP_Query($args);
+                    $pedidos_asignacion_query = new WP_Query($args_asignacion);
 
-                    if ($pedidos_query->have_posts()) :
-                        while ($pedidos_query->have_posts()) : $pedidos_query->the_post();
+                    if ($pedidos_asignacion_query->have_posts()) :
+                        while ($pedidos_asignacion_query->have_posts()) : $pedidos_asignacion_query->the_post();
                     ?>
                         <tr id="order-row-<?php echo get_the_ID(); ?>">
                             <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
@@ -73,6 +78,78 @@ get_header();
                     else: 
                     ?>
                         <tr><td colspan="4" style="text-align:center;">No hay pedidos pendientes de asignación.</td></tr>
+                    <?php
+                    endif;
+                    wp_reset_postdata(); 
+                    ?>
+                </tbody>
+            </table>
+        </div>
+
+        <h2 style="margin-top: 40px;">Pedidos Pendientes de Cierre</h2>
+
+        <?php 
+        // Calcular KPIs para Pedidos Pendientes de Cierre
+        $admin_closure_kpis = ghd_calculate_admin_closure_kpis();
+        ?>
+
+        <div class="ghd-kpi-grid" style="margin-bottom: 30px;">
+            <div class="ghd-kpi-card"><div class="kpi-icon icon-blue"><i class="fa-solid fa-list-check"></i></div><div class="kpi-info"><span id="kpi-cierre-activas" class="kpi-value"><?php echo $admin_closure_kpis['total_pedidos_cierre']; ?></span><span class="kpi-label">Activas</span></div></div>
+            <div class="ghd-kpi-card"><div class="kpi-icon icon-red"><i class="fa-solid fa-triangle-exclamation"></i></div><div class="kpi-info"><span id="kpi-cierre-prioridad-alta" class="kpi-value"><?php echo $admin_closure_kpis['total_prioridad_alta_cierre']; ?></span><span class="kpi-label">Prioridad Alta</span></div></div>
+            <div class="ghd-kpi-card"><div class="kpi-icon icon-green"><i class="fa-solid fa-check"></i></div><div class="kpi-info"><span id="kpi-cierre-completadas-hoy" class="kpi-value"><?php echo $admin_closure_kpis['completadas_hoy_cierre']; ?></span><span class="kpi-label">Completadas Hoy</span></div></div>
+            <div class="ghd-kpi-card"><div class="kpi-icon icon-yellow"><i class="fa-solid fa-clock"></i></div><div class="kpi-info"><span id="kpi-cierre-tiempo-promedio" class="kpi-value"><?php echo esc_html($admin_closure_kpis['tiempo_promedio_str_cierre']); ?></span><span class="kpi-label">Tiempo Promedio</span></div></div>
+        </div>
+
+        <!-- TABLA DE PEDIDOS PENDIENTES DE CIERRE (ADMINISTRATIVO) -->
+        <div class="ghd-card ghd-table-wrapper">
+            <table class="ghd-table">
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Cliente</th>
+                        <th>Producto</th>
+                        <th>Fecha de Pedido</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="ghd-closure-table-body"> <!-- Nuevo ID para el tbody de cierre -->
+                    <?php
+                    $args_cierre = array(
+                        'post_type'      => 'orden_produccion',
+                        'posts_per_page' => -1,
+                        'meta_query'     => array(
+                            array(
+                                'key'     => 'estado_pedido',
+                                'value'   => 'Pendiente de Cierre Admin', // Nuevo estado
+                                'compare' => '=',
+                            ),
+                        ),
+                        'orderby' => 'date',
+                        'order'   => 'ASC',
+                    );
+                    $pedidos_cierre_query = new WP_Query($args_cierre);
+
+                    if ($pedidos_cierre_query->have_posts()) :
+                        while ($pedidos_cierre_query->have_posts()) : $pedidos_cierre_query->the_post();
+                    ?>
+                        <tr id="order-row-closure-<?php echo get_the_ID(); ?>"> <!-- ID específico para filas de cierre -->
+                            <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
+                            <td><?php echo esc_html(get_field('nombre_cliente')); ?></td>
+                            <td><?php echo esc_html(get_field('nombre_producto')); ?></td>
+                            <td><?php echo get_the_date(); ?></td>
+                            <td>
+                                <button class="ghd-btn ghd-btn-primary archive-order-btn" data-order-id="<?php echo get_the_ID(); ?>">
+                                    Archivar Pedido
+                                </button>
+                                <!-- Opcional: Botón Generar Remito -->
+                                <!-- <a href="#" class="ghd-btn ghd-btn-secondary generate-remito-btn" data-order-id="<?php echo get_the_ID(); ?>">Generar Remito</a> -->
+                            </td>
+                        </tr>
+                    <?php
+                        endwhile;
+                    else: 
+                    ?>
+                        <tr><td colspan="5" style="text-align:center;">No hay pedidos pendientes de cierre.</td></tr>
                     <?php
                     endif;
                     wp_reset_postdata(); 
