@@ -48,47 +48,63 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // --- LÓGICA DEL PANEL DE SECTOR ---
-    const tasksList = document.querySelector('.ghd-sector-tasks-list');
-    if (tasksList) {
-        tasksList.addEventListener('click', function(e) {
-            const actionButton = e.target.closest('.action-button');
-            if (actionButton) {
-                e.preventDefault();
-                const card = actionButton.closest('.ghd-order-card');
-                card.style.opacity = '0.5';
-                
-                const params = new URLSearchParams({
-                    action: 'ghd_update_task_status', nonce: ghd_ajax.nonce,
-                    order_id: actionButton.dataset.orderId,
-                    field: actionButton.dataset.field,
-                    value: actionButton.dataset.value
-                });
+// --- REEMPLAZA ESTE BLOQUE COMPLETO EN js/app.js ---
 
-                fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.success) {
-                            if (actionButton.dataset.value === 'Completado') {
-                                card.remove();
-                            } else {
-                                card.outerHTML = data.data.html;
+// --- LÓGICA DEL PANEL DE SECTOR (CON ACTUALIZACIÓN DE UI EN EL CLIENTE) ---
+const tasksList = document.querySelector('.ghd-sector-tasks-list');
+if (tasksList) {
+    tasksList.addEventListener('click', function(e) {
+        const actionButton = e.target.closest('.action-button');
+        if (actionButton) {
+            e.preventDefault();
+            
+            const card = actionButton.closest('.ghd-order-card');
+            card.style.opacity = '0.5';
+            
+            const params = new URLSearchParams({
+                action: 'ghd_update_task_status', nonce: ghd_ajax.nonce,
+                order_id: actionButton.dataset.orderId,
+                field: actionButton.dataset.field,
+                value: actionButton.dataset.value
+            });
+
+            fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        // Si la acción fue 'Completado', eliminamos la tarjeta.
+                        if (actionButton.dataset.value === 'Completado') {
+                            card.remove();
+                        } 
+                        // SI LA ACCIÓN FUE 'EN PROGRESO', ACTUALIZAMOS LA TARJETA MANUALMENTE.
+                        else if (actionButton.dataset.value === 'En Progreso') {
+                            // 1. Cambiamos el botón
+                            actionButton.textContent = 'Marcar Completa';
+                            actionButton.dataset.value = 'Completado';
+
+                            // 2. Añadimos la etiqueta "En Progreso"
+                            const tagsContainer = card.querySelector('.order-tags');
+                            if (tagsContainer) {
+                                const newTag = document.createElement('span');
+                                newTag.className = 'ghd-tag tag-blue';
+                                newTag.textContent = 'En Progreso';
+                                tagsContainer.appendChild(newTag);
                             }
-                        } else {
-                            alert('Error al actualizar el estado.');
                         }
-                    })
-                    .catch(error => console.error('Error:', error))
-                    .finally(() => {
-                        const finalCard = document.getElementById(card.id);
-                        if (finalCard) {
-                            finalCard.style.opacity = '1';
-                        }
-                    });
-            }
-        });
-    }
-
+                    } else {
+                        alert('Error al actualizar el estado.');
+                    }
+                })
+                .catch(error => console.error('Error:', error))
+                .finally(() => {
+                    // Nos aseguramos de que la tarjeta vuelva a ser visible si no se eliminó.
+                    if (document.body.contains(card)) {
+                        card.style.opacity = '1';
+                    }
+                });
+        }
+    });
+}
 
 // --- LÓGICA DE FILTROS Y BÚSQUEDA PARA EL PANEL DE ADMINISTRADOR ---
 const adminDashboard = document.querySelector('.page-template-template-admin-dashboard');
