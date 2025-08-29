@@ -1,38 +1,109 @@
 <?php
 /**
- * Template Part para el sidebar del panel de administrador.
- * Versión final con clase 'active' dinámica.
+ * Template Part: Sidebar para el Administrador
  */
-$admin_dashboard_url = home_url('/panel-de-control/');
-$sectores_url = home_url('/sectores-de-produccion/');
-$clientes_url = home_url('/clientes/');
-$reportes_url = home_url('/reportes/');
+
+// Obtener la URL base del panel de control
+$admin_dashboard_url = get_posts([
+    'post_type'  => 'page',
+    'fields'     => 'ids',
+    'nopaging'   => true,
+    'meta_key'   => '_wp_page_template',
+    'meta_value' => 'template-admin-dashboard.php'
+]);
+$admin_dashboard_url = !empty($admin_dashboard_url) ? get_permalink($admin_dashboard_url[0]) : home_url();
+
+// Obtener la URL de la página de "Sectores de Producción"
+$sectores_page_url = get_posts([
+    'post_type'  => 'page',
+    'fields'     => 'ids',
+    'nopaging'   => true,
+    'meta_key'   => '_wp_page_template',
+    'meta_value' => 'template-sectores.php'
+]);
+$sectores_page_url = !empty($sectores_page_url) ? get_permalink($sectores_page_url[0]) : home_url();
+
+// Obtener la URL de la página de "Clientes"
+$clientes_page_url = get_posts([
+    'post_type'  => 'page',
+    'fields'     => 'ids',
+    'nopaging'   => true,
+    'meta_key'   => '_wp_page_template',
+    'meta_value' => 'template-clientes.php'
+]);
+$clientes_page_url = !empty($clientes_page_url) ? get_permalink($clientes_page_url[0]) : home_url();
+
+// Obtener la URL de la página de "Reportes"
+$reportes_page_url = get_posts([
+    'post_type'  => 'page',
+    'fields'     => 'ids',
+    'nopaging'   => true,
+    'meta_key'   => '_wp_page_template',
+    'meta_value' => 'template-reportes.php'
+]);
+$reportes_page_url = !empty($reportes_page_url) ? get_permalink($reportes_page_url[0]) : home_url();
+
+
+// Función para determinar si un enlace está activo
+function is_sidebar_link_active($template_name) {
+    global $post;
+    if (is_page_template($template_name)) {
+        return 'active';
+    }
+    return '';
+}
+
 ?>
 
-<div class="ghd-sidebar">
-<div class="sidebar-header">
-    <h1 class="logo">Gestor de Producción</h1>
-</div>
-<nav class="sidebar-nav">
-    <ul>
-        <li class="<?php if (is_page('panel-de-control')) echo 'active'; ?>">
-            <a href="<?php echo esc_url($admin_dashboard_url); ?>"><i class="fa-solid fa-table-columns"></i> <span>Panel de Control</span></a>
-        </li>
-        <li class="<?php if (is_page('panel-administrativo')) echo 'active'; ?>">
-            <a href="<?php echo home_url('/panel-administrativo/'); ?>"><i class="fa-solid fa-file-invoice-dollar"></i> <span>Administrativo</span></a>
-        </li>
-        <li><a href="#"><i class="fa-solid fa-plus"></i> <span>Nuevo Pedido</span></a></li>
-        <li class="<?php if (is_page('sectores-de-produccion')) echo 'active'; ?>">
-            <a href="<?php echo esc_url($sectores_url); ?>"><i class="fa-solid fa-cubes"></i> <span>Sectores de Producción</span></a>
-        </li>
-        <li class="<?php if (is_page('clientes')) echo 'active'; ?>">
-            <a href="<?php echo esc_url($clientes_url); ?>"><i class="fa-solid fa-users"></i> <span>Clientes</span></a>
-        </li>
-        <li class="<?php if (is_page('reportes')) echo 'active'; ?>">
-            <a href="<?php echo esc_url($reportes_url); ?>"><i class="fa-solid fa-chart-pie"></i> <span>Reportes</span></a>
-        </li>
-        <li><a href="#"><i class="fa-solid fa-gear"></i> <span>Configuración</span></a></li>
-        <li><a href="<?php echo wp_logout_url(home_url('/iniciar-sesion/')); ?>"><i class="fa-solid fa-sign-out-alt"></i> <span>Cerrar Sesión</span></a></li>
-    </ul>
-</nav>
-</div>
+<aside class="ghd-sidebar">
+    <div class="sidebar-header">
+        <h1 class="logo">Gestor de Producción</h1>
+    </div>
+    <nav class="sidebar-nav">
+        <ul>
+            <li class="<?php echo is_sidebar_link_active('template-admin-dashboard.php'); ?>">
+                <a href="<?php echo esc_url($admin_dashboard_url); ?>">
+                    <i class="fa-solid fa-gauge-high"></i>
+                    <span>Panel de Control</span>
+                </a>
+            </li>
+            <!-- "Administrativo" se elimina ya que su función se consolida en "Panel de Control" -->
+            <li>
+                <a href="<?php echo esc_url($admin_dashboard_url); ?>?action=new-order"> <!-- Puedes ajustar esta URL para tu página de Nuevo Pedido -->
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Nuevo Pedido</span>
+                </a>
+            </li>
+            <li class="<?php echo is_sidebar_link_active('template-sectores.php'); ?>">
+                <a href="<?php echo esc_url($sectores_page_url); ?>">
+                    <i class="fa-solid fa-people-carry-box"></i>
+                    <span>Sectores de Producción</span>
+                </a>
+            </li>
+            <li class="<?php echo is_sidebar_link_active('template-clientes.php'); ?>">
+                <a href="<?php echo esc_url($clientes_page_url); ?>">
+                    <i class="fa-solid fa-users"></i>
+                    <span>Clientes</span>
+                </a>
+            </li>
+            <li class="<?php echo is_sidebar_link_active('template-reportes.php'); ?>">
+                <a href="<?php echo esc_url($reportes_page_url); ?>">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>Reportes</span>
+                </a>
+            </li>
+            <li class="<?php // is_sidebar_link_active('template-configuracion.php'); ?>">
+                <a href="#"> <!-- Placeholder para Configuración -->
+                    <i class="fa-solid fa-gear"></i>
+                    <span>Configuración</span>
+                </a>
+            </li>
+            <li>
+                <a href="<?php echo wp_logout_url(home_url('/iniciar-sesion/')); ?>">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span>Cerrar Sesión</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+</aside>
