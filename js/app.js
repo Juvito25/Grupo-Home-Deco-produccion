@@ -116,7 +116,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             // debemos refrescar también la sección de producción del admin.
                             if (document.body.classList.contains('is-admin-dashboard-panel')) {
                                 const refreshProdBtn = document.getElementById('ghd-refresh-production-tasks');
-                                if (refreshProdBtn) { refreshProdBtn.click(); } // Simular click en refresh
+                                if (refreshProdBtn) { refreshProdBtn.click(); }
                                 const refreshClosureBtn = document.getElementById('ghd-refresh-closure-tasks');
                                 if (refreshClosureBtn) { refreshClosureBtn.click(); }
                             }
@@ -330,11 +330,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            productionTasksContainer.style.opacity = '0.5'; // Efecto visual de carga
+            productionTasksContainer.style.opacity = '0.5';
             refreshProductionTasksBtn.disabled = true;
 
             const params = new URLSearchParams({
-                action: 'ghd_refresh_production_tasks', // Nuevo endpoint AJAX
+                action: 'ghd_refresh_production_tasks',
                 nonce: ghd_ajax.nonce
             });
 
@@ -342,13 +342,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
-                        productionTableBody.innerHTML = data.data.tasks_html; // tasks_html para esta sección
+                        productionTableBody.innerHTML = data.data.tasks_html;
                         if (data.data.kpi_data) {
-                            updateAdminProductionKPIs(data.data.kpi_data); // Actualizar los KPIs de producción
+                            updateAdminProductionKPIs(data.data.kpi_data);
                         }
                     } else {
                         alert('Error al refrescar pedidos en producción: ' + (data.data?.message || ''));
-                        productionTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Error al cargar pedidos en producción.</td></tr>'; // Colspan adecuado
+                        productionTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Error al cargar pedidos en producción.</td></tr>';
                     }
                 })
                 .catch(error => {
@@ -429,7 +429,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 // --- LÓGICA PARA LOS GRÁFICOS DE LA PÁGINA DE REPORTES ---
-// Este bloque fue movido para estar dentro del DOMContentLoaded principal
 if (typeof ghd_reports_data !== 'undefined' && document.querySelector('.ghd-reports-grid')) {
     
     // GRÁFICO 1: PEDIDOS POR ESTADO (BARRAS)
@@ -438,28 +437,64 @@ if (typeof ghd_reports_data !== 'undefined' && document.querySelector('.ghd-repo
         new Chart(pedidosCtx, {
             type: 'bar',
             data: {
-                labels: ghd_reports_data.sector.labels,
+                labels: ghd_reports_data.pedidos_por_estado.labels,
                 datasets: [{
-                    label: 'Pedidos Activos',
-                    data: ghd_reports_data.sector.data,
-                    backgroundColor: 'rgba(74, 124, 89, 0.7)' // Verde corporativo
+                    label: 'Pedidos por Estado',
+                    data: ghd_reports_data.pedidos_por_estado.data,
+                    // Usar colores dinámicos si están en los datos
+                    backgroundColor: ghd_reports_data.pedidos_por_estado.labels.map(label => 
+                        ghd_reports_data.pedidos_por_estado.backgroundColors[label] || 'rgba(74, 124, 89, 0.7)' // Fallback color
+                    ),
+                    borderColor: 'rgba(255, 255, 255, 0.8)',
+                    borderWidth: 1
                 }]
             },
-            options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+            options: { 
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { 
+                    y: { 
+                        beginAtZero: true, 
+                        ticks: { stepSize: 1 } 
+                    } 
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    title: {
+                        display: false
+                    }
+                }
+            }
         });
     }
     
-    // GRÁFICO 2: CARGA POR SECTOR (DONA)
+    // GRÁFICO 2: CARGA DE TRABAJO POR SECTOR (DONA)
     const cargaCtx = document.getElementById('cargaPorSectorChart');
     if (cargaCtx) {
         new Chart(cargaCtx, {
             type: 'doughnut',
             data: {
-                labels: ghd_reports_data.sector.labels,
+                labels: ghd_reports_data.carga_por_sector.labels,
                 datasets: [{
-                    data: ghd_reports_data.sector.data,
-                    backgroundColor: ['#4A7C59', '#B34A49', '#F59E0B', '#6B7280', '#3E3E3E']
+                    data: ghd_reports_data.carga_por_sector.data,
+                    backgroundColor: ghd_reports_data.carga_por_sector.backgroundColors || ['#4A7C59', '#B34A49', '#F59E0B', '#6B7280', '#3E3E3E'],
+                    borderColor: '#fff',
+                    borderWidth: 2
                 }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                    },
+                    title: {
+                        display: false
+                    }
+                }
             }
         });
     }
@@ -470,16 +505,39 @@ if (typeof ghd_reports_data !== 'undefined' && document.querySelector('.ghd-repo
         new Chart(prioridadCtx, {
             type: 'polarArea',
             data: {
-                labels: ghd_reports_data.prioridad.labels,
+                labels: ghd_reports_data.pedidos_por_prioridad.labels,
                 datasets: [{
-                    data: ghd_reports_data.prioridad.data,
-                    backgroundColor: ['rgba(179, 74, 73, 0.7)', 'rgba(245, 158, 11, 0.7)', 'rgba(74, 124, 89, 0.7)']
+                    data: ghd_reports_data.pedidos_por_prioridad.data,
+                    backgroundColor: ghd_reports_data.pedidos_por_prioridad.labels.map(label => 
+                        ghd_reports_data.pedidos_por_prioridad.backgroundColors[label] || 'rgba(179, 74, 73, 0.7)'
+                    ),
+                    borderColor: '#fff',
+                    borderWidth: 2
                 }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                    },
+                    title: {
+                        display: false
+                    }
+                },
+                scale: {
+                    ticks: {
+                        beginAtZero: true,
+                        stepSize: 1
+                    }
+                }
             }
         });
     }
 }
-}); // Cierre del document.addEventListener('DOMContentLoaded', function() original
+} // <--- ESTA LLAVE DE CIERRE FINAL CAUSA EL ERROR
+); // Cierre del document.addEventListener('DOMContentLoaded', function() original
 
 // LÓGICA PARA ACTIVAR EL FILTRO DESDE LA URL AL CARGAR LA PÁGINA (EXISTENTE)
 window.addEventListener('load', function() {

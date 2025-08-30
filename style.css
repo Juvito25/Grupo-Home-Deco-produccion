@@ -824,3 +824,38 @@ body.page-template-template-login {
         margin-right: 1.5rem; /* Espacio entre imagen e info */
     }
 }
+
+/* ------------------ Estilos para la página de Reportes ------------------------------------------------ */
+.ghd-reports-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr; /* Mantiene el layout principal de 2 columnas */
+    gap: 1.5rem;
+    align-items: flex-start;
+}
+
+.report-card {
+    min-height: 350px; /* Altura mínima para los contenedores de los gráficos */
+    display: flex;
+    flex-direction: column;
+}
+
+.report-card .card-section-title {
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-borde);
+    font-size: 1.1rem;
+    color: var(--texto-principal);
+}
+
+.chart-container {
+    position: relative;
+    width: 100%;
+    flex-grow: 1; /* Permite que el contenedor del canvas se expanda */
+}
+
+/* Responsive para la grid de reportes */
+@media (max-width: 900px) {
+    .ghd-reports-grid {
+        grid-template-columns: 1fr; /* Una columna en tablets y móviles */
+    }
+}

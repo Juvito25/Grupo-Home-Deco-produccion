@@ -117,7 +117,7 @@ get_header();
                     </tr>
                 </thead>
                 <tbody id="ghd-production-table-body">
-                    <?php echo $production_data['tasks_html']; // HTML generado por la función PHP ?>
+                    <?php echo $production_data['tasks_html']; ?>
                 </tbody>
             </table>
         </div>
@@ -182,8 +182,6 @@ get_header();
                                 <button class="ghd-btn ghd-btn-primary archive-order-btn" data-order-id="<?php echo get_the_ID(); ?>">
                                     Archivar Pedido
                                 </button>
-                                <!-- Opcional: Botón Generar Remito -->
-                                <!-- <a href="#" class="ghd-btn ghd-btn-secondary generate-remito-btn" data-order-id="<?php echo get_the_ID(); ?>">Generar Remito</a> -->
                             </td>
                         </tr>
                     <?php
