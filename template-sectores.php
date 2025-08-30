@@ -63,7 +63,7 @@ get_header();
                 <div class="ghd-sector-card">
                     <h3 class="sector-card-title"><?php echo esc_html($sector_display_name); ?></h3>
                     <p class="sector-card-stat">Pedidos Activos: <?php echo $pedidos_en_sector; ?></p>
-                    <a href="<?php echo esc_url($link_al_panel); ?>" class="ghd-btn ghd-btn-secondary">Ver Panel</a>
+                    <a href="<?php echo esc_url($link_al_panel); ?>" class="ghd-btn ghd-btn-primary">Ver Panel</a>
                 </div>
             <?php endforeach; ?>
         </div>

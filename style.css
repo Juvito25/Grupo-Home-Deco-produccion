@@ -533,31 +533,61 @@ body.page-template-template-login {
 .ghd-sector-card-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 1.5rem;
+    gap: 1.5rem; /* Aumento del gap para mejor espaciado */
 }
 
 .ghd-sector-card {
     background-color: var(--color-fondo-claro);
     border-radius: 8px;
     border: 1px solid var(--color-borde);
-    padding: 1.5rem;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    padding: 1.8rem 1.5rem; /* Aumento del padding para más "aire" */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05); /* Sombra más suave y moderna */
     text-align: center;
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out; /* Animación al pasar el ratón */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; /* Empuja el botón hacia abajo */
+    align-items: center;
+}
+
+.ghd-sector-card:hover {
+    transform: translateY(-5px); /* Efecto "levantar" al pasar el ratón */
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1); /* Sombra más intensa al pasar el ratón */
 }
 
 .sector-card-title {
     margin-top: 0;
-    margin-bottom: 0.5rem;
-    font-size: 1.2rem;
+    margin-bottom: 0.75rem; /* Ajuste de margen */
+    font-size: 1.5rem; /* Título más grande */
+    font-weight: 700; /* Más audaz */
+    color: var(--texto-principal);
 }
 
 .sector-card-stat {
     margin-top: 0;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1.5rem; /* Espacio antes del botón */
     color: var(--texto-secundario);
-    font-size: 0.9rem;
+    font-size: 1rem; /* Tamaño de fuente ligeramente más grande */
+    font-weight: 500;
 }
 
+/* Estilo para el botón dentro de la tarjeta de sector */
+.ghd-sector-card .ghd-btn {
+    width: 100%; /* Botón de ancho completo en la tarjeta */
+    margin-top: auto; /* Empuja el botón hacia el final del flex container */
+    padding: 0.8rem 1.2rem; /* Ajuste de padding del botón */
+    font-size: 16px; /* Tamaño de fuente más legible */
+    text-transform: uppercase; /* Texto en mayúsculas */
+    letter-spacing: 0.5px; /* Espaciado entre letras */
+}
+
+/* Media query para ajustar el grid en pantallas más pequeñas si es necesario */
+@media (max-width: 600px) {
+    .ghd-sector-card-grid {
+        grid-template-columns: 1fr; /* Una columna en pantallas muy pequeñas */
+        gap: 1rem;
+    }
+}
 
 /* ==========================================================================
    5. RESPONSIVE Y UI MÓVIL
@@ -737,4 +767,60 @@ body.page-template-template-login {
 .ghd-btn.ghd-btn-small {
     padding: 6px 12px;
     font-size: 0.85rem;
+}
+
+/* --- Mejoras para la sección de Información del Producto en detalles --- */
+.product-details-section {
+    display: flex;
+    flex-direction: column; /* Por defecto columna para responsive */
+    gap: 1.5rem;
+}
+
+.product-image-wrapper {
+    flex-shrink: 0; /* Previene que la imagen se encoja */
+    /* Ancho máximo en pantallas grandes, pero flexible */
+    max-width: 350px; 
+    width: 100%;
+}
+
+.product-image-wrapper img {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); /* Sombra más pronunciada para la imagen */
+    object-fit: cover;
+    max-height: 400px; /* Limita la altura para evitar imágenes muy alargadas */
+}
+
+.product-info-wrapper {
+    flex-grow: 1; /* Permite que la información crezca */
+}
+
+.product-main-info {
+    margin-bottom: 1rem;
+}
+
+.product-main-info h3 {
+    font-size: 1.8rem; /* Título de producto más grande */
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+    color: var(--texto-principal);
+}
+
+.product-specifications p {
+    font-size: 1rem;
+    line-height: 1.5;
+    color: var(--texto-secundario);
+    margin: 0;
+}
+
+/* Responsive para la sección de producto */
+@media (min-width: 769px) {
+    .product-details-section {
+        flex-direction: row; /* En desktop, la imagen y la info van en fila */
+        align-items: flex-start; /* Alinea al inicio */
+    }
+    .product-image-wrapper {
+        margin-right: 1.5rem; /* Espacio entre imagen e info */
+    }
 }
