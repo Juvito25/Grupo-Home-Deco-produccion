@@ -37,6 +37,19 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tiempoEl) tiempoEl.textContent = kpiData.tiempo_promedio_str_cierre;
     };
 
+    // --- Función para actualizar los KPIs en la sección de Pedidos en Producción del Admin principal ---
+    const updateAdminProductionKPIs = (kpiData) => {
+        const activasEl = document.getElementById('kpi-produccion-activas');
+        const prioridadEl = document.getElementById('kpi-produccion-prioridad-alta');
+        const completadasHoyEl = document.getElementById('kpi-produccion-completadas-hoy');
+        const tiempoEl = document.getElementById('kpi-produccion-tiempo-promedio');
+
+        if (activasEl) activasEl.textContent = kpiData.total_pedidos_produccion;
+        if (prioridadEl) prioridadEl.textContent = kpiData.total_prioridad_alta_produccion;
+        if (completadasHoyEl) completadasHoyEl.textContent = kpiData.completadas_hoy_produccion;
+        if (tiempoEl) tiempoEl.textContent = kpiData.tiempo_promedio_str_produccion;
+    };
+
 
     // --- LÓGICA UNIVERSAL DE CLICS EN EL CONTENIDO PRINCIPAL ---
     const mainContent = document.querySelector('.ghd-main-content');
@@ -44,10 +57,9 @@ document.addEventListener('DOMContentLoaded', function() {
         mainContent.addEventListener('click', function(e) {
             
             // Lógica para el botón "Archivar Pedido" (versión NO-ADMIN-DASHBOARD)
-            // Esta lógica se aplica a botones .archive-order-btn que NO están en el is-admin-dashboard-panel
-            // (ej., si por alguna razón un admin ve un sector ajeno y archiva desde allí, aunque ya no debería haber botón)
+            // Se aplica a botones .archive-order-btn que NO están en el is-admin-dashboard-panel
+            // (ej. si un administrador está viendo un panel de sector y archiva desde allí, aunque ya no debería haber un botón de archivado activo en esos paneles)
             const archiveBtnGeneral = e.target.closest('.archive-order-btn');
-            // La condición se asegura de que no se ejecute si estamos en el panel principal del Admin
             if (archiveBtnGeneral && !document.body.classList.contains('is-admin-dashboard-panel')) { 
                 e.preventDefault();
                 if (!confirm('¿Archivar este pedido? Esta acción es final.')) return;
@@ -102,12 +114,20 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (data.data.kpi_data) {
                                 updateSectorKPIs(data.data.kpi_data);
                             }
+                            // Si estamos en el panel del admin, y un pedido pasa de "En Producción" a "Pendiente de Cierre Admin"
+                            // o cambia su estado, debemos refrescar también las secciones de producción y cierre del admin.
+                            // Esto se dispara si es un admin viendo *su propio* dashboard y se completa una tarea en un sector.
+                            if (document.body.classList.contains('is-admin-dashboard-panel')) {
+                                const refreshProdBtn = document.getElementById('ghd-refresh-production-tasks');
+                                if (refreshProdBtn) { refreshProdBtn.click(); }
+                                const refreshClosureBtn = document.getElementById('ghd-refresh-closure-tasks');
+                                if (refreshClosureBtn) { refreshClosureBtn.click(); }
+                            }
                         } else { 
                             alert('Error al actualizar: ' + (data.data?.message || '')); 
                         }
                     })
                     .finally(() => {
-                        // Si la tarjeta no fue removida, restaurar opacidad
                         const finalCard = document.getElementById(card.id);
                         if (finalCard) { finalCard.style.opacity = '1'; }
                     });
@@ -138,6 +158,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     .then(data => {
                         if (data.success) {
                             rowToRemove.remove(); 
+                            // ¡Refrescar la sección de Pedidos en Producción del Admin!
+                            const refreshProdBtn = document.getElementById('ghd-refresh-production-tasks');
+                            if (refreshProdBtn) { refreshProdBtn.click(); }
                         } else {
                             alert('Error: ' + (data.data?.message || 'No se pudo iniciar la producción.'));
                             rowToRemove.style.opacity = '1';
@@ -297,6 +320,51 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // --- LÓGICA PARA EL BOTÓN "REFRESCAR" EN LA SECCIÓN DE PEDIDOS EN PRODUCCIÓN DEL ADMIN PRINCIPAL ---
+    const refreshProductionTasksBtn = document.getElementById('ghd-refresh-production-tasks');
+    if (refreshProductionTasksBtn && document.body.classList.contains('is-admin-dashboard-panel')) {
+        refreshProductionTasksBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const productionTasksContainer = document.getElementById('admin-production-tasks-container');
+            const productionTableBody = document.getElementById('ghd-production-table-body');
+
+            if (!productionTasksContainer || !productionTableBody) {
+                console.error("No se encontró el contenedor de tareas en producción.");
+                return;
+            }
+            
+            productionTasksContainer.style.opacity = '0.5';
+            refreshProductionTasksBtn.disabled = true;
+
+            const params = new URLSearchParams({
+                action: 'ghd_refresh_production_tasks',
+                nonce: ghd_ajax.nonce
+            });
+
+            fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        productionTableBody.innerHTML = data.data.tasks_html;
+                        if (data.data.kpi_data) {
+                            updateAdminProductionKPIs(data.data.kpi_data);
+                        }
+                    } else {
+                        alert('Error al refrescar pedidos en producción: ' + (data.data?.message || ''));
+                        productionTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Error al cargar pedidos en producción.</td></tr>';
+                    }
+                })
+                .catch(error => {
+                    console.error("Error en la petición AJAX de refresco de producción:", error);
+                    alert('Error de red al refrescar pedidos en producción.');
+                    productionTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Error de red. Inténtalo de nuevo.</td></tr>';
+                })
+                .finally(() => {
+                    productionTasksContainer.style.opacity = '1';
+                    refreshProductionTasksBtn.disabled = false;
+                });
+        });
+    }
 
     // --- LÓGICA DE FILTROS Y BÚSQUEDA PARA EL PANEL DE ADMINISTRADOR (EXISTENTE) ---
     const adminDashboard = document.querySelector('.page-template-template-admin-dashboard');
@@ -364,7 +432,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 // --- LÓGICA PARA LOS GRÁFICOS DE LA PÁGINA DE REPORTES ---
-// Este bloque fue movido para estar dentro del DOMContentLoaded principal
 if (typeof ghd_reports_data !== 'undefined' && document.querySelector('.ghd-reports-grid')) {
     
     // GRÁFICO 1: PEDIDOS POR ESTADO (BARRAS)
@@ -373,28 +440,64 @@ if (typeof ghd_reports_data !== 'undefined' && document.querySelector('.ghd-repo
         new Chart(pedidosCtx, {
             type: 'bar',
             data: {
-                labels: ghd_reports_data.sector.labels,
+                labels: ghd_reports_data.pedidos_por_estado.labels,
                 datasets: [{
-                    label: 'Pedidos Activos',
-                    data: ghd_reports_data.sector.data,
-                    backgroundColor: 'rgba(74, 124, 89, 0.7)' // Verde corporativo
+                    label: 'Pedidos por Estado',
+                    data: ghd_reports_data.pedidos_por_estado.data,
+                    // Usar colores dinámicos si están en los datos
+                    backgroundColor: ghd_reports_data.pedidos_por_estado.labels.map(label => 
+                        ghd_reports_data.pedidos_por_estado.backgroundColors[label] || 'rgba(74, 124, 89, 0.7)' // Fallback color
+                    ),
+                    borderColor: 'rgba(255, 255, 255, 0.8)',
+                    borderWidth: 1
                 }]
             },
-            options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+            options: { 
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { 
+                    y: { 
+                        beginAtZero: true, 
+                        ticks: { stepSize: 1 } 
+                    } 
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    title: {
+                        display: false
+                    }
+                }
+            }
         });
     }
     
-    // GRÁFICO 2: CARGA POR SECTOR (DONA)
+    // GRÁFICO 2: CARGA DE TRABAJO POR SECTOR (DONA)
     const cargaCtx = document.getElementById('cargaPorSectorChart');
     if (cargaCtx) {
         new Chart(cargaCtx, {
             type: 'doughnut',
             data: {
-                labels: ghd_reports_data.sector.labels,
+                labels: ghd_reports_data.carga_por_sector.labels,
                 datasets: [{
-                    data: ghd_reports_data.sector.data,
-                    backgroundColor: ['#4A7C59', '#B34A49', '#F59E0B', '#6B7280', '#3E3E3E']
+                    data: ghd_reports_data.carga_por_sector.data,
+                    backgroundColor: ghd_reports_data.carga_por_sector.backgroundColors || ['#4A7C59', '#B34A49', '#F59E0B', '#6B7280', '#3E3E3E'],
+                    borderColor: '#fff',
+                    borderWidth: 2
                 }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                    },
+                    title: {
+                        display: false
+                    }
+                }
             }
         });
     }
@@ -405,11 +508,33 @@ if (typeof ghd_reports_data !== 'undefined' && document.querySelector('.ghd-repo
         new Chart(prioridadCtx, {
             type: 'polarArea',
             data: {
-                labels: ghd_reports_data.prioridad.labels,
+                labels: ghd_reports_data.pedidos_por_prioridad.labels,
                 datasets: [{
-                    data: ghd_reports_data.prioridad.data,
-                    backgroundColor: ['rgba(179, 74, 73, 0.7)', 'rgba(245, 158, 11, 0.7)', 'rgba(74, 124, 89, 0.7)']
+                    data: ghd_reports_data.pedidos_por_prioridad.data,
+                    backgroundColor: ghd_reports_data.pedidos_por_prioridad.labels.map(label => 
+                        ghd_reports_data.pedidos_por_prioridad.backgroundColors[label] || 'rgba(179, 74, 73, 0.7)'
+                    ),
+                    borderColor: '#fff',
+                    borderWidth: 2
                 }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                    },
+                    title: {
+                        display: false
+                    }
+                },
+                scale: {
+                    ticks: {
+                        beginAtZero: true,
+                        stepSize: 1
+                    }
+                }
             }
         });
     }

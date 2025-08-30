@@ -59,15 +59,15 @@ get_header(); ?>
 
         <div class="ghd-main-content-body">
             <?php while ( have_posts() ) : the_post(); 
-                $current_post_id = get_the_ID(); // Obtenemos el ID del post actual
+                $current_post_id = get_the_ID();
             ?>
 
                 <div class="ghd-details-grid">
                     <div class="details-main ghd-card">
                         <h3 class="card-section-title">Información del Cliente</h3>
                         <p><strong>Nombre:</strong> <?php echo esc_html(get_field('nombre_cliente', $current_post_id)); ?></p>
-                        <p><strong>Email:</strong> <?php echo esc_html(get_field('cliente_email', $current_post_id)); ?></p> <!-- CORREGIDO: campo cliente_email -->
-                        <p><strong>Teléfono:</strong> <?php echo esc_html(get_field('cliente_telefono', $current_post_id)); ?></p> <!-- CORREGIDO: campo cliente_telefono -->
+                        <p><strong>Email:</strong> <?php echo esc_html(get_field('cliente_email', $current_post_id)); ?></p>
+                        <p><strong>Teléfono:</strong> <?php echo esc_html(get_field('cliente_telefono', $current_post_id)); ?></p>
                     </div>
 
                     <div class="details-sidebar ghd-card">
@@ -76,29 +76,43 @@ get_header(); ?>
                         <p><strong>Prioridad:</strong> <?php echo esc_html(get_field('prioridad_pedido', $current_post_id)); ?></p>
                     </div>
 
-                                        <div class="details-main ghd-card">
-                        <h3 class="card-section-title">Información del Producto</h3>
+                    <!-- NUEVA ESTRUCTURA PARA "INFORMACIÓN DEL PRODUCTO" -->
+                    <div class="details-main ghd-card product-details-section"> <!-- Añadimos class product-details-section -->
                         <?php 
-                        $product_image = get_field('imagen_del_producto', $current_post_id); 
-                        // --- ELIMINA LAS LÍNEAS DE DEPURACIÓN QUE AÑADIMOS ANTES ---
-                        // echo '<pre>';
-                        // var_dump($product_image);
-                        // echo '</pre>';
-                        // ------------------------------------------
-                        if ($product_image) : 
-                            // Si ACF devuelve un string (URL), usarlo directamente.
-                            // Si devuelve un array (Image Array), usar $product_image['url'].
-                            // Podemos ser flexibles.
+                        $product_image = get_field('imagen_del_producto', $current_post_id);
+                        $image_url = '';
+                        $image_alt = '';
+
+                        if ($product_image) {
                             $image_url = is_array($product_image) ? $product_image['url'] : $product_image;
                             $image_alt = is_array($product_image) && !empty($product_image['alt']) ? $product_image['alt'] : get_the_title($current_post_id) . ' - ' . get_field('nombre_producto', $current_post_id);
+                        }
                         ?>
-                            <div style="margin-bottom: 1rem;">
-                                <img src="<?php echo esc_url($image_url); ?>" alt="<?php echo esc_attr($image_alt); ?>" style="max-width: 200px; height: auto; border-radius: 8px;">
+                        
+                        <?php if ($product_image) : ?>
+                            <div class="product-image-wrapper">
+                                <img src="<?php echo esc_url($image_url); ?>" alt="<?php echo esc_attr($image_alt); ?>">
                             </div>
                         <?php endif; ?>
-                        <p><strong>Producto:</strong> <?php echo esc_html(get_field('nombre_producto', $current_post_id)); ?></p>
-                        <p><strong>Especificaciones:</strong> <?php echo esc_html(get_field('especificaciones_producto', $current_post_id)); ?></p>
-                    </div> 
+
+                        <div class="product-info-wrapper">
+                            <h3 class="card-section-title">Información del Producto</h3>
+                            <div class="product-main-info">
+                                <p><strong>Producto:</strong> <?php echo esc_html(get_field('nombre_producto', $current_post_id)); ?></p>
+                                <!-- Puedes añadir más detalles clave del producto aquí si los tienes -->
+                            </div>
+                            <?php 
+                            $especificaciones = get_field('especificaciones_producto', $current_post_id);
+                            if ($especificaciones) : ?>
+                                <div class="product-specifications">
+                                    <p><strong>Especificaciones:</strong></p>
+                                    <p><?php echo esc_html($especificaciones); ?></p>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <!-- FIN DE LA NUEVA ESTRUCTURA -->
+
 
                     <div class="details-sidebar ghd-card">
                         <h3 class="card-section-title">Sub-estados de Producción</h3>
@@ -113,7 +127,7 @@ get_header(); ?>
                     </div>
                 </div>
 
-            <?php endwhile; ?>
+            <?php endwhile; // End of the loop. ?>
         </div>
     </main>
 </div>
