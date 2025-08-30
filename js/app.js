@@ -109,6 +109,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (data.data.kpi_data) {
                                 updateSectorKPIs(data.data.kpi_data);
                             }
+                            // Si estamos en el panel del admin, y un pedido pasa de "En Producción" a "Pendiente de Cierre Admin"
+                            // o cambia su estado, debemos refrescar también las secciones de producción y cierre del admin.
                             if (document.body.classList.contains('is-admin-dashboard-panel')) {
                                 const refreshProdBtn = document.getElementById('ghd-refresh-production-tasks');
                                 if (refreshProdBtn) { refreshProdBtn.click(); }
@@ -150,6 +152,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     .then(data => {
                         if (data.success) {
                             rowToRemove.remove(); 
+                            // ¡Refrescar la sección de Pedidos en Producción del Admin!
                             const refreshProdBtn = document.getElementById('ghd-refresh-production-tasks');
                             if (refreshProdBtn) { refreshProdBtn.click(); }
                         } else {
@@ -355,13 +358,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 .finally(() => {
                     productionTasksContainer.style.opacity = '1';
                     refreshProductionTasksBtn.disabled = false;
+                    // --- NUEVO: Refrescar también Pedidos Pendientes de Cierre ---
+                    const refreshClosureBtn = document.getElementById('ghd-refresh-closure-tasks');
+                    if (refreshClosureBtn) { refreshClosureBtn.click(); }
                 });
         });
     }
 
     // --- LÓGICA PARA EL BOTÓN "REFRESCAR" EN LA PÁGINA DE PEDIDOS ARCHIVADOS ---
     const refreshArchivedOrdersBtn = document.getElementById('ghd-refresh-archived-orders');
-    if (refreshArchivedOrdersBtn && document.body.classList.contains('is-admin-dashboard-panel')) { // También si es admin dashboard
+    if (refreshArchivedOrdersBtn && document.body.classList.contains('is-admin-dashboard-panel')) { 
         refreshArchivedOrdersBtn.addEventListener('click', function(e) {
             e.preventDefault();
             const archivedOrdersTableBody = document.getElementById('ghd-archived-orders-table-body');
@@ -401,8 +407,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+
     // --- LÓGICA DE FILTROS Y BÚSQUEDA PARA EL PANEL DE ADMINISTRADOR (EXISTENTE) ---
-    // Este bloque queda como estaba
     const adminDashboard = document.querySelector('.page-template-template-admin-dashboard');
 
     if (adminDashboard) {
@@ -468,7 +474,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- LÓGICA PARA LOS GRÁFICOS DE LA PÁGINA DE REPORTES ---
-    // Este bloque ya está dentro del DOMContentLoaded
     if (typeof ghd_reports_data !== 'undefined' && document.querySelector('.ghd-reports-grid')) {
         const pedidosCtx = document.getElementById('pedidosPorEstadoChart');
         if (pedidosCtx) {
