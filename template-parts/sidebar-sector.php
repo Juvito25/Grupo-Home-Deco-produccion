@@ -60,8 +60,19 @@ function is_sector_link_active($template_name) {
                 </a>
             </li>
             <!-- Enlace al perfil/nombre del usuario, no a una página específica sino a su rol/nombre -->
-            <li>
-                <a href="#">
+                        <?php
+            // Obtener la URL de la página de perfil
+            $user_profile_page_url = get_posts([
+                'post_type'  => 'page',
+                'fields'     => 'ids',
+                'nopaging'   => true,
+                'meta_key'   => '_wp_page_template',
+                'meta_value' => 'template-user-profile.php'
+            ]);
+            $profile_url = !empty($user_profile_page_url) ? get_permalink($user_profile_page_url[0]) : '#';
+            ?>
+            <li class="<?php echo is_sector_link_active('template-user-profile.php'); ?>">
+                <a href="<?php echo esc_url($profile_url); ?>">
                     <i class="fa-solid fa-user"></i>
                     <span><?php echo esc_html($user_display_name); ?></span>
                     <span style="font-size: 0.8em; margin-left: auto; color: #7f8c8d;"><?php echo esc_html($sector_name_for_sidebar); ?></span>
