@@ -25,7 +25,7 @@ get_header(); ?>
                 // Botón "Volver" inteligente
                 $referer_url = wp_get_referer();
                 // Si viene de un panel conocido, intentar volver a él
-                if (strpos($referer_url, 'template-admin-dashboard.php') !== false || strpos($referer_url, 'template-sector-dashboard.php') !== false) {
+                if (strpos($referer_url, 'template-admin-dashboard.php') !== false || strpos($referer_url, 'template-sector-dashboard.php') !== false || strpos($referer_url, 'template-pedidos-archivados.php') !== false) { // Añadido para pedidos archivados
                     $back_url = $referer_url;
                 } else {
                     // Fallback si no se detecta el referer o es desconocido
@@ -41,10 +41,10 @@ get_header(); ?>
                         // Añadir el parámetro de sector si es un usuario de sector y viene del sidebar
                         $current_user_roles = wp_get_current_user()->roles;
                         $current_user_role = !empty($current_user_roles) ? $current_user_roles[0] : '';
-                        $mapa_roles = ghd_get_mapa_roles_a_campos(); // Usar la función para obtener el mapeo
+                        $mapa_roles = ghd_get_mapa_roles_a_campos(); 
                         if (array_key_exists($current_user_role, $mapa_roles)) {
                             $sector_name = ucfirst(str_replace(['rol_', '_'], ' ', $current_user_role));
-                            $clean_sector_name = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $sector_name));
+                            $clean_sector_name = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $clean_sector_name));
                             $back_url = add_query_arg('sector', urlencode($clean_sector_name), $back_url);
                         }
                     }
@@ -77,7 +77,7 @@ get_header(); ?>
                     </div>
 
                     <!-- NUEVA ESTRUCTURA PARA "INFORMACIÓN DEL PRODUCTO" -->
-                    <div class="details-main ghd-card product-details-section"> <!-- Añadimos class product-details-section -->
+                    <div class="details-main ghd-card product-details-section">
                         <?php 
                         $product_image = get_field('imagen_del_producto', $current_post_id);
                         $image_url = '';
@@ -87,6 +87,10 @@ get_header(); ?>
                             $image_url = is_array($product_image) ? $product_image['url'] : $product_image;
                             $image_alt = is_array($product_image) && !empty($product_image['alt']) ? $product_image['alt'] : get_the_title($current_post_id) . ' - ' . get_field('nombre_producto', $current_post_id);
                         }
+                        // --- Nuevos campos de Material, Color, Observaciones ---
+                        $material_producto = get_field('material_del_producto', $current_post_id); // Asumo este nombre de campo ACF
+                        $color_producto = get_field('color_del_producto', $current_post_id);     // Asumo este nombre de campo ACF
+                        $observaciones_personalizacion = get_field('observaciones_personalizacion', $current_post_id); // Asumo este nombre de campo ACF
                         ?>
                         
                         <?php if ($product_image) : ?>
@@ -99,7 +103,14 @@ get_header(); ?>
                             <h3 class="card-section-title">Información del Producto</h3>
                             <div class="product-main-info">
                                 <p><strong>Producto:</strong> <?php echo esc_html(get_field('nombre_producto', $current_post_id)); ?></p>
-                                <!-- Puedes añadir más detalles clave del producto aquí si los tienes -->
+                                <?php if ($material_producto) : ?><p><strong>Material:</strong> <?php echo esc_html($material_producto); ?></p><?php endif; ?>
+                                <?php if ($color_producto) : ?>
+                                    <p>
+                                        <strong>Color:</strong> 
+                                        <span class="color-swatch" style="background-color: <?php echo esc_attr($color_producto); ?>; margin-left: 5px;"></span>
+                                        <?php echo esc_html($color_producto); ?>
+                                    </p>
+                                <?php endif; ?>
                             </div>
                             <?php 
                             $especificaciones = get_field('especificaciones_producto', $current_post_id);
@@ -107,6 +118,12 @@ get_header(); ?>
                                 <div class="product-specifications">
                                     <p><strong>Especificaciones:</strong></p>
                                     <p><?php echo esc_html($especificaciones); ?></p>
+                                </div>
+                            <?php endif; ?>
+                            <?php if ($observaciones_personalizacion) : ?>
+                                <div class="product-specifications" style="margin-top: 1rem;">
+                                    <p><strong>Observaciones de Personalización:</strong></p>
+                                    <p><?php echo nl2br(esc_html($observaciones_personalizacion)); ?></p>
                                 </div>
                             <?php endif; ?>
                         </div>

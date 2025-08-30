@@ -197,6 +197,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (data.data.kpi_data) {
                                 updateAdminClosureKPIs(data.data.kpi_data);
                             }
+                            const refreshArchivedBtn = document.getElementById('ghd-refresh-archived-orders'); 
+                            if (refreshArchivedBtn) { refreshArchivedBtn.click(); }
                         } else {
                             alert('Error: ' + (data.data.message || 'No se pudo archivar.'));
                             rowToArchive.style.opacity = '1';
@@ -342,17 +344,59 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     } else {
                         alert('Error al refrescar pedidos en producción: ' + (data.data?.message || ''));
-                        productionTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Error al cargar pedidos en producción.</td></tr>';
+                        productionTableBody.innerHTML = '<tr><td colspan="9" style="text-align:center;">Error al cargar pedidos en producción.</td></tr>'; // Colspan ajustado
                     }
                 })
                 .catch(error => {
                     console.error("Error en la petición AJAX de refresco de producción:", error);
                     alert('Error de red al refrescar pedidos en producción.');
-                    productionTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Error de red. Inténtalo de nuevo.</td></tr>';
+                    productionTableBody.innerHTML = '<tr><td colspan="9" style="text-align:center;">Error de red. Inténtalo de nuevo.</td></tr>'; // Colspan ajustado
                 })
                 .finally(() => {
                     productionTasksContainer.style.opacity = '1';
                     refreshProductionTasksBtn.disabled = false;
+                });
+        });
+    }
+
+    // --- LÓGICA PARA EL BOTÓN "REFRESCAR" EN LA PÁGINA DE PEDIDOS ARCHIVADOS ---
+    const refreshArchivedOrdersBtn = document.getElementById('ghd-refresh-archived-orders');
+    if (refreshArchivedOrdersBtn && document.body.classList.contains('is-admin-dashboard-panel')) { // También si es admin dashboard
+        refreshArchivedOrdersBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const archivedOrdersTableBody = document.getElementById('ghd-archived-orders-table-body');
+
+            if (!archivedOrdersTableBody) {
+                console.error("No se encontró el cuerpo de la tabla de pedidos archivados.");
+                return;
+            }
+            
+            archivedOrdersTableBody.style.opacity = '0.5';
+            refreshArchivedOrdersBtn.disabled = true;
+
+            const params = new URLSearchParams({
+                action: 'ghd_refresh_archived_orders',
+                nonce: ghd_ajax.nonce
+            });
+
+            fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        archivedOrdersTableBody.innerHTML = data.data.table_html;
+                    } else {
+                        alert('Error al refrescar pedidos archivados: ' + (data.data?.message || ''));
+                        archivedOrdersTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Error al cargar pedidos archivados.</td></tr>';
+                    }
+                })
+                .catch(error => {
+                    console.error("Error en la petición AJAX de refresco de archivados:", error);
+                    alert('Error de red al refrescar pedidos archivados.');
+                    archivedOrdersTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Error de red. Inténtalo de nuevo.</td></tr>';
+                })
+                .finally(() => {
+                    archivedOrdersTableBody.style.opacity = '1';
+                    refreshArchivedOrdersBtn.disabled = false;
                 });
         });
     }
@@ -484,54 +528,11 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
-
-    // --- LÓGICA PARA EL BOTÓN "REFRESCAR" EN LA PÁGINA DE PEDIDOS ARCHIVADOS ---
-    // ¡AQUÍ ES DONDE DEBE ESTAR! DENTRO DEL DOMContentLoaded
-    const refreshArchivedOrdersBtn = document.getElementById('ghd-refresh-archived-orders');
-    if (refreshArchivedOrdersBtn) {
-        refreshArchivedOrdersBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            const archivedOrdersTableBody = document.getElementById('ghd-archived-orders-table-body');
-
-            if (!archivedOrdersTableBody) {
-                console.error("No se encontró el cuerpo de la tabla de pedidos archivados.");
-                return;
-            }
-            
-            archivedOrdersTableBody.style.opacity = '0.5';
-            refreshArchivedOrdersBtn.disabled = true;
-
-            const params = new URLSearchParams({
-                action: 'ghd_refresh_archived_orders',
-                nonce: ghd_ajax.nonce
-            });
-
-            fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        archivedOrdersTableBody.innerHTML = data.data.table_html;
-                    } else {
-                        alert('Error al refrescar pedidos archivados: ' + (data.data?.message || ''));
-                        archivedOrdersTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Error al cargar pedidos archivados.</td></tr>';
-                    }
-                })
-                .catch(error => {
-                    console.error("Error en la petición AJAX de refresco de archivados:", error);
-                    alert('Error de red al refrescar pedidos archivados.');
-                    archivedOrdersTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Error de red. Inténtalo de nuevo.</td></tr>';
-                })
-                .finally(() => {
-                    archivedOrdersTableBody.style.opacity = '1';
-                    refreshArchivedOrdersBtn.disabled = false;
-                });
-        });
-    }
-
-}); // <--- Cierre ÚNICO y CORRECTO del document.addEventListener('DOMContentLoaded', function() principal
+}); // Cierre ÚNICO y CORRECTO del document.addEventListener('DOMContentLoaded', function() principal
 
 // LÓGICA PARA ACTIVAR EL FILTRO DESDE LA URL AL CARGAR LA PÁGINA (EXISTENTE)
 // Este listener de window.load queda como un bloque independiente al final del archivo.
+// Se ha mantenido aquí por compatibilidad, aunque su funcionalidad de applyFilters ya está en DOMContentLoaded.
 window.addEventListener('load', function() {
     const searchFilterInput = document.getElementById('ghd-search-filter');
     if (!searchFilterInput) return;

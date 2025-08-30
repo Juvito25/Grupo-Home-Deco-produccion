@@ -1,14 +1,13 @@
 <?php
 /**
  * Template Name: GHD - Panel de Administrador
- * Versión V4 - Pedidos en Producción
+ * Versión V5 - Pedidos en Producción (con Material/Color/Observaciones)
  */
 
 if (!is_user_logged_in() || !current_user_can('manage_options')) {
     auth_redirect();
 }
 
-// Añadir una clase al body para identificar este panel en JS
 add_filter('body_class', function($classes) {
     $classes[] = 'is-admin-dashboard-panel';
     return $classes;
@@ -111,6 +110,9 @@ get_header();
                         <th>Código</th>
                         <th>Cliente</th>
                         <th>Producto</th>
+                        <th>Material</th> <!-- NUEVA COLUMNA -->
+                        <th>Color</th>   <!-- NUEVA COLUMNA -->
+                        <th>Observaciones</th> <!-- NUEVA COLUMNA -->
                         <th>Estado General</th>
                         <th>Sub-estados de Producción</th>
                         <th>Acciones</th>
@@ -130,7 +132,6 @@ get_header();
         </div>
 
         <?php 
-        // Calcular KPIs para Pedidos Pendientes de Cierre
         $admin_closure_kpis = ghd_calculate_admin_closure_kpis();
         ?>
 
@@ -189,7 +190,7 @@ get_header();
                                     ]);
                                     $remito_base_url = !empty($remito_page_id) ? get_permalink($remito_page_id[0]) : home_url();
                                     echo esc_url( add_query_arg( 'order_id', get_the_ID(), $remito_base_url ) );
-                                ?>" target="_blank" class="ghd-btn ghd-btn-secondary" data-order-id="<?php echo get_the_ID(); ?>">
+                                ?>" target="_blank" class="ghd-btn ghd-btn-secondary ghd-btn-small generate-remito-btn" data-order-id="<?php echo get_the_ID(); ?>">
                                     <i class="fa-solid fa-file-invoice"></i> Generar Remito
                                 </a>
                                 <button class="ghd-btn ghd-btn-primary archive-order-btn" data-order-id="<?php echo get_the_ID(); ?>">
