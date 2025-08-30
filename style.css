@@ -859,3 +859,9 @@ body.page-template-template-login {
         grid-template-columns: 1fr; /* Una columna en tablets y móviles */
     }
 }
+
+/* ------------ Estilos para botones pequeños ------------------ 
+.ghd-btn.ghd-btn-small {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+}*/

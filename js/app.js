@@ -57,6 +57,8 @@ document.addEventListener('DOMContentLoaded', function() {
         mainContent.addEventListener('click', function(e) {
             
             // Lógica para el botón "Archivar Pedido" (versión NO-ADMIN-DASHBOARD)
+            // Se aplica a botones .archive-order-btn que NO están en el is-admin-dashboard-panel
+            // (ej. si un administrador está viendo un panel de sector y archiva desde allí, aunque ya no debería haber un botón de archivado activo en esos paneles)
             const archiveBtnGeneral = e.target.closest('.archive-order-btn');
             if (archiveBtnGeneral && !document.body.classList.contains('is-admin-dashboard-panel')) { 
                 e.preventDefault();
@@ -112,8 +114,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (data.data.kpi_data) {
                                 updateSectorKPIs(data.data.kpi_data);
                             }
-                            // Si estamos en el panel del admin, y un pedido pasa a "Pendiente de Cierre Admin"
-                            // debemos refrescar también la sección de producción del admin.
+                            // Si estamos en el panel del admin, y un pedido pasa de "En Producción" a "Pendiente de Cierre Admin"
+                            // o cambia su estado, debemos refrescar también las secciones de producción y cierre del admin.
+                            // Esto se dispara si es un admin viendo *su propio* dashboard y se completa una tarea en un sector.
                             if (document.body.classList.contains('is-admin-dashboard-panel')) {
                                 const refreshProdBtn = document.getElementById('ghd-refresh-production-tasks');
                                 if (refreshProdBtn) { refreshProdBtn.click(); }
@@ -536,8 +539,7 @@ if (typeof ghd_reports_data !== 'undefined' && document.querySelector('.ghd-repo
         });
     }
 }
-} // <--- ESTA LLAVE DE CIERRE FINAL CAUSA EL ERROR
-); // Cierre del document.addEventListener('DOMContentLoaded', function() original
+}); // Cierre del document.addEventListener('DOMContentLoaded', function() original
 
 // LÓGICA PARA ACTIVAR EL FILTRO DESDE LA URL AL CARGAR LA PÁGINA (EXISTENTE)
 window.addEventListener('load', function() {

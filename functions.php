@@ -783,3 +783,15 @@ function ghd_refresh_production_tasks_callback() {
     ]);
     wp_die();
 }
+
+/**
+ * Registra la nueva plantilla de página para el remito.
+ *
+ * @param array $templates Un array de plantillas de página.
+ * @return array Un array modificado de plantillas de página.
+ */
+add_filter( 'theme_page_templates', 'ghd_register_remito_template' );
+function ghd_register_remito_template( $templates ) {
+    $templates['template-remito.php'] = 'GHD - Generar Remito';
+    return $templates;
+}

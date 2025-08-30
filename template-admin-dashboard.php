@@ -179,6 +179,19 @@ get_header();
                             <td><?php echo esc_html(get_field('nombre_producto')); ?></td>
                             <td><?php echo get_the_date(); ?></td>
                             <td>
+                                <a href="<?php 
+                                    $remito_page_id = get_posts([
+                                        'post_type'  => 'page',
+                                        'fields'     => 'ids',
+                                        'nopaging'   => true,
+                                        'meta_key'   => '_wp_page_template',
+                                        'meta_value' => 'template-remito.php'
+                                    ]);
+                                    $remito_base_url = !empty($remito_page_id) ? get_permalink($remito_page_id[0]) : home_url();
+                                    echo esc_url( add_query_arg( 'order_id', get_the_ID(), $remito_base_url ) );
+                                ?>" target="_blank" class="ghd-btn ghd-btn-secondary" data-order-id="<?php echo get_the_ID(); ?>">
+                                    <i class="fa-solid fa-file-invoice"></i> Generar Remito
+                                </a>
                                 <button class="ghd-btn ghd-btn-primary archive-order-btn" data-order-id="<?php echo get_the_ID(); ?>">
                                     Archivar Pedido
                                 </button>
