@@ -92,6 +92,23 @@ function is_sidebar_link_active($template_name) {
                     <span>Reportes</span>
                 </a>
             </li>
+             <?php
+            // URL para la página de Pedidos Archivados
+            $archived_orders_page_url = get_posts([
+                'post_type'  => 'page',
+                'fields'     => 'ids',
+                'nopaging'   => true,
+                'meta_key'   => '_wp_page_template',
+                'meta_value' => 'template-pedidos-archivados.php'
+            ]);
+            $archived_orders_url = !empty($archived_orders_page_url) ? get_permalink($archived_orders_page_url[0]) : home_url();
+            ?>
+            <li class="<?php echo is_sidebar_link_active('template-pedidos-archivados.php'); ?>">
+                <a href="<?php echo esc_url($archived_orders_url); ?>">
+                    <i class="fa-solid fa-box-archive"></i> <!-- Icono de archivo -->
+                    <span>Pedidos Archivados</span>
+                </a>
+            </li>
             <li class="<?php // is_sidebar_link_active('template-configuracion.php'); ?>">
                 <a href="#"> <!-- Placeholder para Configuración -->
                     <i class="fa-solid fa-gear"></i>
