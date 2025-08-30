@@ -1,6 +1,6 @@
 <?php
 /**
- * functions.php - Versión 2.9 - Reportes y Consolidación Administrativa
+ * functions.php - Versión 3.0 - Reportes, Consolidación Administrativa y Mejoras de Flujo
  */
 
 // --- 1. CARGA DE ESTILOS Y SCRIPTS ---
@@ -9,15 +9,15 @@ function ghd_enqueue_assets() {
     wp_enqueue_style('parent-style', get_template_directory_uri() . '/style.css');
     wp_enqueue_style('google-fonts', 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap', false);
     wp_enqueue_style('font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css', [], '6.4.2');
-    wp_enqueue_style('ghd-style', get_stylesheet_uri(), ['parent-style'], '2.9'); // Versión actualizada
-    wp_enqueue_script('ghd-app', get_stylesheet_directory_uri() . '/js/app.js', [], '2.9', true); // Versión actualizada
+    wp_enqueue_style('ghd-style', get_stylesheet_uri(), ['parent-style'], '3.0'); // Versión actualizada
+    wp_enqueue_script('ghd-app', get_stylesheet_directory_uri() . '/js/app.js', [], '3.0', true); // Versión actualizada
 
     // Localizar scripts solo si estamos en el front-end y no en el admin de WP.
     // Esto asegura que ghd_ajax esté siempre disponible.
     if (!is_admin()) {
         wp_localize_script('ghd-app', 'ghd_ajax', ['ajax_url' => admin_url('admin-ajax.php'), 'nonce' => wp_create_nonce('ghd-ajax-nonce')]);
         
-        // --- NUEVO: Localizar datos de reportes si estamos en la página de reportes ---
+        // --- Localizar datos de reportes si estamos en la página de reportes ---
         global $post;
         if (is_a($post, 'WP_Post') && is_page_template('template-reportes.php')) {
             wp_enqueue_script('chart-js', 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js', [], '4.4.1', true);
@@ -206,13 +206,13 @@ function ghd_get_pedidos_en_produccion_data() {
     $kpi_data = [
         'total_pedidos_produccion'        => $pedidos_query->post_count,
         'total_prioridad_alta_produccion' => 0,
-        'tiempo_promedio_str_produccion'  => '0.0h', // Tiempo promedio desde inicio de producción
-        'completadas_hoy_produccion'      => 0, // Pedidos que salieron de producción hoy
+        'tiempo_promedio_str_produccion'  => '0.0h',
+        'completadas_hoy_produccion'      => 0,
     ];
 
     $total_tiempo_produccion = 0;
     $ahora = current_time('U');
-    $mapa_roles_a_campos = ghd_get_mapa_roles_a_campos(); // Usar el mapeo de campos
+    $mapa_roles_a_campos = ghd_get_mapa_roles_a_campos();
 
     ob_start();
     if ($pedidos_query->have_posts()) :
@@ -223,19 +223,32 @@ function ghd_get_pedidos_en_produccion_data() {
                 $kpi_data['total_prioridad_alta_produccion']++;
             }
 
-            // Calcular tiempo de producción desde que pasó a "En Producción"
-            $produccion_iniciada_time = get_post_meta($order_id, 'historial_produccion_iniciada_timestamp', true); // Se necesita guardar este timestamp
+            $produccion_iniciada_time = get_post_meta($order_id, 'historial_produccion_iniciada_timestamp', true);
 
             if ($produccion_iniciada_time) {
                 $total_tiempo_produccion += $ahora - $produccion_iniciada_time;
             } else {
-                $total_tiempo_produccion += $ahora - get_the_modified_time('U', $order_id); // Fallback
+                $total_tiempo_produccion += $ahora - get_the_modified_time('U', $order_id);
             }
+
+            // --- NUEVOS CAMPOS RECUPERADOS ---
+            $material_producto = get_field('material_del_producto', $order_id); // Asumo este nombre de campo ACF
+            $color_producto = get_field('color_del_producto', $order_id);     // Asumo este nombre de campo ACF
+            $observaciones_personalizacion = get_field('observaciones_personalizacion', $order_id); // Asumo este nombre de campo ACF
             ?>
             <tr id="order-row-prod-<?php echo $order_id; ?>">
                 <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
                 <td><?php echo esc_html(get_field('nombre_cliente', $order_id)); ?></td>
                 <td><?php echo esc_html(get_field('nombre_producto', $order_id)); ?></td>
+                <td><?php echo esc_html($material_producto); ?></td>
+                <td>
+                    <?php if ($color_producto) : ?>
+                        <span class="color-swatch" style="background-color: <?php echo esc_attr($color_producto); ?>;"></span>
+                    <?php else : ?>
+                        N/A
+                    <?php endif; ?>
+                </td>
+                <td class="production-observations"><?php echo nl2br(esc_html($observaciones_personalizacion)); ?></td>
                 <td><?php echo esc_html(get_field('estado_pedido', $order_id)); ?></td>
                 <td>
                     <div class="production-substatus-badges">
@@ -252,11 +265,14 @@ function ghd_get_pedidos_en_produccion_data() {
                             } else { // No Asignado
                                 $badge_class = 'status-gray';
                             }
+                            // Solo mostrar si tiene un estado relevante
+                            if ($sub_estado !== 'No Asignado') {
                             ?>
                             <span class="ghd-badge <?php echo esc_attr($badge_class); ?>">
-                                <?php echo ucfirst(str_replace('estado_', '', $field_key)); ?>: <?php echo esc_html($sub_estado); ?>
+                                <?php echo ucfirst(str_replace('estado_', '', str_replace('rol_', '', $role_key))); ?>: <?php echo esc_html($sub_estado); ?>
                             </span>
                             <?php
+                            }
                         }
                         ?>
                     </div>
@@ -266,7 +282,7 @@ function ghd_get_pedidos_en_produccion_data() {
             <?php
         endwhile;
     else : ?>
-        <tr><td colspan="6" style="text-align:center;">No hay pedidos actualmente en producción.</td></tr>
+        <tr><td colspan="9" style="text-align:center;">No hay pedidos actualmente en producción.</td></tr>
     <?php endif;
     wp_reset_postdata();
     $production_tasks_html = ob_get_clean();
@@ -276,7 +292,6 @@ function ghd_get_pedidos_en_produccion_data() {
         $kpi_data['tiempo_promedio_str_produccion'] = number_format($promedio_horas, 1) . 'h';
     }
 
-    // Completadas hoy (salieron de producción hoy - ej. pasaron a 'Pendiente de Cierre Admin')
     $today_start = strtotime('today', current_time('timestamp', true));
     $today_end   = strtotime('tomorrow - 1 second', current_time('timestamp', true));
 
@@ -286,7 +301,7 @@ function ghd_get_pedidos_en_produccion_data() {
         'meta_query'     => [
             [
                 'key'     => 'estado_pedido',
-                'value'   => 'Pendiente de Cierre Admin', // O cualquier otro estado que indique que salió de producción
+                'value'   => 'Pendiente de Cierre Admin', 
                 'compare' => '=',
             ],
         ],
@@ -303,7 +318,10 @@ function ghd_get_pedidos_en_produccion_data() {
     return ['tasks_html' => $production_tasks_html, 'kpi_data' => $kpi_data];
 }
 
-// --- NUEVA FUNCIÓN: Recopilar datos para la página de reportes ---
+/**
+ * --- Recopilar datos para la página de reportes ---
+ * (Ahora está dentro del functions.php principal, no como un fragmento)
+ */
 function ghd_get_reports_data() {
     $reports_data = [
         'pedidos_por_estado' => [
@@ -497,64 +515,48 @@ add_action('wp_ajax_ghd_update_task_status', function() {
     $sector_kpi_data = ghd_calculate_sector_kpis($field); // <-- Calculamos los KPIs del sector
     
     if ($value === 'Completado') {
-        // Regla 1: Carpintería y Corte -> Costura
+        // Regla 1: Carpintería y Corte -> Costura (SIN CAMBIOS, YA ESPERA A AMBOS)
         if (get_field('estado_carpinteria', $id) == 'Completado' && get_field('estado_corte', $id) == 'Completado' && get_field('estado_costura', $id) == 'No Asignado') {
             update_field('estado_costura', 'Pendiente', $id); update_field('estado_pedido', 'En Costura', $id);
-            wp_insert_post(['post_title' => 'Fase 1 completa -> A Costura', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $id]]);
+            wp_insert_post(['post_title' => 'Fase 1 completa (Carpintería y Corte) -> A Costura', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $id]]);
         }
-        // Regla 2: Costura -> Tapicería y Embalaje
-        if (get_field('estado_costura', $id) == 'Completado' && get_field('estado_tapiceria', $id) == 'No Asignado') {
+        // Regla 2: Costura Y Carpintería -> Tapicería y Embalaje (AJUSTADA)
+        if (get_field('estado_costura', $id) == 'Completado' && get_field('estado_carpinteria', $id) == 'Completado' && get_field('estado_tapiceria', $id) == 'No Asignado') {
             update_field('estado_tapiceria', 'Pendiente', $id); update_field('estado_embalaje', 'Pendiente', $id);
             update_field('estado_pedido', 'En Tapicería/Embalaje', $id);
-            wp_insert_post(['post_title' => 'Fase Costura completa -> A Tapicería/Embalaje', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $id]]);
+            wp_insert_post(['post_title' => 'Fase Costura completa (y Carpintería) -> A Tapicería/Embalaje', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $id]]);
         }
-        // Regla 3: Tapicería y Embalaje -> Logística
+        // Regla 3: Tapicería y Embalaje -> Logística (SIN CAMBIOS, YA ESPERA A AMBOS)
         if (get_field('estado_tapiceria', $id) == 'Completado' && get_field('estado_embalaje', $id) == 'Completado' && get_field('estado_logistica', $id) == 'No Asignado') {
             update_field('estado_logistica', 'Pendiente', $id); update_field('estado_pedido', 'Listo para Entrega', $id);
             wp_insert_post(['post_title' => 'Fase Tapicería/Embalaje completa -> A Logística', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $id]]);
         }
-        // Regla 4: Logística -> Pendiente de Cierre Admin (Consolidación)
-        // Eliminamos el 'estado_administrativo = Pendiente' como tarea para un rol específico
-        // Ahora el Admin principal lo manejará.
-        if (get_field('estado_logistica', $id) == 'Completado' && get_field('estado_pedido', $id) !== 'Pendiente de Cierre Admin') { // Aseguramos no sobreescribir si ya está en ese estado
-            update_field('estado_pedido', 'Pendiente de Cierre Admin', $id); // Nuevo estado general
-            update_field('estado_administrativo', 'Listo para Archivar', $id); // Para seguimiento interno, ya no como una "tarea"
+        // Regla 4: Logística -> Pendiente de Cierre Admin (SIN CAMBIOS)
+        if (get_field('estado_logistica', $id) == 'Completado' && get_field('estado_pedido', $id) !== 'Pendiente de Cierre Admin') {
+            update_field('estado_pedido', 'Pendiente de Cierre Admin', $id);
+            update_field('estado_administrativo', 'Listo para Archivar', $id);
             wp_insert_post(['post_title' => 'Entrega Completada -> Pendiente de Cierre Admin', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $id]]);
         }
 
-        wp_send_json_success(['message' => 'Tarea completada.', 'kpi_data' => $sector_kpi_data]); // <-- Devolvemos los KPIs
+        wp_send_json_success(['message' => 'Tarea completada.', 'kpi_data' => $sector_kpi_data]);
     } else {
-        // Si no se completó, devolvemos el HTML de la tarjeta actualizada y los KPIs.
         ob_start();
-
         $prioridad_pedido = get_field('prioridad_pedido', $id);
         $prioridad_class = '';
-        if ($prioridad_pedido === 'Alta') {
-            $prioridad_class = 'prioridad-alta';
-        } elseif ($prioridad_pedido === 'Media') {
-            $prioridad_class = 'prioridad-media';
-        } else {
-            $prioridad_class = 'prioridad-baja';
-        }
-
+        if ($prioridad_pedido === 'Alta') { $prioridad_class = 'prioridad-alta'; } elseif ($prioridad_pedido === 'Media') { $prioridad_class = 'prioridad-media'; } else { $prioridad_class = 'prioridad-baja'; }
         $task_card_args = [
-            'post_id'         => $id,
-            'titulo'          => get_the_title($id),
-            'prioridad_class' => $prioridad_class,
-            'prioridad'       => $prioridad_pedido,
-            'nombre_cliente'  => get_field('nombre_cliente', $id),
-            'nombre_producto' => get_field('nombre_producto', $id),
-            'permalink'       => get_permalink($id),
-            'campo_estado'    => $field, 
-            'estado_actual'   => $value, 
+            'post_id'         => $id, 'titulo'          => get_the_title($id),
+            'prioridad_class' => $prioridad_class, 'prioridad'       => $prioridad_pedido,
+            'nombre_cliente'  => get_field('nombre_cliente', $id), 'nombre_producto' => get_field('nombre_producto', $id),
+            'permalink'       => get_permalink($id), 'campo_estado'    => $field, 'estado_actual'   => $value, 
         ];
-        
         get_template_part('template-parts/task-card', null, $task_card_args);
         $html = ob_get_clean();
-        wp_send_json_success(['message' => 'Estado actualizado.', 'html' => $html, 'kpi_data' => $sector_kpi_data]); // <-- Devolvemos los KPIs
+        wp_send_json_success(['message' => 'Estado actualizado.', 'html' => $html, 'kpi_data' => $sector_kpi_data]);
     }
     wp_die();
 });
+
 
 // --- MANEJADOR AJAX PARA ARCHIVAR PEDIDOS (AHORA LLAMADO POR EL ADMIN PRINCIPAL) ---
 add_action('wp_ajax_ghd_archive_order', 'ghd_archive_order_callback');
@@ -734,16 +736,30 @@ function ghd_refresh_admin_closure_section_callback() {
     );
     $pedidos_cierre_query = new WP_Query($args_cierre);
 
+    $remito_page_id = get_posts([
+        'post_type'  => 'page',
+        'fields'     => 'ids',
+        'nopaging'   => true,
+        'meta_key'   => '_wp_page_template',
+        'meta_value' => 'template-remito.php'
+    ]);
+    $remito_base_url = !empty($remito_page_id) ? get_permalink($remito_page_id[0]) : home_url();
+
     if ($pedidos_cierre_query->have_posts()) :
         while ($pedidos_cierre_query->have_posts()) : $pedidos_cierre_query->the_post();
+            $order_id = get_the_ID();
+            $remito_url = esc_url( add_query_arg( 'order_id', $order_id, $remito_base_url ) );
         ?>
-            <tr id="order-row-closure-<?php echo get_the_ID(); ?>">
+            <tr id="order-row-closure-<?php echo $order_id; ?>">
                 <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
-                <td><?php echo esc_html(get_field('nombre_cliente')); ?></td>
-                <td><?php echo esc_html(get_field('nombre_producto')); ?></td>
-                <td><?php echo get_the_date(); ?></td>
+                <td><?php echo esc_html(get_field('nombre_cliente', $order_id)); ?></td>
+                <td><?php echo esc_html(get_field('nombre_producto', $order_id)); ?></td>
+                <td><?php echo get_the_date('d/m/Y', $order_id); ?></td>
                 <td>
-                    <button class="ghd-btn ghd-btn-primary archive-order-btn" data-order-id="<?php echo get_the_ID(); ?>">
+                    <a href="<?php echo $remito_url; ?>" target="_blank" class="ghd-btn ghd-btn-secondary ghd-btn-small generate-remito-btn" data-order-id="<?php echo $order_id; ?>">
+                        <i class="fa-solid fa-file-invoice"></i> Generar Remito
+                    </a>
+                    <button class="ghd-btn ghd-btn-primary archive-order-btn" data-order-id="<?php echo $order_id; ?>">
                         Archivar Pedido
                     </button>
                 </td>
@@ -782,18 +798,6 @@ function ghd_refresh_production_tasks_callback() {
         'kpi_data' => $data['kpi_data']
     ]);
     wp_die();
-}
-
-/**
- * Registra la nueva plantilla de página para el remito.
- *
- * @param array $templates Un array de plantillas de página.
- * @return array Un array modificado de plantillas de página.
- */
-add_filter( 'theme_page_templates', 'ghd_register_remito_template' );
-function ghd_register_remito_template( $templates ) {
-    $templates['template-remito.php'] = 'GHD - Generar Remito';
-    return $templates;
 }
 
 /**
@@ -850,7 +854,7 @@ function ghd_refresh_archived_orders_callback() {
                 <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
                 <td><?php echo esc_html(get_field('nombre_cliente', $order_id)); ?></td>
                 <td><?php echo esc_html(get_field('nombre_producto', $order_id)); ?></td>
-                <td><?php echo get_the_modified_date('d/m/Y'); ?></td>
+                <td><?php echo get_the_modified_date('d/m/Y', $order_id); ?></td>
                 <td>
                     <a href="<?php echo $remito_url; ?>" target="_blank" class="ghd-btn ghd-btn-secondary ghd-btn-small generate-remito-btn" data-order-id="<?php echo $order_id; ?>">
                         <i class="fa-solid fa-file-invoice"></i> Remito
