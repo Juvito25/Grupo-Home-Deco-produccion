@@ -17,18 +17,24 @@ if (current_user_can('manage_options') && isset($_GET['sector'])) {
     $clean_sector_name = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $sector_name));
     $campo_estado = 'estado_' . $clean_sector_name;
 } 
-// Caso 2: Trabajador de producción o administrativo viendo su propio panel
+// Caso 2: Trabajador de producción viendo su propio panel
 elseif (!current_user_can('manage_options')) {
     $mapa_roles = ghd_get_mapa_roles_a_campos();
     $campo_estado = $mapa_roles[$user_role] ?? '';
-    $sector_name = ucfirst(str_replace(['rol_', '_'], ' ', $user_role));
+    // Si el rol es 'rol_administrativo' y no es admin viendo, no tendrá un campo_estado para tareas activas aquí.
+    if ($user_role === 'rol_administrativo') {
+        $sector_name = 'Cierre de Pedidos'; // Nombre para el panel del antiguo rol_administrativo
+    } else {
+        $sector_name = ucfirst(str_replace(['rol_', '_'], ' ', $user_role));
+    }
 } 
-// Caso 3: Admin sin especificar sector (redirigir)
+// Caso 3: Admin sin especificar sector (redirigir, aunque el login_redirect ya lo debería manejar)
 else {
     wp_redirect(home_url('/panel-de-control/'));
     exit;
 }
 
+<<<<<<< HEAD
 // --- AÑADIR CLASE AL BODY SI ES EL PANEL ADMINISTRATIVO ---
 if ($user_role === 'rol_administrativo' && !$is_admin_viewing) { // Aseguramos que sea el admin viendo su propio panel, no un admin viendo otro sector
     add_filter('body_class', function($classes) {
@@ -82,6 +88,42 @@ $completadas_hoy_args = [
 $completadas_hoy_query = new WP_Query($completadas_hoy_args);
 $completadas_hoy = $completadas_hoy_query->post_count;
 
+=======
+get_header();
+
+// --- CALCULAR KPIs DEL SECTOR (AHORA USANDO LA FUNCIÓN REUTILIZABLE) ---
+// Solo calculamos KPIs si hay un campo_estado definido para este rol/sector
+$sector_kpi_data = [];
+if (!empty($campo_estado)) {
+    $sector_kpi_data = ghd_calculate_sector_kpis($campo_estado);
+} else {
+    // Si no hay campo_estado (ej. rol_administrativo sin tareas activas aquí), inicializar a cero
+    $sector_kpi_data = [
+        'total_pedidos'        => 0,
+        'total_prioridad_alta' => 0,
+        'tiempo_promedio_str'  => '0.0h',
+        'completadas_hoy'      => 0,
+    ];
+}
+
+$total_pedidos = $sector_kpi_data['total_pedidos'];
+$total_prioridad_alta = $sector_kpi_data['total_prioridad_alta'];
+$completadas_hoy = $sector_kpi_data['completadas_hoy'];
+$tiempo_promedio_str = $sector_kpi_data['tiempo_promedio_str'];
+
+// --- CONSULTA PARA LAS TARJETAS DE TAREA (AHORA UNIFICADA) ---
+$pedidos_query = new WP_Query([
+    'post_type'      => 'orden_produccion', 
+    'posts_per_page' => -1, 
+    'meta_query'     => [
+        [
+            'key'     => $campo_estado, 
+            'value'   => ['Pendiente', 'En Progreso'], 
+            'compare' => 'IN'
+        ]
+    ]
+]);
+>>>>>>> 2dac4e9 (Feat: completado del flujo de trabajo)
 
 ?>
 
@@ -91,7 +133,7 @@ $completadas_hoy = $completadas_hoy_query->post_count;
     else { get_template_part('template-parts/sidebar-sector'); } 
     ?>
 
-    <main class="ghd-main-content">
+    <main class="ghd-main-content" data-campo-estado="<?php echo esc_attr($campo_estado); ?>">
         <header class="ghd-main-header">
             <div class="header-title-wrapper">
                 <button id="mobile-menu-toggle" class="ghd-btn-icon"><i class="fa-solid fa-bars"></i></button>
@@ -111,33 +153,31 @@ $completadas_hoy = $completadas_hoy_query->post_count;
         <div class="ghd-sector-tasks-list">
             <?php if ($pedidos_query->have_posts()) : while ($pedidos_query->have_posts()) : $pedidos_query->the_post();
                 
-                // --- CORRECCIÓN CLAVE: Lógica condicional para el tipo de tarjeta ---
-                // Si el usuario es administrativo, mostramos una tarjeta diferente.
-                if ($user_role === 'rol_administrativo') {
-                    ?>
-                    <div class="ghd-order-card" id="order-<?php echo get_the_ID(); ?>">
-                        <div class="order-card-main">
-                            <div class="order-card-header">
-                                <h3><?php the_title(); ?></h3>
-                            </div>
-                            <div class="order-card-body">
-                                <p><strong>Cliente:</strong> <?php echo esc_html(get_field('nombre_cliente')); ?></p>
-                                <p><strong>Producto:</strong> <?php echo esc_html(get_field('nombre_producto')); ?></p>
-                            </div>
-                        </div>
-                        <div class="order-card-actions">
-                            <button class="ghd-btn ghd-btn-primary archive-order-btn" data-order-id="<?php echo get_the_ID(); ?>">
-                                Archivar Pedido
-                            </button>
-                            <a href="<?php the_permalink(); ?>" class="ghd-btn ghd-btn-secondary">Ver Detalles</a>
-                        </div>
-                    </div>
-                    <?php
-                } 
-                // Si es cualquier otro trabajador de producción, mostramos la tarjeta normal.
-                else {
-                    get_template_part('template-parts/task-card-v2', null, ['id' => get_the_ID(), 'campo_estado' => $campo_estado]);
+                $current_order_id = get_the_ID();
+                $current_status = get_field($campo_estado, $current_order_id);
+                $prioridad_pedido = get_field('prioridad_pedido', $current_order_id);
+                $prioridad_class = '';
+                if ($prioridad_pedido === 'Alta') {
+                    $prioridad_class = 'prioridad-alta';
+                } elseif ($prioridad_pedido === 'Media') {
+                    $prioridad_class = 'prioridad-media';
+                } else { // Baja o no especificada
+                    $prioridad_class = 'prioridad-baja';
                 }
+
+                $task_card_args = [
+                    'post_id'         => $current_order_id,
+                    'titulo'          => get_the_title($current_order_id),
+                    'prioridad_class' => $prioridad_class,
+                    'prioridad'       => $prioridad_pedido,
+                    'nombre_cliente'  => get_field('nombre_cliente', $current_order_id),
+                    'nombre_producto' => get_field('nombre_producto', $current_order_id),
+                    'permalink'       => get_permalink($current_order_id),
+                    'campo_estado'    => $campo_estado,
+                    'estado_actual'   => $current_status,
+                ];
+
+                get_template_part('template-parts/task-card', null, $task_card_args);
 
             endwhile; else: ?>
                 <p class="no-tasks-message">No tienes tareas pendientes.</p>

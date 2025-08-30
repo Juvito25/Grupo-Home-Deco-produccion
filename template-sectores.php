@@ -25,13 +25,21 @@ get_header();
 
         <div class="ghd-sector-card-grid">
             <?php
-            $panel_sector_url = home_url('/mis-tareas/');
+            // Obtener la URL base del panel de tareas del sector
+            $sector_dashboard_page = get_posts([
+                'post_type'  => 'page',
+                'fields'     => 'ids',
+                'nopaging'   => true,
+                'meta_key'   => '_wp_page_template',
+                'meta_value' => 'template-sector-dashboard.php'
+            ]);
+            $panel_sector_base_url = !empty($sector_dashboard_page) ? get_permalink($sector_dashboard_page[0]) : home_url();
             
-            // CORRECCIÓN CLAVE: Usamos el nombre de función correcto: ghd_get_paneles_de_sector()
-            $sectores = ghd_get_paneles_de_sector();
+            // CORRECCIÓN CLAVE: Usamos ghd_get_sectores() que sí existe en functions.php
+            $sectores = ghd_get_sectores();
             
-            foreach ($sectores as $sector) :
-                $clean_sector_name = strtolower($sector);
+            foreach ($sectores as $sector_display_name) : // Renombramos para mayor claridad
+                $clean_sector_name = strtolower($sector_display_name);
                 $clean_sector_name = str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $clean_sector_name);
                 $campo_estado = 'estado_' . $clean_sector_name;
 
@@ -41,18 +49,19 @@ get_header();
                     'meta_query'     => [
                         [
                             'key'     => $campo_estado,
-                            'value'   => 'Pendiente',
-                            'compare' => '=',
+                            'value'   => ['Pendiente', 'En Progreso'], // <-- Mostrar también 'En Progreso' para un conteo más real
+                            'compare' => 'IN',
                         ]
                     ]
                 ]);
                 $pedidos_en_sector = $query->post_count;
                 wp_reset_postdata();
 
-                $link_al_panel = add_query_arg('sector', urlencode($sector), $panel_sector_url);
+                // Construir el link al panel de tareas de este sector específico
+                $link_al_panel = add_query_arg('sector', urlencode($sector_display_name), $panel_sector_base_url);
             ?>
                 <div class="ghd-sector-card">
-                    <h3 class="sector-card-title"><?php echo esc_html($sector); ?></h3>
+                    <h3 class="sector-card-title"><?php echo esc_html($sector_display_name); ?></h3>
                     <p class="sector-card-stat">Pedidos Activos: <?php echo $pedidos_en_sector; ?></p>
                     <a href="<?php echo esc_url($link_al_panel); ?>" class="ghd-btn ghd-btn-secondary">Ver Panel</a>
                 </div>

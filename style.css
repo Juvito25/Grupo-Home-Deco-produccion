@@ -4,7 +4,7 @@ Theme URI: https://gruphomedeco.com/
 Author: Juvi Web | Automatización y Desarrollo Web
 Author URI: https://instagram.com/juviweb
 Description: Tema personalizado para el Gestor de Flujo de Producción.
-Version: 1.0
+Version: 1.1 (Optimizado)
 Template: hello-elementor
 */
 /* ==========================================================================
@@ -16,11 +16,18 @@ Template: hello-elementor
     --color-borde: #E5E7EB;
     --texto-principal: #3E3E3E;
     --texto-secundario: #6B7280;
-    --texto-claro: #F1F5F1;
-    --color-primario: #4A7C59;
-    --color-primario-hover: #3a6347;
-    --color-rojo: #B34A49;
-    --color-amarillo: #F59E0B;
+    --texto-claro: #F1F5F1; /* Usado para texto claro sobre fondos oscuros */
+
+    /* Colores primarios y de acción */
+    --color-primario: #4A7C59; /* Verde corporativo principal */
+    --color-primario-hover: #3b6348; /* Verde corporativo más oscuro para hover */
+    --color-rojo: #B34A49; /* Rojo de alerta o prioridad alta */
+    --color-rojo-hover: #993a39; /* Rojo más oscuro para hover */
+    --color-amarillo: #F59E0B; /* Amarillo de advertencia o tiempo promedio */
+    --color-azul: #3b82f6; /* Azul para "Activas" */
+    --color-verde-exito: #22c55e; /* Verde brillante para "Completado" */
+    --color-verde-exito-hover: #16a34a; /* Verde brillante más oscuro para hover */
+
     --font-family-sans: 'Inter', sans-serif;
 }
 body {
@@ -31,69 +38,366 @@ body {
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    line-height: 1.6; /* Añadido para mejor legibilidad */
 }
 * { box-sizing: border-box; }
+
+/* Enlaces generales */
+a {
+    color: var(--color-primario);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+a:hover {
+    color: var(--color-primario-hover);
+    text-decoration: underline;
+}
+
 
 /* ==========================================================================
    2. ESTRUCTURA PRINCIPAL
    ========================================================================== */
-.ghd-pro-header { background-color: var(--color-fondo-claro); padding: 0.75rem 2rem; border-bottom: 1px solid var(--color-borde); display: flex; justify-content: space-between; align-items: center; }
+.ghd-pro-header { 
+    background-color: var(--color-fondo-claro); 
+    padding: 0.75rem 2rem; 
+    border-bottom: 1px solid var(--color-borde); 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+}
+#mobile-menu-toggle { 
+    display: none; /* Asegura que esté oculto por defecto en desktop */
+    /* Asegúrate de que no haya otras reglas que lo hagan display:block aquí */
+}
+
 .header-logo-title { display: flex; align-items: center; gap: 1rem; }
 .header-logo { height: 40px; }
 .header-title-group { display: flex; flex-direction: column; }
-.main-title { font-weight: 600; }
-.sub-title { font-size: 0.85rem; color: var(--texto-secundario); }
+.main-title { font-weight: 600; margin: 0; }
+.sub-title { font-size: 0.85rem; color: var(--texto-secundario); margin: 0; }
 .header-user-profile { display: flex; align-items: center; gap: 1rem; }
 .user-info { display: flex; flex-direction: column; text-align: right; }
 .user-name { font-weight: 600; }
 .user-role { font-size: 0.85rem; color: var(--texto-secundario); }
-.user-avatar img { border-radius: 50%; }
+.user-avatar img { border-radius: 50%; width: 40px; height: 40px; object-fit: cover; }
+
 .ghd-app-wrapper { display: flex; flex-grow: 1; }
-.ghd-sidebar { width: 260px; background-color: var(--texto-principal); color: var(--texto-claro); padding: 1.5rem; display: flex; flex-direction: column; }
+.ghd-sidebar { 
+    width: 260px; 
+    background-color: var(--texto-principal); 
+    color: var(--texto-claro); 
+    padding: 1.5rem; 
+    display: flex; 
+    flex-direction: column; 
+    flex-shrink: 0;
+}
 .ghd-sidebar .sidebar-header { margin-bottom: 2rem; }
-.ghd-sidebar .sidebar-header .logo { font-size: 1.5rem; font-weight: 700; color: var(--texto-claro); margin: 0; }
+.ghd-sidebar .sidebar-header .logo { 
+    font-size: 1.5rem; 
+    font-weight: 700; 
+    color: var(--texto-claro); 
+    margin: 0; 
+}
 .sidebar-nav ul { list-style: none; padding: 0; margin: 0; }
-.sidebar-nav li a { display: flex; align-items: center; padding: 0.75rem 1rem; border-radius: 6px; text-decoration: none; color: #a7a7a7; }
-.sidebar-nav li.active a { background-color: var(--color-primario); color: white; }
-.sidebar-nav li a i { width: 20px; margin-right: 12px; }
-.ghd-main-content { flex-grow: 1; padding: 2rem; }
-.ghd-main-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+.sidebar-nav li { margin-bottom: 0.5rem; } /* Espacio entre elementos de menú */
+.sidebar-nav li a { 
+    display: flex; 
+    align-items: center; 
+    padding: 0.75rem 1rem; 
+    border-radius: 6px; 
+    text-decoration: none; 
+    color: #a7a7a7; /* Color de texto para enlaces inactivos */
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+.sidebar-nav li a:hover {
+    background-color: rgba(255, 255, 255, 0.1); 
+    color: var(--texto-claro);
+}
+.sidebar-nav li.active a { 
+    background-color: var(--color-primario); 
+    color: white; 
+    font-weight: 600;
+}
+.sidebar-nav li a i { width: 20px; margin-right: 12px; font-size: 1rem; }
+.ghd-main-content { 
+    flex-grow: 1; 
+    padding: 2rem; 
+    background-color: var(--color-fondo-app);
+}
+.ghd-main-header { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 1.5rem; 
+}
 .ghd-main-header h2 { font-size: 1.8rem; margin: 0; }
+
+/* Estilos para el contenedor de título y botón de refresco */
+.header-title-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap; /* Permite que los elementos se envuelvan en pantallas pequeñas */
+}
+.header-title-wrapper h2 {
+    margin: 0;
+}
+
 
 /* ==========================================================================
    3. COMPONENTES REUTILIZABLES
    ========================================================================== */
-.ghd-card { background-color: var(--color-fondo-claro); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid var(--color-borde); }
-.ghd-btn { padding: 0.6rem 1.2rem; border: none;  border-radius: 6px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; justify-content: center; }
-.action-button{
-    border: 1px solid var(--color-rojo);
+.ghd-card { 
+    background-color: var(--color-fondo-claro); 
+    border-radius: 8px; 
+    padding: 1.5rem; 
+    margin-bottom: 1.5rem; 
+    border: 1px solid var(--color-borde); 
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05); /* Soft shadow for cards */
 }
-.ghd-btn-primary { background-color: var(--color-primario); color: white; border: none;}
-.ghd-tag { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.8rem; font-weight: 500; }
-.tag-red { background-color: #FEE2E2; color: #991B1B; }
-.tag-yellow { background-color: #FEF3C7; color: #92400E; }
-.tag-green { background-color: #D1FAE5; color: #065F46; }
+.ghd-btn { 
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px; 
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out, border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    text-decoration: none;
+    line-height: 1;
+    height: auto;
+    border: none;
+    white-space: nowrap; /* Previene el salto de línea en botones */
+}
+.ghd-btn i {
+    margin-right: 8px;
+    font-size: 1em;
+}
+
+/* Primary buttons (e.g., Nuevo Pedido, Archivar Pedido) */
+.ghd-btn-primary {
+    background-color: var(--color-primario);
+    color: #ffffff;
+    border: 1px solid var(--color-primario);
+}
+.ghd-btn-primary:hover {
+    background-color: var(--color-primario-hover);
+    border-color: var(--color-primario-hover);
+    box-shadow: 0 4px 8px rgba(74, 124, 89, 0.2);
+}
+
+/* Secondary buttons (e.g., Exportar, Ver Detalles, Refrescar) */
+.ghd-btn-secondary {
+    background-color: var(--color-fondo-claro); /* White background */
+    color: var(--texto-secundario); /* Muted text */
+    border: 1px solid var(--color-borde); /* Light gray border */
+}
+.ghd-btn-secondary:hover {
+    background-color: var(--color-fondo-app); /* Slightly darker gray background */
+    border-color: #a1a5aa;
+    color: var(--texto-principal); /* Darker text on hover */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* Success button (e.g., Marcar Completa) */
+.ghd-btn-success {
+    background-color: var(--color-verde-exito);
+    color: #ffffff;
+    border: 1px solid var(--color-verde-exito);
+}
+.ghd-btn-success:hover {
+    background-color: var(--color-verde-exito-hover);
+    border-color: var(--color-verde-exito-hover);
+    box-shadow: 0 4px 8px rgba(34, 197, 94, 0.2);
+}
+
+/* Specific button for "Iniciar Producción" */
+.start-production-btn {
+    background-color: var(--color-rojo); 
+    border-color: var(--color-rojo);
+    color: #ffffff;
+}
+.start-production-btn:hover {
+    background-color: var(--color-rojo-hover); 
+    border-color: var(--color-rojo-hover);
+    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.2);
+}
+
+/* Botones de Icono (mobile menu toggle, reset filters) */
+.ghd-btn-icon {
+    background-color: transparent;
+    border: none;
+    color: var(--texto-principal);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.5rem; /* Ajuste de padding para el área de clic */
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+.ghd-btn-icon:hover {
+    background-color: rgba(0,0,0,0.05);
+}
+
+
+.ghd-tag { 
+    display: inline-block; 
+    padding: 0.2rem 0.6rem; 
+    border-radius: 12px; 
+    font-size: 0.8rem; 
+    font-weight: 500; 
+}
+.ghd-tag.prioridad-alta { background-color: #FEE2E2; color: #991B1B; } 
+.ghd-tag.prioridad-media { background-color: #FEF3C7; color: #92400E; } 
+.ghd-tag.prioridad-baja { background-color: #D1FAE5; color: #065F46; } 
+
 
 /* ==========================================================================
-
    4. SECCIONES ESPECÍFICAS
    ========================================================================== */
 /* --- PANEL DE ADMINISTRADOR --- */
+.ghd-table-wrapper {
+    overflow-x: auto;
+    border-radius: 8px; /* Added border-radius for consistency */
+    border: 1px solid var(--color-borde); /* Added border */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05); /* Added shadow */
+    background-color: var(--color-fondo-claro); /* Ensure white background */
+}
 .ghd-table { width: 100%; border-collapse: collapse; }
-.ghd-table th, .ghd-table td { padding: 0.8rem 1rem; text-align: left; border-bottom: 1px solid var(--color-borde); }
+.ghd-table th, .ghd-table td { 
+    padding: 0.8rem 1rem; 
+    text-align: left; 
+    border-bottom: 1px solid var(--color-borde); 
+    white-space: nowrap;
+}
+.ghd-table th {
+    background-color: #f8fafc; /* Slightly different background for headers */
+    font-weight: 600;
+    color: var(--texto-secundario);
+    font-size: 0.9rem;
+    text-transform: uppercase;
+}
+.ghd-table tbody tr:last-child td {
+    border-bottom: none;
+}
+.ghd-table tbody tr:hover {
+    background-color: var(--color-fondo-app); 
+}
 
-/* --- PANEL DE SECTOR (NUEVO DISEÑO V2) --- */
-.ghd-kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; }
-.ghd-kpi-card { background-color: var(--color-fondo-claro); border-radius: 8px; padding: 1.5rem; display: flex; align-items: center; gap: 1rem; }
-.kpi-icon { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; color: white; }
-.kpi-icon.icon-blue { background-color: #3b82f6; } .kpi-icon.icon-red { background-color: #ef4444; } .kpi-icon.icon-green { background-color: #22c55e; } .kpi-icon.icon-yellow { background-color: #f59e0b; }
-.kpi-info { display: flex; flex-direction: column; } .kpi-value { font-size: 1.75rem; font-weight: 700; } .kpi-label { font-size: 0.9rem; color: var(--texto-secundario); }
+
+/* --- PANEL DE SECTOR (KPI y TARJETAS DE TAREA) --- */
+.ghd-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.ghd-kpi-card {
+    background-color: var(--color-fondo-claro);
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    display: flex;
+    align-items: center;
+    padding: 20px;
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    border: 1px solid var(--color-borde);
+}
+
+.ghd-kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+}
+
+.ghd-kpi-card .kpi-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: #fff;
+    margin-right: 15px;
+    flex-shrink: 0; /* Prevent icon from shrinking */
+}
+
+/* KPI Icon Colors (using variables) */
+.kpi-icon.icon-blue { background-color: var(--color-azul); } 
+.kpi-icon.icon-red { background-color: var(--color-rojo); } 
+.kpi-icon.icon-green { background-color: var(--color-verde-exito); } 
+.kpi-icon.icon-yellow { background-color: var(--color-amarillo); }
+
+.kpi-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.kpi-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--texto-principal);
+    line-height: 1.2;
+}
+
+.kpi-label {
+    font-size: 14px;
+    color: var(--texto-secundario);
+    margin-top: 2px;
+}
+
 .ghd-sector-tasks-list { display: flex; flex-direction: column; gap: 1.5rem; }
-.ghd-order-card { display: flex; background-color: var(--color-fondo-claro); border-radius: 8px; border: 1px solid var(--color-borde); overflow: hidden; }
-.order-card-main { flex-grow: 1; }
-.order-card-header { display: flex; justify-content: space-between; padding: 1rem 1.5rem; border-bottom: 1px solid var(--color-borde); }
-.order-card-body { padding: 1.5rem; }
-.order-card-actions { display: flex; flex-direction: column; gap: 0.75rem; padding: 1.5rem; border-left: 1px solid var(--color-borde); width: 220px; }
+.ghd-order-card { 
+    display: flex; 
+    background-color: var(--color-fondo-claro); 
+    border-radius: 8px; 
+    border: 1px solid var(--color-borde); 
+    overflow: hidden; 
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05); /* Consistent card shadow */
+    transition: opacity 0.3s ease-in-out; 
+    flex-direction: column; /* Default a columna para móvil */
+}
+.order-card-main { flex-grow: 1; display: flex; flex-direction: column; }
+.order-card-header { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    padding: 1rem 1.5rem; 
+    border-bottom: 1px solid var(--color-borde); 
+    flex-wrap: wrap; /* Permite que el header se envuelva */
+    gap: 10px; /* Espacio entre título y tag */
+}
+.order-card-header h3 { margin: 0; font-size: 1.25rem; } 
+
+.order-card-body { padding: 1.5rem; flex-grow: 1; }
+.order-card-body p { margin: 0 0 0.5rem 0; font-size: 0.95rem; }
+.order-card-body p:last-child { margin-bottom: 0; }
+.order-card-body strong { color: var(--texto-principal); }
+
+
+.order-card-actions { 
+    display: flex; 
+    flex-direction: column; 
+    gap: 0.75rem; 
+    padding: 1.5rem; 
+    border-top: 1px solid var(--color-borde); /* Por defecto top para móvil */
+    width: 100%; /* Por defecto ancho completo para móvil */
+    flex-shrink: 0; 
+    justify-content: center; 
+}
+/* Para pantallas más grandes, las acciones vuelven a la derecha */
+@media (min-width: 769px) {
+    .ghd-order-card {
+        flex-direction: row; /* Vuelve a fila en desktop */
+    }
+    .order-card-actions {
+        border-top: none; /* Quita el borde de arriba */
+        border-left: 1px solid var(--color-borde); /* Añade borde a la izquierda */
+        width: 220px; /* Vuelve al ancho fijo */
+    }
+}
+
 
 /* ==========================================================================
    ESTILOS PARA LA PÁGINA DE DETALLES
@@ -131,24 +435,22 @@ body {
    ESTILOS PARA LA PÁGINA DE LOGIN (V3 - DISEÑO REFINADO)
    ========================================================================== */
 
-/* El contenedor flex que crea las dos columnas */
 .ghd-login-split-layout {
     display: flex;
     height: 100%;
     width: 100%;
 }
 
-/* El panel de la imagen (50% del ancho) */
 .login-image-panel {
     flex: 1;
     background-image: url('./img/login-bg.jpg');
     background-size: cover;
     background-position: center;
-    position: relative; /* Necesario para posicionar la capa superpuesta */
+    position: relative;
     height: 100%;
+    filter: grayscale(100%); /* Imagen en blanco y negro */
 }
 
-/* --- NUEVO: Capa de color semitransparente --- */
 .login-image-panel::before {
     content: '';
     position: absolute;
@@ -156,19 +458,11 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: var(--color-primario); /* Verde corporativo */
-    opacity: 0.5; /* Ajusta este valor para más o menos transparencia */
+    background-color: var(--color-primario);
+    opacity: 0.5;
     z-index: 1;
 }
 
-/* --- NUEVO: Imagen en blanco y negro --- */
-/* Esta regla se aplica a la imagen de fondo real */
-.login-image-panel {
-    filter: grayscale(100%);
-    height: 100%;
-}
-
-/* El panel del formulario (50% del ancho) */
 .login-form-panel {
     flex: 1;
     display: flex;
@@ -178,7 +472,6 @@ body {
     background-color: var(--color-fondo-app);
 }
 
-/* La caja blanca del formulario (sin cambios) */
 .ghd-login-box {
     background-color: var(--color-fondo-claro);
     padding: 2.5rem;
@@ -195,63 +488,42 @@ body {
     color: var(--color-rojo)
 }
 
-/* Estilos para los campos del formulario (sin cambios) */
 .login-form-box #loginform p { display: flex; flex-direction: column; text-align: left; margin-bottom: 1rem; }
 .login-form-box #loginform label { font-weight: 500; margin-bottom: 0.5rem; }
 .login-form-box #loginform input[type="text"],
-.login-form-box #loginform input[type="password"] { padding: 0.75rem; border: 1px solid var(--color-borde); border-radius: 6px; }
+.login-form-box #loginform input[type="password"] { padding: 0.75rem; border: 1px solid var(--color-borde); border-radius: 6px; width: 100%; }
 .login-form-box #loginform .login-remember { flex-direction: row; align-items: center; gap: 0.5rem; }
 
-/* --- CORREGIDO: Botón de Iniciar Sesión --- */
-/*.login-form-box #loginform input[type="submit"]#wp-submit{
-    width: 100%;
-    margin-top: 1.5rem;
-    padding: 0.75rem;
-    border: none;
-    border-radius: 6px;
-    background-color: var(--color-primario) !important; /* Verde corporativo 
-    color: white;
-    font-weight: 600;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
-.login-form-box #loginform input[type="submit"]:hover {
-    background-color: var(--color-primario-hover); 
-} */
 input[type="submit"].button-primary{
     width: 100%;
     margin-top: 1.5rem;
     padding: 0.75rem;
     border: 1px solid var(--color-primario);
     border-radius: 6px;
-    background-color: transparent; /* Verde corporativo */ 
+    background-color: transparent;
     color: var(--color-primario);
     font-weight: 600;
     font-size: 1rem;
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    transition: background-color 0.2s ease, color 0.2s ease;
 }
 input[type="submit"].button-primary:hover{
     background-color: var(--color-primario-hover);
-    color: var(--texto-claro);
+    color: var(--texto-claro); /* Changed to var(--texto-claro) for better contrast */
 }
 
 /* ==========================================================================
    CORRECCIÓN FINAL - LAYOUT DE LOGIN SIN SCROLL
    ========================================================================== */
 
-/* Targeta el BODY solo en la página de login */
 body.page-template-template-login {
     height: 100vh;
-    overflow: hidden; /* Previene el scrollbar bajo cualquier circunstancia */
+    overflow: hidden;
 }
 
-/* Ajusta nuestro contenedor principal para que llene el body */
 .page-template-template-login .ghd-login-split-layout {
     min-height: 100%;
     max-height: 100%;
-    /* min-height: initial;  Resetea la regla anterior para evitar conflictos */
 }
 
 /* ==========================================================================
@@ -286,23 +558,60 @@ body.page-template-template-login {
     font-size: 0.9rem;
 }
 
-#mobile-menu-toggle { 
-    display: none; 
-}
 
 /* ==========================================================================
    5. RESPONSIVE Y UI MÓVIL
    ========================================================================== */
 @media (max-width: 1024px) {
-    /* ... */
+    .ghd-sidebar {
+        position: fixed;
+        left: -260px;
+        height: 100%;
+        z-index: 1000;
+        transition: left 0.3s ease-in-out;
+    }
+    .ghd-sidebar.sidebar-visible {
+        left: 0;
+    }
     #mobile-menu-toggle { 
-        display: block !important; 
+        display: block !important; /* !important forzar si hay especificidad */
+        background-color: transparent;
+        border: none;
+        color: var(--texto-principal);
+        font-size: 1.5rem;
+        cursor: pointer;
+    }
+    .header-title-wrapper {
+        justify-content: flex-start;
+    }
+    .ghd-main-header {
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    .ghd-main-content {
+        padding: 1rem;
+    }
+    .ghd-pro-header {
+        padding: 0.5rem 1rem;
+    }
+    .header-logo {
+        height: 35px;
     }
 }
 
 @media (max-width: 900px) {
     .ghd-details-grid {
         grid-template-columns: 1fr;
+    }
+    .ghd-filters-wrapper {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .ghd-filters-wrapper input,
+    .ghd-filters-wrapper select,
+    .ghd-filters-wrapper .ghd-btn-icon {
+        min-width: unset;
+        width: 100%;
     }
 }
 
@@ -357,12 +666,13 @@ body.page-template-template-login {
     border-radius: 8px;
     border: 1px solid var(--color-borde);
     margin-bottom: 1.5rem;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.03); /* Soft shadow for filters card */
 }
 .filter-group {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    flex-grow: 1; /* Permite que cada grupo crezca */
+    flex-grow: 1; 
 }
 .filter-group label {
     font-size: 0.85rem;
@@ -376,12 +686,12 @@ body.page-template-template-login {
     border: 1px solid var(--color-borde);
     background-color: var(--color-fondo-claro);
     min-width: 180px;
-    width: 100%; /* Ocupa todo el ancho de su grupo */
+    width: 100%; 
 }
 .ghd-filters-wrapper input[type="search"] {
     min-width: 250px;
 }
-.ghd-filters-wrapper .ghd-btn-icon {
+.ghd-filters-wrapper .ghd-btn-icon { /* Reset filters button */
     height: 38px;
     width: 38px;
     border: 1px solid var(--color-borde);
