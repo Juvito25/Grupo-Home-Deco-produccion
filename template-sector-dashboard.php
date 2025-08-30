@@ -34,61 +34,6 @@ else {
     exit;
 }
 
-<<<<<<< HEAD
-// --- AÑADIR CLASE AL BODY SI ES EL PANEL ADMINISTRATIVO ---
-if ($user_role === 'rol_administrativo' && !$is_admin_viewing) { // Aseguramos que sea el admin viendo su propio panel, no un admin viendo otro sector
-    add_filter('body_class', function($classes) {
-        $classes[] = 'is-admin-sector-panel';
-        return $classes;
-    });
-}
-
-get_header(); // get_header() debe estar después de add_filter('body_class')
-
-// --- 2. CONSULTA Y KPIs (Estable) ---
-$pedidos_args = ['post_type' => 'orden_produccion', 'posts_per_page' => -1, 'meta_query' => [['key' => $campo_estado, 'value' => ['Pendiente', 'En Progreso'], 'compare' => 'IN']], 'orderby'  => ['prioridad_pedido' => 'ASC', 'date' => 'ASC'], 'meta_key' => 'prioridad_pedido' ];
-$pedidos_query = new WP_Query($pedidos_args);
-$total_pedidos = $pedidos_query->post_count;
-$total_prioridad_alta = 0; $total_tiempo_espera = 0; $ahora = current_time('U');
-if ($pedidos_query->have_posts()) {
-    foreach ($pedidos_query->posts as $pedido) {
-        if (get_field('prioridad_pedido', $pedido->ID) === 'Alta') { $total_prioridad_alta++; }
-        $total_tiempo_espera += $ahora - get_the_modified_time('U', $pedido->ID);
-    }
-}
-$tiempo_promedio_str = '0.0h';
-if ($total_pedidos > 0) {
-    $promedio_horas = ($total_tiempo_espera / $total_pedidos) / 3600;
-    $tiempo_promedio_str = number_format($promedio_horas, 1) . 'h';
-}
-
-// Calcular 'Completadas Hoy' para la carga inicial del dashboard
-$completadas_hoy = 0;
-// Obtener el inicio y fin del día actual en GMT para la consulta
-$today_start = strtotime('today', current_time('timestamp', true)); // Inicio de hoy en timestamp GMT
-$today_end   = strtotime('tomorrow - 1 second', current_time('timestamp', true)); // Fin de hoy en timestamp GMT
-
-$completadas_hoy_args = [
-    'post_type'      => 'orden_produccion',
-    'posts_per_page' => -1,
-    'meta_query'     => [
-        [
-            'key'     => 'estado_administrativo',
-            'value'   => 'Archivado',
-            'compare' => '=',
-        ],
-    ],
-    'date_query' => [ 
-        'after'     => date('Y-m-d H:i:s', $today_start),
-        'before'    => date('Y-m-d H:i:s', $today_end),
-        'inclusive' => true,
-        'column'    => 'post_modified_gmt',
-    ],
-];
-$completadas_hoy_query = new WP_Query($completadas_hoy_args);
-$completadas_hoy = $completadas_hoy_query->post_count;
-
-=======
 get_header();
 
 // --- CALCULAR KPIs DEL SECTOR (AHORA USANDO LA FUNCIÓN REUTILIZABLE) ---
@@ -123,7 +68,6 @@ $pedidos_query = new WP_Query([
         ]
     ]
 ]);
->>>>>>> 2dac4e9 (Feat: completado del flujo de trabajo)
 
 ?>
 

@@ -43,18 +43,12 @@ document.addEventListener('DOMContentLoaded', function() {
     if (mainContent) {
         mainContent.addEventListener('click', function(e) {
             
-<<<<<<< HEAD
-            // Lógica para el botón "Archivar Pedido"
-            // Esta lógica DEBE evitar ser el controlador principal del panel administrativo
-            // ya que el panel administrativo tiene su propia lógica de archivo con actualización de KPIs.
-            // Usamos la nueva clase 'is-admin-sector-panel' para diferenciarlo.
-            const archiveBtn = e.target.closest('.archive-order-btn');
-            if (archiveBtn && !document.body.classList.contains('is-admin-sector-panel')) { 
-=======
             // Lógica para el botón "Archivar Pedido" (versión NO-ADMIN-DASHBOARD)
+            // Esta lógica se aplica a botones .archive-order-btn que NO están en el is-admin-dashboard-panel
+            // (ej., si por alguna razón un admin ve un sector ajeno y archiva desde allí, aunque ya no debería haber botón)
             const archiveBtnGeneral = e.target.closest('.archive-order-btn');
+            // La condición se asegura de que no se ejecute si estamos en el panel principal del Admin
             if (archiveBtnGeneral && !document.body.classList.contains('is-admin-dashboard-panel')) { 
->>>>>>> 2dac4e9 (Feat: completado del flujo de trabajo)
                 e.preventDefault();
                 if (!confirm('¿Archivar este pedido? Esta acción es final.')) return;
 
@@ -215,21 +209,21 @@ document.addEventListener('DOMContentLoaded', function() {
         refreshTasksBtn.addEventListener('click', function(e) {
             e.preventDefault();
             const sectorTasksList = document.querySelector('.ghd-sector-tasks-list');
-            const mainContentEl = document.querySelector('.ghd-main-content'); // Obtener el elemento main
-            const campoEstado = mainContentEl ? mainContentEl.dataset.campoEstado : ''; // Obtener campo_estado del data attribute
+            const mainContentEl = document.querySelector('.ghd-main-content');
+            const campoEstado = mainContentEl ? mainContentEl.dataset.campoEstado : '';
 
             if (!sectorTasksList || !campoEstado) {
                 console.error("No se encontró la lista de tareas del sector o el campo_estado.");
                 return;
             }
 
-            sectorTasksList.style.opacity = '0.5'; // Efecto visual de carga
+            sectorTasksList.style.opacity = '0.5';
             refreshTasksBtn.disabled = true;
 
             const params = new URLSearchParams({
                 action: 'ghd_refresh_sector_tasks',
                 nonce: ghd_ajax.nonce,
-                campo_estado: campoEstado // Pasar el campo_estado del sector actual
+                campo_estado: campoEstado
             });
 
             fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
@@ -238,7 +232,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.success) {
                         sectorTasksList.innerHTML = data.data.tasks_html;
                         if (data.data.kpi_data) {
-                            updateSectorKPIs(data.data.kpi_data); // Actualizar los KPIs
+                            updateSectorKPIs(data.data.kpi_data);
                         }
                     } else {
                         alert('Error al refrescar tareas: ' + (data.data?.message || ''));
@@ -270,7 +264,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            closureTasksContainer.style.opacity = '0.5'; // Efecto visual de carga
+            closureTasksContainer.style.opacity = '0.5';
             refreshClosureTasksBtn.disabled = true;
 
             const params = new URLSearchParams({
@@ -284,7 +278,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.success) {
                         closureTableBody.innerHTML = data.data.table_html;
                         if (data.data.kpi_data) {
-                            updateAdminClosureKPIs(data.data.kpi_data); // Actualizar los KPIs de cierre
+                            updateAdminClosureKPIs(data.data.kpi_data);
                         }
                     } else {
                         alert('Error al refrescar pedidos de cierre: ' + (data.data?.message || ''));
@@ -305,7 +299,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
     // --- LÓGICA DE FILTROS Y BÚSQUEDA PARA EL PANEL DE ADMINISTRADOR (EXISTENTE) ---
-    // (Este bloque no tiene cambios, se mantiene como estaba)
     const adminDashboard = document.querySelector('.page-template-template-admin-dashboard');
 
     if (adminDashboard) {
@@ -369,8 +362,7 @@ document.addEventListener('DOMContentLoaded', function() {
             history.pushState("", document.title, window.location.pathname + window.location.search);
         }
     }
-<<<<<<< HEAD
-}
+
 // --- LÓGICA PARA LOS GRÁFICOS DE LA PÁGINA DE REPORTES ---
 // Este bloque fue movido para estar dentro del DOMContentLoaded principal
 if (typeof ghd_reports_data !== 'undefined' && document.querySelector('.ghd-reports-grid')) {
@@ -422,90 +414,9 @@ if (typeof ghd_reports_data !== 'undefined' && document.querySelector('.ghd-repo
         });
     }
 }
-
-
-// --- LÓGICA DEL PANEL ADMINISTRATIVO (ARCHIVAR CON KPIs) ---
-// Este bloque debe estar dentro del DOMContentLoaded principal y usar el selector correcto.
-const adminPanel = document.querySelector('.is-admin-sector-panel'); // <--- SELECTOR CORREGIDO
-if (adminPanel) {
-    // Si la tabla usa .ghd-table tbody, o si usa .ghd-sector-tasks-list (para las tarjetas)
-    const containerForEvents = adminPanel.querySelector('.ghd-table tbody') || adminPanel.querySelector('.ghd-sector-tasks-list'); 
-    
-    // Función para actualizar los KPIs en la UI
-    const updateAdminKPIs = (kpiData) => {
-        const activasEl = document.getElementById('kpi-activas');
-        const prioridadEl = document.getElementById('kpi-prioridad-alta');
-        const completadasHoyEl = document.getElementById('kpi-completadas-hoy'); 
-        const tiempoEl = document.getElementById('kpi-tiempo-promedio');
-
-        if (activasEl) activasEl.textContent = kpiData.total_pedidos;
-        if (prioridadEl) prioridadEl.textContent = kpiData.total_prioridad_alta;
-        if (completadasHoyEl) completadasHoyEl.textContent = kpiData.completadas_hoy;
-        if (tiempoEl) tiempoEl.textContent = kpiData.tiempo_promedio_str;
-    };
-
-    if (containerForEvents) { 
-        containerForEvents.addEventListener('click', function(e) {
-            const archiveBtn = e.target.closest('.archive-order-btn');
-            if (archiveBtn) {
-                e.preventDefault();
-                if (!confirm('¿Archivar este pedido? Esta acción es final.')) return;
-
-                const orderId = archiveBtn.dataset.orderId;
-                // El elemento a remover es la tarjeta completa en el ghd-sector-tasks-list
-                const containerToRemove = archiveBtn.closest('.ghd-order-card');
-                
-                containerToRemove.style.opacity = '0.5';
-                archiveBtn.disabled = true;
-                archiveBtn.textContent = 'Archivando...';
-
-                const params = new URLSearchParams({ action: 'ghd_archive_order', nonce: ghd_ajax.nonce, order_id: orderId });
-                fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            containerToRemove.remove();
-                            // Actualizamos los KPIs con los datos que nos devuelve el servidor
-                            if (data.data.kpi_data) {
-                                updateAdminKPIs(data.data.kpi_data);
-                            }
-                        } else {
-                            alert('Error: ' + (data.data.message || 'No se pudo archivar.'));
-                            containerToRemove.style.opacity = '1';
-                            archiveBtn.disabled = false;
-                            archiveBtn.textContent = 'Archivar Pedido';
-                        }
-                    })
-                    .catch(error => { // Añadir manejo de errores de red
-                        console.error("Error en la petición AJAX:", error);
-                        alert('Error de red. No se pudo archivar el pedido.');
-                        containerToRemove.style.opacity = '1';
-                        archiveBtn.disabled = false;
-                        archiveBtn.textContent = 'Archivar Pedido';
-                    });
-            }
-        });
-    }
-}
-}); // Cierre del document.addEventListener('DOMContentLoaded', function() original
-=======
-
-    // --- LÓGICA PARA LOS GRÁFICOS DE LA PÁGINA DE REPORTES (EXISTENTE) ---
-    // (Este bloque no tiene cambios)
-    if (typeof ghd_reports_data !== 'undefined' && document.querySelector('.ghd-reports-grid')) {
-        const pedidosCtx = document.getElementById('pedidosPorEstadoChart');
-        if (pedidosCtx) { new Chart(pedidosCtx, { type: 'bar', data: { labels: ghd_reports_data.sector.labels, datasets: [{ label: 'Pedidos Activos', data: ghd_reports_data.sector.data, backgroundColor: 'rgba(74, 124, 89, 0.7)' }] }, options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } } }); }
-        const cargaCtx = document.getElementById('cargaPorSectorChart');
-        if (cargaCtx) { new Chart(cargaCtx, { type: 'doughnut', data: { labels: ghd_reports_data.sector.labels, datasets: [{ data: ghd_reports_data.sector.data, backgroundColor: ['#4A7C59', '#B34A49', '#F59E0B', '#6B7280', '#3E3E3E'] }] } }); }
-        const prioridadCtx = document.getElementById('pedidosPorPrioridadChart');
-        if (prioridadCtx) { new Chart(prioridadCtx, { type: 'polarArea', data: { labels: ghd_reports_data.prioridad.labels, datasets: [{ data: ghd_reports_data.prioridad.data, backgroundColor: ['rgba(179, 74, 73, 0.7)', 'rgba(245, 158, 11, 0.7)', 'rgba(74, 124, 89, 0.7)'] }] } }); }
-    }
->>>>>>> 2dac4e9 (Feat: completado del flujo de trabajo)
-
 }); // Cierre del document.addEventListener('DOMContentLoaded', function() original
 
 // LÓGICA PARA ACTIVAR EL FILTRO DESDE LA URL AL CARGAR LA PÁGINA (EXISTENTE)
-// (Este bloque no tiene cambios, aunque applyFilters necesita estar en un scope accesible)
 window.addEventListener('load', function() {
     const searchFilterInput = document.getElementById('ghd-search-filter');
     if (!searchFilterInput) return;
@@ -515,21 +426,11 @@ window.addEventListener('load', function() {
 
     if (searchTerm) {
         searchFilterInput.value = searchTerm;
-<<<<<<< HEAD
-        // Para que applyFilters funcione aquí, debería estar definida en un scope más amplio o
-        // se debe replicar la lógica. Para evitar duplicación, asumo que applyFilters puede ser llamada
-        // si el adminDashboard (que la contiene) existe. Si no, necesitarías mover applyFilters a un scope global
-        // o pasar los parámetros necesarios para re-ejecutar el filtro.
-        // Por la estructura actual, la forma más simple es re-trigger el evento keyup o un "click" en un botón de filtro si existe.
-        const event = new Event('keyup');
-        searchFilterInput.dispatchEvent(event); // Esto simulará el keyup y disparará applyFilters vía setTimeout
-=======
         const adminDashboardEl = document.querySelector('.page-template-template-admin-dashboard');
         if (adminDashboardEl) {
             const event = new Event('keyup');
             searchFilterInput.dispatchEvent(event);
         }
->>>>>>> 2dac4e9 (Feat: completado del flujo de trabajo)
         history.pushState("", document.title, window.location.pathname + window.location.search);
     }
 });
