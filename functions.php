@@ -231,10 +231,10 @@ function ghd_get_pedidos_en_produccion_data() {
                 $total_tiempo_produccion += $ahora - get_the_modified_time('U', $order_id);
             }
 
-            // --- NUEVOS CAMPOS RECUPERADOS ---
-            $material_producto = get_field('material_del_producto', $order_id); // Asumo este nombre de campo ACF
-            $color_producto = get_field('color_del_producto', $order_id);     // Asumo este nombre de campo ACF
-            $observaciones_personalizacion = get_field('observaciones_personalizacion', $order_id); // Asumo este nombre de campo ACF
+            // --- CAMPOS ADICIONALES RECUPERADOS ---
+            $material_producto = get_field('material_del_producto', $order_id); 
+            $color_producto = get_field('color_del_producto', $order_id);    
+            $observaciones_personalizacion = get_field('observaciones_personalizacion', $order_id); 
             ?>
             <tr id="order-row-prod-<?php echo $order_id; ?>">
                 <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
@@ -244,6 +244,7 @@ function ghd_get_pedidos_en_produccion_data() {
                 <td>
                     <?php if ($color_producto) : ?>
                         <span class="color-swatch" style="background-color: <?php echo esc_attr($color_producto); ?>;"></span>
+                        <?php echo esc_html($color_producto); ?>
                     <?php else : ?>
                         N/A
                     <?php endif; ?>
@@ -370,8 +371,9 @@ function ghd_get_reports_data() {
     foreach (['Pendiente de Asignación', 'En Producción', 'En Costura', 'En Tapicería/Embalaje', 'Listo para Entrega', 'Despachado', 'Pendiente de Cierre Admin', 'Completado y Archivado'] as $estado) {
         $estados_generales_count[$estado] = 0;
     }
-    foreach ($sectores as $sector) {
-        $carga_por_sector_count[$sector] = 0;
+    // Inicializar carga por sector con todos los sectores de ghd_get_sectores
+    foreach ($sectores as $sector_display_name) {
+        $carga_por_sector_count[$sector_display_name] = 0;
     }
     
 
@@ -401,13 +403,15 @@ function ghd_get_reports_data() {
             // Carga de Trabajo por Sector (contar 'Pendiente' o 'En Progreso' para cada campo de sector)
             foreach ($mapa_roles_a_campos as $role_key => $field_key) {
                 $sub_estado = get_field($field_key, $order_id);
+                // Si el sector tiene una tarea activa (Pendiente o En Progreso), se suma a su carga
                 if ($sub_estado === 'Pendiente' || $sub_estado === 'En Progreso') {
-                    $sector_display_name = ucfirst(str_replace(['rol_', 'estado_'], '', $role_key)); // Ej: Carpintería
+                    // El sector_display_name ya está capitalizado en ghd_get_sectores
+                    $sector_display_name = ucfirst(str_replace(['rol_', 'estado_'], '', $role_key)); 
                     if (isset($carga_por_sector_count[$sector_display_name])) {
                         $carga_por_sector_count[$sector_display_name]++;
-                    } else {
-                        $carga_por_sector_count[$sector_display_name] = 1;
                     }
+                    // Si no está en $carga_por_sector_count, significa que no es un sector de ghd_get_sectores
+                    // o no fue inicializado correctamente, pero ya lo inicializamos.
                 }
             }
         }
