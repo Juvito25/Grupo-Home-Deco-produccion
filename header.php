@@ -28,40 +28,29 @@ if (
 <!-- INICIO DE LA CABECERA PROFESIONAL (SOLO PARA LA APP) -->
 <header class="ghd-pro-header">
     <div class="header-logo-title">
-        <img src="<?php echo get_stylesheet_directory_uri(); ?>/img/logo.png" alt="Logo Grupo Home Deco" class="header-logo">
+        <a href="<?php echo home_url(); ?>" class="site-logo-link"> <!-- Opcional: hacer el logo un enlace a la home -->
+            <img src="<?php echo get_stylesheet_directory_uri(); ?>/img/logo.png" alt="GRUPO DECO HOME S.R.L" class="header-app-logo">
+        </a>
         <div class="header-title-group">
-            <span class="main-title">Gestor de Flujo de Producción</span>
-            <?php 
-            $sub_title = 'Panel de Control'; // Por defecto
-            if (is_page_template('template-sector-dashboard.php')) {
-                $current_user = wp_get_current_user();
-                $user_roles = $current_user->roles;
-                $user_role = !empty($user_roles) ? $user_roles[0] : '';
-                $role_to_sector_map = array('rol_carpinteria' => 'Carpintería', 'rol_costura' => 'Costura', 'rol_tapiceria' => 'Tapicería', 'rol_logistica' => 'Logística');
-                $sector_name = isset($role_to_sector_map[$user_role]) ? $role_to_sector_map[$user_role] : '';
-                $sub_title = $sector_name . ' Dashboard';
-            } elseif (is_singular('orden_produccion')) {
-                $sub_title = 'Detalles del Pedido';
-            } elseif (is_page_template('template-sectores.php')) {
-                $sub_title = 'Vista de Sectores';
-            }
-            ?>
-            <span class="sub-title"><?php echo esc_html($sub_title); ?></span>
+            <h1 class="main-title">Gestor de Flujo de Producción</h1> <!-- Esto ahora es el nombre de la app, no la razón social -->
+            <span class="sub-title">Panel de Control</span>
         </div>
     </div>
+    <?php $current_user = wp_get_current_user(); ?>
     <div class="header-user-profile">
-        <?php if (is_user_logged_in()) : 
-            $current_user = wp_get_current_user();
-            $user_role_name = !empty($current_user->roles) ? ucfirst(str_replace(['rol_', '_'], ' ', $current_user->roles[0])) : '';
-        ?>
-            <div class="user-info">
-                <span class="user-name"><?php echo esc_html($current_user->display_name); ?></span>
-                <span class="user-role"><?php echo esc_html($user_role_name); ?></span>
-            </div>
-            <div class="user-avatar">
-                <?php echo get_avatar($current_user->ID, 32); ?>
-            </div>
-        <?php endif; ?>
+        <div class="user-info">
+            <span class="user-name"><?php echo esc_html($current_user->display_name); ?></span>
+            <span class="user-role"><?php echo esc_html(ucfirst($current_user->roles[0])); ?></span>
+        </div>
+        <div class="user-avatar-wrapper"> <!-- Nuevo wrapper para mejor control del avatar -->
+            <?php 
+            $avatar_url = get_avatar_url($current_user->ID, ['size' => 40]);
+            if ($avatar_url) : ?>
+                <img src="<?php echo esc_url($avatar_url); ?>" alt="Avatar de <?php echo esc_attr($current_user->display_name); ?>" class="user-avatar-img">
+            <?php else : ?>
+                <i class="fa-solid fa-circle-user user-avatar-placeholder"></i> <!-- Icono de Font Awesome como placeholder -->
+            <?php endif; ?>
+        </div>
     </div>
 </header>
 <!-- FIN DE LA CABECERA PROFESIONAL -->

@@ -65,21 +65,73 @@ a:hover {
     justify-content: space-between; 
     align-items: center; 
 }
+.header-logo-title { 
+    display: flex; 
+    align-items: center; 
+    gap: 1rem; /* Espacio entre el logo y el texto */
+}
 #mobile-menu-toggle { 
     display: none; /* Asegura que esté oculto por defecto en desktop */
     /* Asegúrate de que no haya otras reglas que lo hagan display:block aquí */
 }
+.header-app-logo {
+    height: 45px; /* Ajusta este valor para el tamaño deseado del logo */
+    width: auto; /* Mantiene la proporción */
+    object-fit: contain; /* Asegura que la imagen se vea bien dentro de su altura */
+    margin-right: 15px; /* Espacio a la derecha del logo */
+}
 
-.header-logo-title { display: flex; align-items: center; gap: 1rem; }
-.header-logo { height: 40px; }
+/* .header-logo { height: 40px; } */
 .header-title-group { display: flex; flex-direction: column; }
-.main-title { font-weight: 600; margin: 0; }
+.main-title { font-weight: 600; margin: 0; font-size: 1.1rem; color: var(--texto-principal); } /* Ajustar tamaño y color */
 .sub-title { font-size: 0.85rem; color: var(--texto-secundario); margin: 0; }
-.header-user-profile { display: flex; align-items: center; gap: 1rem; }
-.user-info { display: flex; flex-direction: column; text-align: right; }
-.user-name { font-weight: 600; }
-.user-role { font-size: 0.85rem; color: var(--texto-secundario); }
-.user-avatar img { border-radius: 50%; width: 40px; height: 40px; object-fit: cover; }
+
+.header-user-profile { 
+    display: flex; 
+    align-items: center; 
+    gap: 15px; /* Espacio entre info de usuario y avatar */
+}
+.user-info { 
+    display: flex; 
+    flex-direction: column; 
+    text-align: right; 
+}
+.user-name { 
+    font-weight: 600; 
+    color: var(--texto-principal);
+    font-size: 1rem;
+}
+.user-role { 
+    font-size: 0.85rem; 
+    color: var(--texto-secundario); 
+}
+
+/* Nuevo contenedor para el avatar */
+.user-avatar-wrapper {
+    width: 40px; /* Ancho fijo para el wrapper */
+    height: 40px; /* Alto fijo para el wrapper */
+    border-radius: 50%;
+    overflow: hidden; /* Asegura que el avatar se recorte dentro del círculo */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f0f0f0; /* Fondo si no hay imagen */
+    border: 1px solid var(--color-borde);
+}
+
+/* Estilo para la imagen del avatar */
+.user-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Asegura que la imagen llene el círculo */
+    display: block; /* Elimina espacio extra debajo de la imagen */
+}
+
+/* Estilo para el icono de Font Awesome si no hay avatar */
+.user-avatar-placeholder {
+    font-size: 24px; /* Tamaño del icono */
+    color: var(--texto-secundario); /* Color del icono */
+}
 
 .ghd-app-wrapper { display: flex; flex-grow: 1; }
 .ghd-sidebar { 
@@ -140,7 +192,7 @@ a:hover {
     flex-wrap: wrap; /* Permite que los elementos se envuelvan en pantallas pequeñas */
     justify-content: space-between;
     margin-bottom: .5%;
-    width: 100%;
+    /* width: 100%; */
 }
 .header-title-wrapper h2 {
     margin: 0;
@@ -627,8 +679,18 @@ body.page-template-template-login {
     .ghd-pro-header {
         padding: 0.5rem 1rem;
     }
-    .header-logo {
+     .header-user-profile {
+        gap: 10px; /* Reducir gap en móvil */
+    }
+    .user-info {
+        display: none; /* Ocultar nombre y rol en móvil si es muy estrecho */
+    }
+    .user-avatar-wrapper {
+        width: 35px; /* Avatar más pequeño en móvil */
         height: 35px;
+    }
+    .user-avatar-placeholder {
+        font-size: 20px;
     }
 }
 
@@ -645,6 +707,9 @@ body.page-template-template-login {
     .ghd-filters-wrapper .ghd-btn-icon {
         min-width: unset;
         width: 100%;
+    }
+    .ghd-reports-grid {
+        grid-template-columns: 1fr !important; /* Una columna en tablets y móviles */
     }
 }
 

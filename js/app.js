@@ -109,8 +109,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (data.data.kpi_data) {
                                 updateSectorKPIs(data.data.kpi_data);
                             }
-                            // Si estamos en el panel del admin, y un pedido pasa de "En Producción" a "Pendiente de Cierre Admin"
-                            // o cambia su estado, debemos refrescar también las secciones de producción y cierre del admin.
                             if (document.body.classList.contains('is-admin-dashboard-panel')) {
                                 const refreshProdBtn = document.getElementById('ghd-refresh-production-tasks');
                                 if (refreshProdBtn) { refreshProdBtn.click(); }
@@ -152,7 +150,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     .then(data => {
                         if (data.success) {
                             rowToRemove.remove(); 
-                            // ¡Refrescar la sección de Pedidos en Producción del Admin!
                             const refreshProdBtn = document.getElementById('ghd-refresh-production-tasks');
                             if (refreshProdBtn) { refreshProdBtn.click(); }
                         } else {
@@ -358,7 +355,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 .finally(() => {
                     productionTasksContainer.style.opacity = '1';
                     refreshProductionTasksBtn.disabled = false;
-                    // --- NUEVO: Refrescar también Pedidos Pendientes de Cierre ---
+                    // --- Refrescar también Pedidos Pendientes de Cierre ---
                     const refreshClosureBtn = document.getElementById('ghd-refresh-closure-tasks');
                     if (refreshClosureBtn) { refreshClosureBtn.click(); }
                 });
@@ -367,7 +364,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- LÓGICA PARA EL BOTÓN "REFRESCAR" EN LA PÁGINA DE PEDIDOS ARCHIVADOS ---
     const refreshArchivedOrdersBtn = document.getElementById('ghd-refresh-archived-orders');
-    if (refreshArchivedOrdersBtn && document.body.classList.contains('is-admin-dashboard-panel')) { 
+    if (refreshArchivedOrdersBtn) { // <-- Condición simplificada
         refreshArchivedOrdersBtn.addEventListener('click', function(e) {
             e.preventDefault();
             const archivedOrdersTableBody = document.getElementById('ghd-archived-orders-table-body');
@@ -437,6 +434,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.success) {
                         tableBody.innerHTML = data.data.html;
                     } else {
+                        alert('Error al refrescar tareas: ' + (data.data?.message || ''));
                         tableBody.innerHTML = '<tr><td colspan="9">Ocurrió un error al cargar los datos.</td></tr>';
                     }
                 })
@@ -475,6 +473,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- LÓGICA PARA LOS GRÁFICOS DE LA PÁGINA DE REPORTES ---
     if (typeof ghd_reports_data !== 'undefined' && document.querySelector('.ghd-reports-grid')) {
+        console.log("Datos de Reportes Recibidos:", ghd_reports_data)
         const pedidosCtx = document.getElementById('pedidosPorEstadoChart');
         if (pedidosCtx) {
             new Chart(pedidosCtx, {
