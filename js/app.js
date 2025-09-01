@@ -125,24 +125,45 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
             }
             
-            // Lógica para el botón "Iniciar Producción" en el Panel de Administrador principal
+                        // Lógica para el botón "Iniciar Producción" en el Panel de Administrador principal
             const startProductionBtn = e.target.closest('.start-production-btn');
             if (startProductionBtn && document.body.classList.contains('is-admin-dashboard-panel')) {
-                e.preventDefault();
+                // --- Importante: Si el botón está deshabilitado, el evento click NO debería propagarse ---
+                // y el mensaje de alerta debería mostrarse aquí.
+                // Esta lógica ahora está dentro del if(startProductionBtn...)
+                // El `startProductionBtn.disabled` es manejado por el listener `change` del selector.
+                // Si el navegador permite el click en un botón deshabilitado (no debería),
+                // o si el estado `disabled` no se aplica bien visualmente, esta alerta actúa como fallback.
+                
+                // Primero, prevenir cualquier acción por defecto.
+                e.preventDefault(); 
+
+                // Obtener el selector de prioridad de la misma fila
+                const orderId = startProductionBtn.dataset.orderId;
+                const ordersTableBody = document.getElementById('ghd-orders-table-body'); // Necesitamos este para el selector
+                const prioritySelector = ordersTableBody ? ordersTableBody.querySelector(`select.ghd-priority-selector[data-order-id="${orderId}"]`) : null;
+                const priorityToInitiate = prioritySelector ? prioritySelector.value : 'Seleccionar Prioridad';
+
+                // Si la prioridad es 'Seleccionar Prioridad', mostrar alerta y salir
+                if (priorityToInitiate === 'Seleccionar Prioridad') {
+                    alert('Por favor, selecciona una prioridad para el pedido antes de iniciar la producción.');
+                    return; // Salir de la función de clic
+                }
+
                 if (!confirm('¿Deseas iniciar la producción de este pedido?')) return;
 
-                const orderId = startProductionBtn.dataset.orderId;
                 const rowToRemove = startProductionBtn.closest('tr');
                 
                 rowToRemove.style.opacity = '0.5';
-                startProductionBtn.disabled = true;
+                startProductionBtn.disabled = true; // Deshabilitar el botón durante la petición
                 startProductionBtn.textContent = 'Iniciando...';
 
                 const params = new URLSearchParams({ 
                     action: 'ghd_admin_action', 
                     nonce: ghd_ajax.nonce, 
                     order_id: orderId,
-                    type: 'start_production' 
+                    type: 'start_production',
+                    priority: priorityToInitiate // Incluir la prioridad en la petición
                 });
 
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
@@ -153,7 +174,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             const refreshProdBtn = document.getElementById('ghd-refresh-production-tasks');
                             if (refreshProdBtn) { refreshProdBtn.click(); }
                         } else {
-                            alert('Error: ' + (data.data?.message || 'No se pudo iniciar la producción.'));
+                            alert('Error al iniciar la producción: ' + (data.data?.message || 'No se pudo iniciar.'));
                             rowToRemove.style.opacity = '1';
                             startProductionBtn.disabled = false;
                             startProductionBtn.textContent = 'Iniciar Producción';
@@ -218,6 +239,72 @@ document.addEventListener('DOMContentLoaded', function() {
         }); // Fin del mainContent.addEventListener('click')
     } // Fin del if(mainContent)
 
+        // --- LÓGICA PARA ASIGNAR PRIORIDAD EN EL PANEL DE ASIGNACIÓN ---
+        // --- LÓGICA PARA ASIGNAR PRIORIDAD EN EL PANEL DE ASIGNACIÓN ---
+    const assignationPanel = document.querySelector('.page-template-template-admin-dashboard');
+
+    if (assignationPanel) { // Solo si estamos en el panel de asignación del administrador
+        const ordersTableBody = document.getElementById('ghd-orders-table-body');
+
+        if (ordersTableBody) {
+            // --- NUEVO: Función para inicializar el estado del botón al cargar la página ---
+            const initializePriorityButtons = () => {
+                ordersTableBody.querySelectorAll('tr').forEach(row => {
+                    const prioritySelector = row.querySelector('.ghd-priority-selector');
+                    const startProductionBtn = row.querySelector('.start-production-btn');
+                    if (prioritySelector && startProductionBtn) {
+                        startProductionBtn.disabled = (prioritySelector.value === 'Seleccionar Prioridad');
+                    }
+                });
+            };
+
+            // Ejecutar la inicialización al cargar la página
+            initializePriorityButtons();
+
+            // Manejar cambios en el selector de prioridad
+            ordersTableBody.addEventListener('change', function(e) {
+                const prioritySelector = e.target.closest('.ghd-priority-selector');
+                if (prioritySelector) {
+                    const orderId = prioritySelector.dataset.orderId;
+                    const selectedPriority = prioritySelector.value;
+                    const startProductionBtn = ordersTableBody.querySelector(`button.start-production-btn[data-order-id="${orderId}"]`);
+
+                    // Lógica: Habilitar/deshabilitar el botón "Iniciar Producción"
+                    if (startProductionBtn) {
+                        startProductionBtn.disabled = (selectedPriority === 'Seleccionar Prioridad');
+                    }
+
+                    // Enviar la prioridad al backend vía AJAX para guardarla
+                    const params = new URLSearchParams({
+                        action: 'ghd_update_priority', // Endpoint AJAX
+                        nonce: ghd_ajax.nonce,
+                        order_id: orderId,
+                        priority: selectedPriority
+                    });
+
+                    fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (!data.success) {
+                                console.error('Error al guardar prioridad:', data.data?.message || 'Error desconocido.');
+                                // Opcional: alert('Error al guardar la prioridad.');
+                            } else {
+                                console.log('Prioridad guardada:', data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error("Error de red al guardar prioridad:", error);
+                            // Opcional: alert('Error de red al guardar la prioridad.');
+                        });
+                }
+            });
+
+            // NOTA: El manejador del botón "Iniciar Producción" para enviar la prioridad
+            // ya está en el mainContent.addEventListener('click') y leerá el valor del selector.
+            // La validación del `disabled` ahora se hace directamente en ese manejador también.
+        }
+    }
+    //// // // //// // // //// // // /// // // / Fin del if(assignationPanel)//// // // //// // // //// // // ///// // // //// // // //// // // /
 
     // --- LÓGICA PARA EL BOTÓN "REFRESCAR" EN PANELES DE SECTOR ---
     const refreshTasksBtn = document.getElementById('ghd-refresh-tasks');
