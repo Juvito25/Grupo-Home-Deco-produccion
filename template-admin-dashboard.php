@@ -28,7 +28,9 @@ get_header();
                 <h2>Pedidos Pendientes de Asignación</h2>
             </div> 
             <div class="header-actions">
-                <button class="ghd-btn ghd-btn-secondary"><i class="fa-solid fa-download"></i> <span>Exportar</span></button>
+                <button id="ghd-export-assignation-orders" class="ghd-btn ghd-btn-secondary" data-export-type="assignation">
+                    <i class="fa-solid fa-download"></i> <span>Exportar</span>
+                </button>
                 <button class="ghd-btn ghd-btn-primary"><i class="fa-solid fa-plus"></i> <span>Nuevo Pedido</span></button>
             </div>
         </header>

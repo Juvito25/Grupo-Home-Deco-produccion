@@ -926,3 +926,127 @@ function ghd_refresh_archived_orders_callback() {
     ]);
     wp_die();
 }
+
+/**
+ * Registra la nueva plantilla de página para Configuración.
+ *
+ * @param array $templates Un array de plantillas de página.
+ * @return array Un array modificado de plantillas de página.
+ */
+add_filter( 'theme_page_templates', 'ghd_register_configuracion_template' );
+function ghd_register_configuracion_template( $templates ) {
+    $templates['template-configuracion.php'] = 'GHD - Configuración';
+    return $templates;
+}
+
+// --- Opcional: Registrar una página de opciones de ACF si quieres editar la razón social desde el admin ---
+if (function_exists('acf_add_options_page')) {
+    acf_add_options_page(array(
+        'page_title'    => 'Configuración del Tema GHD',
+        'menu_title'    => 'Configuración GHD',
+        'menu_slug'     => 'ghd-theme-settings',
+        'capability'    => 'manage_options',
+        'redirect'      => false
+    ));
+    acf_add_options_sub_page(array( // Si quieres sub-páginas
+        'page_title'    => 'Ajustes Generales',
+        'menu_title'    => 'Generales',
+        'parent_slug'   => 'ghd-theme-settings',
+    ));
+}
+
+/**
+ * --- NUEVO: LÓGICA AJAX PARA EXPORTAR PEDIDOS A CSV ---
+ * Genera un archivo CSV con los pedidos de un tipo específico.
+ */
+add_action('wp_ajax_ghd_export_orders_csv', 'ghd_export_orders_csv_callback');
+function ghd_export_orders_csv_callback() {
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(['message' => 'No tienes permisos para exportar pedidos.']);
+    }
+
+    $export_type = isset($_POST['export_type']) ? sanitize_key($_POST['export_type']) : 'assignation'; // Por defecto, exportar asignación
+
+    $args = [];
+    $filename = '';
+    $headers = [];
+
+    // Definir la consulta y los encabezados según el tipo de exportación
+    switch ($export_type) {
+        case 'assignation':
+            $args = [
+                'post_type'      => 'orden_produccion',
+                'posts_per_page' => -1,
+                'meta_query'     => [
+                    [
+                        'key'     => 'estado_pedido',
+                        'value'   => 'Pendiente de Asignación',
+                        'compare' => '=',
+                    ],
+                ],
+            ];
+            $filename = 'pedidos_pendientes_asignacion_' . date('Y-m-d') . '.csv';
+            $headers = ['Código', 'Cliente', 'Producto', 'Estado', 'Prioridad', 'Fecha de Pedido'];
+            break;
+        // Puedes añadir más casos aquí para otros tipos de exportación (ej. 'production', 'closure', 'archived')
+        // case 'production':
+        //     $args = [ /* ... */ ];
+        //     $filename = 'pedidos_en_produccion_' . date('Y-m-d') . '.csv';
+        //     $headers = ['Código', 'Cliente', 'Producto', 'Material', 'Color', 'Observaciones', 'Estado General', 'Estado Carpinteria', /* ... otros estados ... */];
+        //     break;
+        // case 'archived':
+        //     $args = [ /* ... */ ];
+        //     $filename = 'pedidos_archivados_' . date('Y-m-d') . '.csv';
+        //     $headers = ['Código', 'Cliente', 'Producto', 'Fecha de Archivo', 'Estado'];
+        //     break;
+        default:
+            wp_send_json_error(['message' => 'Tipo de exportación no válido.']);
+    }
+
+    $pedidos_query = new WP_Query($args);
+
+    if (!$pedidos_query->have_posts()) {
+        wp_send_json_error(['message' => 'No hay pedidos para exportar en este momento.']);
+    }
+
+    // Preparar el contenido del CSV
+    $output = fopen('php://temp', 'r+'); // Abrir un flujo de memoria temporal
+    fputcsv($output, $headers); // Escribir los encabezados
+
+    while ($pedidos_query->have_posts()) : $pedidos_query->the_post();
+        $order_id = get_the_ID();
+        $row = [];
+
+        // Llenar la fila según el tipo de exportación
+        switch ($export_type) {
+            case 'assignation':
+                $row = [
+                    get_the_title($order_id),
+                    get_field('nombre_cliente', $order_id),
+                    get_field('nombre_producto', $order_id),
+                    get_field('estado_pedido', $order_id),
+                    get_field('prioridad_pedido', $order_id),
+                    get_the_date('Y-m-d', $order_id),
+                ];
+                break;
+            // Añadir lógica para otros tipos de exportación aquí
+        }
+        fputcsv($output, $row); // Escribir la fila
+    endwhile;
+    wp_reset_postdata();
+
+    rewind($output); // Rebobinar el puntero del archivo al principio
+    $csv_content = stream_get_contents($output); // Obtener todo el contenido
+    fclose($output); // Cerrar el flujo
+
+    // Enviar el CSV al navegador para descarga
+    header('Content-Type: text/csv; charset=' . get_option('blog_charset'));
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+
+    echo $csv_content;
+
+    wp_die(); // Terminar la ejecución de WordPress
+}
