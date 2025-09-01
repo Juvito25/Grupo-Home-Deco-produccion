@@ -109,8 +109,19 @@ function is_sidebar_link_active($template_name) {
                     <span>Pedidos Archivados</span>
                 </a>
             </li>
-            <li class="<?php // is_sidebar_link_active('template-configuracion.php'); ?>">
-                <a href="#"> <!-- Placeholder para Configuración -->
+                        <?php
+            // URL para la página de Configuración
+            $config_page_url = get_posts([
+                'post_type'  => 'page',
+                'fields'     => 'ids',
+                'nopaging'   => true,
+                'meta_key'   => '_wp_page_template',
+                'meta_value' => 'template-configuracion.php'
+            ]);
+            $config_url = !empty($config_page_url) ? get_permalink($config_page_url[0]) : '#';
+            ?>
+            <li class="<?php echo is_sidebar_link_active('template-configuracion.php'); ?>">
+                <a href="<?php echo esc_url($config_url); ?>">
                     <i class="fa-solid fa-gear"></i>
                     <span>Configuración</span>
                 </a>

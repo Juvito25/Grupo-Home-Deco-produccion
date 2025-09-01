@@ -350,12 +350,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 .catch(error => {
                     console.error("Error en la petición AJAX de refresco de producción:", error);
                     alert('Error de red al refrescar pedidos en producción.');
-                    productionTableBody.innerHTML = '<tr><td colspan="9" style="text-align:center;">Error de red. Inténtalo de nuevo.</td></tr>'; // Colspan ajustado
+                    productionTableBody.innerHTML = '<tr><td colspan="9">Error de red. Inténtalo de nuevo.</td></tr>'; // Colspan ajustado
                 })
                 .finally(() => {
                     productionTasksContainer.style.opacity = '1';
                     refreshProductionTasksBtn.disabled = false;
-                    // --- Refrescar también Pedidos Pendientes de Cierre ---
                     const refreshClosureBtn = document.getElementById('ghd-refresh-closure-tasks');
                     if (refreshClosureBtn) { refreshClosureBtn.click(); }
                 });
@@ -364,7 +363,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- LÓGICA PARA EL BOTÓN "REFRESCAR" EN LA PÁGINA DE PEDIDOS ARCHIVADOS ---
     const refreshArchivedOrdersBtn = document.getElementById('ghd-refresh-archived-orders');
-    if (refreshArchivedOrdersBtn) { // <-- Condición simplificada
+    if (refreshArchivedOrdersBtn) { // Condición simplificada
         refreshArchivedOrdersBtn.addEventListener('click', function(e) {
             e.preventDefault();
             const archivedOrdersTableBody = document.getElementById('ghd-archived-orders-table-body');
@@ -405,10 +404,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 
-    // --- LÓGICA DE FILTROS Y BÚSQUEDA PARA EL PANEL DE ADMINISTRADOR (EXISTENTE) ---
+    // --- LÓGICA DE FILTROS Y BÚSQUEDA PARA EL PANEL DE ADMINISTRADOR ---
     const adminDashboard = document.querySelector('.page-template-template-admin-dashboard');
 
-    if (adminDashboard) {
+    if (adminDashboard) { // <-- ¡Todo el bloque de filtros debe ir aquí adentro!
         const searchFilter = document.getElementById('ghd-search-filter');
         const statusFilter = document.getElementById('ghd-status-filter');
         const priorityFilter = document.getElementById('ghd-priority-filter');
@@ -448,20 +447,28 @@ document.addEventListener('DOMContentLoaded', function() {
         };
 
         let searchTimeout;
-        searchFilter.addEventListener('keyup', () => { 
-            clearTimeout(searchTimeout); 
-            searchTimeout = setTimeout(applyFilters, 500); 
-        });
+        if (searchFilter) { 
+            searchFilter.addEventListener('keyup', () => { 
+                clearTimeout(searchTimeout); 
+                searchTimeout = setTimeout(applyFilters, 500); 
+            });
+        }
         
-        statusFilter.addEventListener('change', applyFilters);
-        priorityFilter.addEventListener('change', applyFilters);
+        if (statusFilter) { 
+            statusFilter.addEventListener('change', applyFilters);
+        }
+        if (priorityFilter) { 
+            priorityFilter.addEventListener('change', applyFilters);
+        }
         
-        resetFiltersBtn.addEventListener('click', () => { 
-            searchFilter.value = ''; 
-            statusFilter.value = ''; 
-            priorityFilter.value = ''; 
-            applyFilters(); 
-        });
+        if (resetFiltersBtn) { 
+            resetFiltersBtn.addEventListener('click', () => { 
+                searchFilter.value = ''; 
+                statusFilter.value = ''; 
+                priorityFilter.value = ''; 
+                applyFilters(); 
+            });
+        }
 
         if (window.location.hash && window.location.hash.startsWith('#buscar=')) {
             let searchTerm = decodeURIComponent(window.location.hash.substring(8)).replace(/\+/g, ' ');
@@ -473,7 +480,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- LÓGICA PARA LOS GRÁFICOS DE LA PÁGINA DE REPORTES ---
     if (typeof ghd_reports_data !== 'undefined' && document.querySelector('.ghd-reports-grid')) {
-        console.log("Datos de Reportes Recibidos:", ghd_reports_data)
         const pedidosCtx = document.getElementById('pedidosPorEstadoChart');
         if (pedidosCtx) {
             new Chart(pedidosCtx, {
@@ -532,12 +538,78 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
+
+// --- LÓGICA PARA EL BOTÓN "EXPORTAR" PEDIDOS ---
+    const exportAssignationOrdersBtn = document.getElementById('ghd-export-assignation-orders');
+    if (exportAssignationOrdersBtn) {
+        exportAssignationOrdersBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const exportType = exportAssignationOrdersBtn.dataset.exportType || 'assignation';
+
+            exportAssignationOrdersBtn.disabled = true;
+            exportAssignationOrdersBtn.textContent = 'Exportando...';
+
+            const params = new URLSearchParams({
+                action: 'ghd_export_orders_csv',
+                nonce: ghd_ajax.nonce,
+                export_type: exportType
+            });
+
+            // Usamos fetch directamente en lugar de AJAX para manejar la descarga de archivos
+            // Capturar la respuesta aquí para que esté disponible en el segundo .then()
+            let fetchResponse; // Variable para almacenar la respuesta
+
+            fetch(ghd_ajax.ajax_url, {
+                method: 'POST',
+                body: params
+            })
+            .then(response => {
+                fetchResponse = response; // Almacenar la respuesta
+                // Verificar si la respuesta es un JSON (un error) o un archivo CSV
+                const contentType = response.headers.get('Content-Type');
+                if (contentType && contentType.includes('application/json')) {
+                    return response.json().then(errorData => {
+                        throw new Error(errorData.data?.message || 'Error desconocido al exportar.');
+                    });
+                }
+                // Si es un archivo, proceder con la descarga
+                return response.blob();
+            })
+            .then(blob => {
+                // Crear un enlace temporal para descargar el archivo
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                // Intentar obtener el nombre del archivo del header Content-Disposition
+                // Usar fetchResponse que ya contiene la respuesta original
+                const contentDisposition = fetchResponse.headers.get('Content-Disposition');
+                const filenameMatch = contentDisposition && contentDisposition.match(/filename="(.+)"/);
+                a.download = filenameMatch ? filenameMatch[1] : `export_${Date.now()}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url); // Limpiar la URL temporal
+                alert('Exportación completada con éxito.');
+            })
+            .catch(error => {
+                console.error("Error al exportar pedidos:", error);
+                alert('Error al exportar pedidos: ' + error.message);
+            })
+            .finally(() => {
+                exportAssignationOrdersBtn.disabled = false;
+                exportAssignationOrdersBtn.innerHTML = '<i class="fa-solid fa-download"></i> <span>Exportar</span>';
+            });
+        });
+    }
 }); // Cierre ÚNICO y CORRECTO del document.addEventListener('DOMContentLoaded', function() principal
 
 // LÓGICA PARA ACTIVAR EL FILTRO DESDE LA URL AL CARGAR LA PÁGINA (EXISTENTE)
 // Este listener de window.load queda como un bloque independiente al final del archivo.
 // Se ha mantenido aquí por compatibilidad, aunque su funcionalidad de applyFilters ya está en DOMContentLoaded.
 window.addEventListener('load', function() {
+    // La función applyFilters se ha movido al DOMContentLoaded, por lo que no es accesible aquí directamente.
+    // Si la lógica de URL filter necesita ejecutar applyFilters, esta deberá ser reubicada o la applyFilters globalizada.
+    // Por ahora, solo se ejecuta si searchFilterInput existe.
     const searchFilterInput = document.getElementById('ghd-search-filter');
     if (!searchFilterInput) return;
 
@@ -546,11 +618,10 @@ window.addEventListener('load', function() {
 
     if (searchTerm) {
         searchFilterInput.value = searchTerm;
-        const adminDashboardEl = document.querySelector('.page-template-template-admin-dashboard');
-        if (adminDashboardEl) {
-            const event = new Event('keyup');
-            searchFilterInput.dispatchEvent(event);
-        }
+        // Para ejecutar el filtro, simulamos el evento keyup en el campo de búsqueda.
+        // Esto activará la lógica applyFilters que está dentro del DOMContentLoaded.
+        const event = new Event('keyup');
+        searchFilterInput.dispatchEvent(event);
         history.pushState("", document.title, window.location.pathname + window.location.search);
     }
 });
