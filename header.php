@@ -28,12 +28,12 @@ if (
 <!-- INICIO DE LA CABECERA PROFESIONAL (SOLO PARA LA APP) -->
 <header class="ghd-pro-header">
     <div class="header-logo-title">
-        <a href="<?php echo home_url(); ?>" class="site-logo-link"> <!-- Opcional: hacer el logo un enlace a la home -->
+        <a href="<?php echo home_url(); ?>" class="site-logo-link">
             <img src="<?php echo get_stylesheet_directory_uri(); ?>/img/logo.png" alt="GRUPO DECO HOME S.R.L" class="header-app-logo">
         </a>
         <div class="header-title-group">
-            <h1 class="main-title">Gestor de Flujo de Producción</h1> <!-- Esto ahora es el nombre de la app, no la razón social -->
-            <span class="sub-title">Panel de Control</span>
+            <h1 class="main-title">Gestor de Flujo de Producción</h1>
+            <span class="sub-title">Panel de Control</span> <!-- Esto podría ser dinámico según la página si lo deseas, o estático -->
         </div>
     </div>
     <?php $current_user = wp_get_current_user(); ?>
@@ -42,18 +42,17 @@ if (
             <span class="user-name"><?php echo esc_html($current_user->display_name); ?></span>
             <span class="user-role"><?php echo esc_html(ucfirst($current_user->roles[0])); ?></span>
         </div>
-        <div class="user-avatar-wrapper"> <!-- Nuevo wrapper para mejor control del avatar -->
+        <div class="user-avatar-wrapper">
             <?php 
             $avatar_url = get_avatar_url($current_user->ID, ['size' => 40]);
             if ($avatar_url) : ?>
                 <img src="<?php echo esc_url($avatar_url); ?>" alt="Avatar de <?php echo esc_attr($current_user->display_name); ?>" class="user-avatar-img">
             <?php else : ?>
-                <i class="fa-solid fa-circle-user user-avatar-placeholder"></i> <!-- Icono de Font Awesome como placeholder -->
+                <i class="fa-solid fa-circle-user user-avatar-placeholder"></i>
             <?php endif; ?>
         </div>
     </div>
-</header>
-<!-- FIN DE LA CABECERA PROFESIONAL -->
+</header><!-- FIN DE LA CABECERA PROFESIONAL -->
 
 <?php 
 endif; // Fin de la condición

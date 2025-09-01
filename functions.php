@@ -1,6 +1,6 @@
 <?php
 /**
- * functions.php - Versión 3.0 - Reportes, Consolidación Administrativa y Mejoras de Flujo
+ * functions.php - Versión 3.2 - Acceso al Admin para Desarrolladores (Corregido)
  */
 
 // --- 1. CARGA DE ESTILOS Y SCRIPTS ---
@@ -9,15 +9,12 @@ function ghd_enqueue_assets() {
     wp_enqueue_style('parent-style', get_template_directory_uri() . '/style.css');
     wp_enqueue_style('google-fonts', 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap', false);
     wp_enqueue_style('font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css', [], '6.4.2');
-    wp_enqueue_style('ghd-style', get_stylesheet_uri(), ['parent-style'], '3.0'); // Versión actualizada
-    wp_enqueue_script('ghd-app', get_stylesheet_directory_uri() . '/js/app.js', [], '3.0', true); // Versión actualizada
+    wp_enqueue_style('ghd-style', get_stylesheet_uri(), ['parent-style'], '3.2'); // Versión actualizada
+    wp_enqueue_script('ghd-app', get_stylesheet_directory_uri() . '/js/app.js', [], '3.2', true); // Versión actualizada
 
-    // Localizar scripts solo si estamos en el front-end y no en el admin de WP.
-    // Esto asegura que ghd_ajax esté siempre disponible.
-    if (!is_admin()) {
+    if (!is_admin()) { // Solo localizar scripts en el frontend
         wp_localize_script('ghd-app', 'ghd_ajax', ['ajax_url' => admin_url('admin-ajax.php'), 'nonce' => wp_create_nonce('ghd-ajax-nonce')]);
         
-        // --- Localizar datos de reportes si estamos en la página de reportes ---
         global $post;
         if (is_a($post, 'WP_Post') && is_page_template('template-reportes.php')) {
             wp_enqueue_script('chart-js', 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js', [], '4.4.1', true);
@@ -44,11 +41,8 @@ function ghd_get_mapa_roles_a_campos() {
         'rol_tapiceria' => 'estado_tapiceria', 
         'rol_embalaje' => 'estado_embalaje', 
         'rol_logistica' => 'estado_logistica',
-        // 'rol_administrativo' ya no está mapeado a un campo de estado específico para "Mis Tareas"
-        // ya que el admin principal se encarga del archivo final.
     ];
 }
-
 /**
  * Función para calcular los KPIs de un sector dado un campo de estado.
  * Reutilizable para la carga inicial y las respuestas AJAX.
@@ -444,16 +438,16 @@ function ghd_custom_login_redirect($redirect_to, $request, $user) {
         if (in_array('administrator', $user->roles)) {
             // Buscamos dinámicamente la URL de la página del panel de admin
             $admin_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-admin-dashboard.php']);
-            return !empty($admin_pages) ? get_permalink($admin_pages[0]) : home_url();
+            return !empty($admin_pages) ? get_permalink($admin_pages[0]) : home_url('/iniciar-sesion/'); // Fallback a página de inicio de sesión
         } else {
             // Para otros roles (incluyendo 'rol_administrativo' si existe pero sin panel dedicado), 
             // siempre se redirige al template-sector-dashboard.php.
             // Si el rol_administrativo no tiene un campo_estado mapeado, verá "No tienes tareas pendientes."
             $sector_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-sector-dashboard.php']);
-            return !empty($sector_pages) ? get_permalink($sector_pages[0]) : home_url();
+            return !empty($sector_pages) ? get_permalink($sector_pages[0]) : home_url('/iniciar-sesion/'); // Fallback a página de inicio de sesión
         }
     }
-    return $redirect_to;
+    return home_url('/iniciar-sesion/'); // Fallback si no hay roles o no se encuentra página
 }
 add_action('wp_login_failed', 'ghd_login_fail_redirect');
 function ghd_login_fail_redirect($username) {
@@ -463,10 +457,58 @@ function ghd_login_fail_redirect($username) {
         exit;
     }
 }
+
+// --- MODIFICADO: Ocultar Admin Bar en el Frontend para TODOS los usuarios ---
 add_action('after_setup_theme', 'ghd_hide_admin_bar');
 function ghd_hide_admin_bar() {
-    if (!current_user_can('manage_options')) {
+    // Si NO estamos en el área de administración de WordPress, ocultar la barra.
+    if (!is_admin()) {
         show_admin_bar(false);
+    }
+}
+
+// --- NUEVO: Redirigir wp-login.php y wp-admin a tu página de login personalizada ---
+add_action('init', 'ghd_redirect_wp_login_to_custom_page');
+function ghd_redirect_wp_login_to_custom_page() {
+    // Obtener la URL de tu página de login personalizada
+    $login_page_query = get_posts([
+        'post_type'  => 'page',
+        'fields'     => 'ids',
+        'nopaging'   => true,
+        'meta_key'   => '_wp_page_template',
+        'meta_value' => 'template-login.php' // Asumo que tu plantilla de login se llama template-login.php
+    ]);
+    $custom_login_url = !empty($login_page_query) ? get_permalink($login_page_query[0]) : wp_login_url(); // Fallback a login de WP si no se encuentra
+
+    // --- MODIFICADO: NO redirigir a administradores logueados que intentan acceder al /wp-admin ---
+    if (is_user_logged_in()) {
+        $user = wp_get_current_user();
+        // Si el usuario es un administrador, permitimos que acceda al /wp-admin
+        if (in_array('administrator', (array) $user->roles)) {
+            return; // No redirigir al administrador logueado
+        }
+        
+        // Para cualquier otro rol logueado que no sea administrador, redirigir a su dashboard
+        if (is_admin() && !defined('DOING_AJAX') && !defined('DOING_CRON')) {
+             $sector_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-sector-dashboard.php']);
+            if (!empty($sector_pages)) {
+                wp_redirect(get_permalink($sector_pages[0]));
+                exit();
+            }
+        }
+    }
+    
+    // Si el usuario NO está logueado e intenta acceder a wp-login.php o /wp-admin, redirigir a la página de login personalizada
+    // Asegurarse de no redirigir AJAX o CRON requests
+    if (!is_user_logged_in() && (!defined('DOING_AJAX') && !defined('DOING_CRON')) ) {
+        $current_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+        $wp_login_regex = '/wp-login\.php/i';
+        $wp_admin_regex = '/wp-admin/i';
+
+        if ( preg_match($wp_login_regex, $current_url) || preg_match($wp_admin_regex, $current_url) ) {
+            wp_redirect( $custom_login_url );
+            exit();
+        }
     }
 }
 

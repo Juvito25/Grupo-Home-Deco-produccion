@@ -64,6 +64,13 @@ a:hover {
     display: flex; 
     justify-content: space-between; 
     align-items: center; 
+
+     /* --- ESTILOS STICKY --- */
+    position: sticky; /* Hace que el header sea sticky */
+    top: 0; /* Lo fija en la parte superior */
+    z-index: 100; /* Asegura que se superponga sobre otros elementos al hacer scroll */
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); /* Sombra suave para darle profundidad */
+    /* --- FIN ESTILOS STICKY --- */
 }
 .header-logo-title { 
     display: flex; 
@@ -72,8 +79,8 @@ a:hover {
 }
 #mobile-menu-toggle { 
     display: none; /* Asegura que esté oculto por defecto en desktop */
-    /* Asegúrate de que no haya otras reglas que lo hagan display:block aquí */
 }
+
 .header-app-logo {
     height: 45px; /* Ajusta este valor para el tamaño deseado del logo */
     width: auto; /* Mantiene la proporción */
@@ -81,10 +88,16 @@ a:hover {
     margin-right: 15px; /* Espacio a la derecha del logo */
 }
 
+
 /* .header-logo { height: 40px; } */
 .header-title-group { display: flex; flex-direction: column; }
-.main-title { font-weight: 600; margin: 0; font-size: 1.1rem; color: var(--texto-principal); } /* Ajustar tamaño y color */
-.sub-title { font-size: 0.85rem; color: var(--texto-secundario); margin: 0; }
+.header-logo-title .main-title { 
+    font-weight: 600; 
+    margin: 0; 
+    font-size: 1.1rem; 
+    color: var(--texto-principal); 
+}
+.header-logo-title .sub-title { font-size: 0.85rem; color: var(--texto-secundario); margin: 0; }
 
 .header-user-profile { 
     display: flex; 
