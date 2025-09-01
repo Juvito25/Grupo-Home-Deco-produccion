@@ -238,7 +238,7 @@ function ghd_get_pedidos_en_produccion_data() {
                 <td>
                     <?php if ($color_producto) : ?>
                         <span class="color-swatch" style="background-color: <?php echo esc_attr($color_producto); ?>;"></span>
-                        <?php echo esc_html($color_producto); ?>
+                        <?php echo esc_html($color_producto); ?> <!-- ¡AQUÍ ESTÁ LA LÍNEA QUE FALTABA! -->
                     <?php else : ?>
                         N/A
                     <?php endif; ?>
