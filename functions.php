@@ -528,11 +528,24 @@ add_action('wp_ajax_ghd_admin_action', function() {
         if (get_field('estado_pedido', $id) !== 'Pendiente de Asignación') {
             wp_send_json_error(['message' => 'El pedido no está pendiente de asignación.']);
         }
+         // --- NUEVO: Obtener la prioridad seleccionada desde el frontend ---
+        $selected_priority = isset($_POST['priority']) ? sanitize_text_field($_POST['priority']) : '';
+        
+        // Opcional: Requerir que una prioridad válida sea seleccionada antes de iniciar
+        if (empty($selected_priority) || $selected_priority === 'Seleccionar Prioridad') {
+            wp_send_json_error(['message' => 'Por favor, selecciona una prioridad para el pedido antes de iniciar la producción.']);
+        }
+        // Actualizar la prioridad en el campo de ACF si es diferente o no estaba guardada
+        if (get_field('prioridad_pedido', $id) !== $selected_priority) {
+            update_field('prioridad_pedido', $selected_priority, $id);
+            wp_insert_post(['post_title' => 'Prioridad fijada a ' . $selected_priority . ' al iniciar producción.', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $id, '_nueva_prioridad' => $selected_priority]]);
+        }
+        // --- FIN NUEVO BLOQUE ---
 
         update_field('estado_carpinteria', 'Pendiente', $id);
         update_field('estado_corte', 'Pendiente', $id);
         update_field('estado_pedido', 'En Producción', $id);
-        update_post_meta($id, 'historial_produccion_iniciada_timestamp', current_time('U')); // <-- Guardamos el timestamp
+        update_post_meta($id, 'historial_produccion_iniciada_timestamp', current_time('U'));
 
         wp_insert_post([
             'post_title' => 'Producción Iniciada para ' . get_the_title($id),
@@ -1049,4 +1062,40 @@ function ghd_export_orders_csv_callback() {
     echo $csv_content;
 
     wp_die(); // Terminar la ejecución de WordPress
+}
+
+/**
+ * --- NUEVO: LÓGICA AJAX PARA ACTUALIZAR PRIORIDAD DE PEDIDO ---
+ * Permite al administrador actualizar la prioridad de un pedido directamente desde el selector.
+ */
+add_action('wp_ajax_ghd_update_priority', 'ghd_update_priority_callback');
+function ghd_update_priority_callback() {
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(['message' => 'No tienes permisos para actualizar la prioridad.']);
+    }
+
+    $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
+    $new_priority = isset($_POST['priority']) ? sanitize_text_field($_POST['priority']) : '';
+
+    if (!$order_id) {
+        wp_send_json_error(['message' => 'ID de pedido no válido.']);
+    }
+    if (empty($new_priority) || $new_priority === 'Seleccionar Prioridad') {
+        // Podrías decidir qué hacer aquí: guardar como vacío, o como "Baja" o requerir una opción.
+        // Por ahora, simplemente no guardar si es la opción de placeholder.
+        // Si necesitas que siempre guarde "Baja" si no se selecciona otra: update_field('prioridad_pedido', 'Baja', $order_id);
+        wp_send_json_success(['message' => 'Prioridad no seleccionada, no se ha guardado.']);
+    }
+
+    update_field('prioridad_pedido', $new_priority, $order_id);
+
+    wp_insert_post([
+        'post_title' => 'Prioridad actualizada para ' . get_the_title($order_id),
+        'post_type' => 'ghd_historial',
+        'meta_input' => ['_orden_produccion_id' => $order_id, '_prioridad_anterior' => get_field('prioridad_pedido', $order_id), '_nueva_prioridad' => $new_priority]
+    ]);
+    
+    wp_send_json_success(['message' => 'Prioridad actualizada con éxito a ' . $new_priority . '.']);
+    wp_die();
 }

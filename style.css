@@ -963,3 +963,16 @@ body.page-template-template-login {
 .product-main-info .color-swatch {
     margin-left: 0; /* Ya lo pusimos inline, pero por si acaso */
 }
+
+/* Estilos para botones deshabilitados */
+.ghd-btn[disabled] {
+    opacity: 0.6; /* Hace el botón más claro */
+    cursor: not-allowed; /* Muestra el cursor de "no permitido" */
+    box-shadow: none; /* Quita la sombra */
+    pointer-events: none; /* Evita que el botón reciba eventos de clic (fundamental!) */
+}
+/* Re-habilitar los eventos para los botones que están deshabilitados pero queremos que muestren un mensaje */
+/* Esto puede ser necesario si el alert() se muestra antes del `pointer-events: none;` */
+.ghd-btn.start-production-btn[disabled] {
+    pointer-events: auto; /* Permite clicks aunque esté deshabilitado, para mostrar el alert() */
+}

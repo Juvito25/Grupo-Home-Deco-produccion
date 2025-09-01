@@ -38,11 +38,12 @@ get_header();
         <!-- TABLA DE PEDIDOS PENDIENTES DE ASIGNACIÓN -->
         <div class="ghd-card ghd-table-wrapper">
             <table class="ghd-table">
-                <thead>
+                    <thead>
                     <tr>
                         <th>Código</th>
                         <th>Cliente</th>
                         <th>Producto</th>
+                        <th>Prioridad</th> <!-- NUEVA COLUMNA -->
                         <th>Acciones</th>
                     </tr>
                 </thead>
@@ -64,12 +65,24 @@ get_header();
                     if ($pedidos_asignacion_query->have_posts()) :
                         while ($pedidos_asignacion_query->have_posts()) : $pedidos_asignacion_query->the_post();
                     ?>
-                        <tr id="order-row-<?php echo get_the_ID(); ?>">
+                                            <tr id="order-row-<?php echo get_the_ID(); ?>">
                             <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
                             <td><?php echo esc_html(get_field('nombre_cliente')); ?></td>
                             <td><?php echo esc_html(get_field('nombre_producto')); ?></td>
                             <td>
-                                <button class="ghd-btn ghd-btn-primary start-production-btn" data-order-id="<?php echo get_the_ID(); ?>">
+                                <?php 
+                                $current_priority = get_field('prioridad_pedido', get_the_ID());
+                                $is_priority_set = !empty($current_priority) && $current_priority !== 'Seleccionar Prioridad';
+                                ?>
+                                <select class="ghd-priority-selector" data-order-id="<?php echo get_the_ID(); ?>">
+                                    <option value="Seleccionar Prioridad" <?php selected($current_priority, 'Seleccionar Prioridad'); ?> <?php if(empty($current_priority)) echo 'selected'; ?>>Seleccionar Prioridad</option>
+                                    <option value="Alta" <?php selected($current_priority, 'Alta'); ?>>Alta</option>
+                                    <option value="Media" <?php selected($current_priority, 'Media'); ?>>Media</option>
+                                    <option value="Baja" <?php selected($current_priority, 'Baja'); ?>>Baja</option>
+                                </select>
+                            </td>
+                            <td>
+                                <button class="ghd-btn ghd-btn-primary start-production-btn" data-order-id="<?php echo get_the_ID(); ?>" <?php if(!$is_priority_set) echo 'disabled'; ?>>
                                     Iniciar Producción
                                 </button>
                             </td>
