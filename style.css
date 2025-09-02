@@ -976,3 +976,60 @@ body.page-template-template-login {
 .ghd-btn.start-production-btn[disabled] {
     pointer-events: auto; /* Permite clicks aunque esté deshabilitado, para mostrar el alert() */
 }
+
+/* --- Estilos para el Selector de Prioridad (ghd-priority-selector) --- */
+.ghd-priority-selector {
+    /* Estilo base */
+    appearance: none; /* Oculta la flecha por defecto del navegador */
+    background-color: var(--color-fondo-claro);
+    border: 1px solid var(--color-borde);
+    border-radius: 6px;
+    padding: 8px 12px;
+    padding-right: 30px; /* Espacio extra para el icono de flecha personalizado */
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--texto-principal);
+    cursor: pointer;
+    outline: none; /* Quita el outline azul al enfocar */
+    transition: all 0.2s ease-in-out;
+    min-width: 150px; /* Asegura un ancho mínimo */
+    position: relative; /* Para posicionar el icono personalizado */
+    background-image: url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%2212%22%20viewBox%3D%220%200%2012%2012%22%3E%3Cpath%20fill%3D%22%236B7280%22%20d%3D%22M10.293%204.293L6%208.586%201.707%204.293A1%201%200%2000.293%205.707l5%205a1%201%200%20001.414%200l5-5a1%201%200%2000-1.414-1.414z%22%2F%3E%3C%2Fsvg%3E'); /* Icono SVG de flecha hacia abajo */
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 10px;
+}
+
+.ghd-priority-selector:hover {
+    border-color: var(--color-primario);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.ghd-priority-selector:focus {
+    border-color: var(--color-primario-hover);
+    box-shadow: 0 0 0 2px rgba(74, 124, 89, 0.2); /* Anillo de foco sutil */
+}
+
+/* Colores dinámicos según la prioridad seleccionada */
+.ghd-priority-selector.prioridad-alta {
+    background-color: #fef2f2; /* Fondo muy claro rojo */
+    border-color: #ef4444; /* Borde rojo */
+    color: #b91c1c; /* Texto rojo oscuro */
+}
+
+.ghd-priority-selector.prioridad-media {
+    background-color: #fffbeb; /* Fondo muy claro amarillo */
+    border-color: #f59e0b; /* Borde amarillo */
+    color: #92400e; /* Texto naranja oscuro */
+}
+
+.ghd-priority-selector.prioridad-baja {
+    background-color: #ecfdf5; /* Fondo muy claro verde */
+    border-color: #22c55e; /* Borde verde */
+    color: #047857; /* Texto verde oscuro */
+}
+
+/* Estilo para la opción "Seleccionar Prioridad" */
+.ghd-priority-selector option[value="Seleccionar Prioridad"] {
+    color: var(--texto-secundario);
+}

@@ -254,6 +254,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     const startProductionBtn = row.querySelector('.start-production-btn');
                     if (prioritySelector && startProductionBtn) {
                         startProductionBtn.disabled = (prioritySelector.value === 'Seleccionar Prioridad');
+                        // Aplicar clase de prioridad al cargar la página
+                        prioritySelector.classList.remove('prioridad-alta', 'prioridad-media', 'prioridad-baja');
+                        if (prioritySelector.value === 'Alta') {
+                            prioritySelector.classList.add('prioridad-alta');
+                        } else if (prioritySelector.value === 'Media') {
+                            prioritySelector.classList.add('prioridad-media');
+                        } else if (prioritySelector.value === 'Baja') {
+                            prioritySelector.classList.add('prioridad-baja');
+                        }
                     }
                 });
             };
@@ -267,6 +276,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (prioritySelector) {
                     const orderId = prioritySelector.dataset.orderId;
                     const selectedPriority = prioritySelector.value;
+                    // Limpiar clases de prioridad existentes
+                    prioritySelector.classList.remove('prioridad-alta', 'prioridad-media', 'prioridad-baja');
+
+                    // Añadir clase según la prioridad seleccionada
+                    if (selectedPriority === 'Alta') {
+                        prioritySelector.classList.add('prioridad-alta');
+                    } else if (selectedPriority === 'Media') {
+                        prioritySelector.classList.add('prioridad-media');
+                    } else if (selectedPriority === 'Baja') {
+                        prioritySelector.classList.add('prioridad-baja');
+                    }
                     const startProductionBtn = ordersTableBody.querySelector(`button.start-production-btn[data-order-id="${orderId}"]`);
 
                     // Lógica: Habilitar/deshabilitar el botón "Iniciar Producción"
