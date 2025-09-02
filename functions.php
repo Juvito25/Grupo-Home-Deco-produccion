@@ -1,6 +1,6 @@
 <?php
 /**
- * functions.php - Versión 3.2 - Acceso al Admin para Desarrolladores (Corregido)
+ * functions.php - Versión 3.3 - Corrección de Redirección de Login (Final)
  */
 
 // --- 1. CARGA DE ESTILOS Y SCRIPTS ---
@@ -9,8 +9,8 @@ function ghd_enqueue_assets() {
     wp_enqueue_style('parent-style', get_template_directory_uri() . '/style.css');
     wp_enqueue_style('google-fonts', 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap', false);
     wp_enqueue_style('font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css', [], '6.4.2');
-    wp_enqueue_style('ghd-style', get_stylesheet_uri(), ['parent-style'], '3.2'); // Versión actualizada
-    wp_enqueue_script('ghd-app', get_stylesheet_directory_uri() . '/js/app.js', [], '3.2', true); // Versión actualizada
+    wp_enqueue_style('ghd-style', get_stylesheet_uri(), ['parent-style'], '3.3'); // Versión actualizada
+    wp_enqueue_script('ghd-app', get_stylesheet_directory_uri() . '/js/app.js', [], '3.3', true); // Versión actualizada
 
     if (!is_admin()) { // Solo localizar scripts en el frontend
         wp_localize_script('ghd-app', 'ghd_ajax', ['ajax_url' => admin_url('admin-ajax.php'), 'nonce' => wp_create_nonce('ghd-ajax-nonce')]);
@@ -238,7 +238,7 @@ function ghd_get_pedidos_en_produccion_data() {
                 <td>
                     <?php if ($color_producto) : ?>
                         <span class="color-swatch" style="background-color: <?php echo esc_attr($color_producto); ?>;"></span>
-                        <?php echo esc_html($color_producto); ?> <!-- ¡AQUÍ ESTÁ LA LÍNEA QUE FALTABA! -->
+                        <?php echo esc_html($color_producto); ?>
                     <?php else : ?>
                         N/A
                     <?php endif; ?>
@@ -431,34 +431,68 @@ function ghd_get_reports_data() {
 }
 
 
-// --- 4. LÓGICA DE LOGIN/LOGOUT (AÑADIDA Y CORREGIDA) ---
+// --- 4. LÓGICA DE LOGIN/LOGOUT (CORREGIDA FINALMENTE) ---
+
+/**
+ * Redirige a los usuarios a sus paneles específicos DESPUÉS de un inicio de sesión exitoso.
+ * Los administradores de WP no son redirigidos por esta función si van a /wp-admin.
+ */
 add_filter('login_redirect', 'ghd_custom_login_redirect', 10, 3);
 function ghd_custom_login_redirect($redirect_to, $request, $user) {
-    if (isset($user->roles) && is_array($user->roles)) {
-        if (in_array('administrator', $user->roles)) {
-            // Buscamos dinámicamente la URL de la página del panel de admin
-            $admin_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-admin-dashboard.php']);
-            return !empty($admin_pages) ? get_permalink($admin_pages[0]) : home_url('/iniciar-sesion/'); // Fallback a página de inicio de sesión
+    // Si el usuario es un administrador de WP (y no va a /wp-admin), ir al dashboard admin
+    if (isset($user->roles) && is_array($user->roles) && in_array('administrator', (array) $user->roles)) {
+        // Redirigir al dashboard de admin principal
+        $admin_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-admin-dashboard.php']);
+        return !empty($admin_pages) ? get_permalink($admin_pages[0]) : admin_url(); // Fallback: /wp-admin para admin
+    } 
+    // Para cualquier otro rol logueado, redirigir a su dashboard de sector
+    elseif (isset($user->roles) && is_array($user->roles)) { // Confirma que tiene roles
+        $sector_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-sector-dashboard.php']);
+        $sector_dashboard_url = !empty($sector_pages) ? get_permalink($sector_pages[0]) : home_url(); // Fallback: home
+        
+        // Añadir el parámetro de sector si el usuario tiene un rol de sector
+        $user_roles = $user->roles;
+        $user_role = !empty($user_roles) ? $user_roles[0] : ''; // Tomar el primer rol
+        $mapa_roles = ghd_get_mapa_roles_a_campos();
+        if (array_key_exists($user_role, $mapa_roles)) {
+            $sector_name = ucfirst(str_replace(['rol_', '_'], ' ', $user_role));
+            $clean_sector_name = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $sector_name));
+            return add_query_arg('sector', urlencode($clean_sector_name), $sector_dashboard_url);
         } else {
-            // Para otros roles (incluyendo 'rol_administrativo' si existe pero sin panel dedicado), 
-            // siempre se redirige al template-sector-dashboard.php.
-            // Si el rol_administrativo no tiene un campo_estado mapeado, verá "No tienes tareas pendientes."
-            $sector_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-sector-dashboard.php']);
-            return !empty($sector_pages) ? get_permalink($sector_pages[0]) : home_url('/iniciar-sesion/'); // Fallback a página de inicio de sesión
+            return $sector_dashboard_url; // Si no es un rol de sector mapeado, va al dashboard base
         }
     }
-    return home_url('/iniciar-sesion/'); // Fallback si no hay roles o no se encuentra página
-}
-add_action('wp_login_failed', 'ghd_login_fail_redirect');
-function ghd_login_fail_redirect($username) {
-    $referrer = $_SERVER['HTTP_REFERER'];
-    if (!empty($referrer) && !strstr($referrer, 'wp-login') && !strstr($referrer, 'wp-admin')) {
-        wp_redirect(home_url('/iniciar-sesion/?login=failed'));
-        exit;
-    }
+    
+    return $redirect_to; // Por defecto, devolver la redirección de WordPress si no aplica nada
 }
 
-// --- MODIFICADO: Ocultar Admin Bar en el Frontend para TODOS los usuarios ---
+/**
+ * Redirige los inicios de sesión fallidos a la página de login personalizada con un parámetro de error.
+ */
+add_action('wp_login_failed', 'ghd_login_fail_redirect');
+function ghd_login_fail_redirect($username) {
+    // Obtener la URL de tu página de login personalizada de forma robusta
+    $login_page_query = get_posts([
+        'post_type'  => 'page',
+        'fields'     => 'ids',
+        'nopaging'   => true,
+        'meta_key'   => '_wp_page_template',
+        'meta_value' => 'template-login.php' // Asumo que tu plantilla de login se llama template-login.php
+    ]);
+    $custom_login_url = !empty($login_page_query) ? get_permalink($login_page_query[0]) : home_url('/iniciar-sesion/');
+    
+    // Si viene de una URL que no es wp-login ni wp-admin, redirigir al custom login con error
+    // Esto asegura que el mensaje de error se muestre en tu formulario personalizado
+    if (!empty($_SERVER['HTTP_REFERER']) && !strpos($_SERVER['HTTP_REFERER'], 'wp-login') && !strpos($_SERVER['HTTP_REFERER'], 'wp-admin')) {
+        wp_redirect($custom_login_url . '?login=failed');
+        exit();
+    }
+    // Si no hay referrer o ya viene de wp-login/wp-admin, el redirect_wp_login_to_custom_page se encargará.
+}
+
+/**
+ * Oculta la Admin Bar en el Frontend para TODOS los usuarios.
+ */
 add_action('after_setup_theme', 'ghd_hide_admin_bar');
 function ghd_hide_admin_bar() {
     // Si NO estamos en el área de administración de WordPress, ocultar la barra.
@@ -467,7 +501,11 @@ function ghd_hide_admin_bar() {
     }
 }
 
-// --- NUEVO: Redirigir wp-login.php y wp-admin a tu página de login personalizada ---
+/**
+ * Redirige los accesos a wp-login.php y /wp-admin a la página de login personalizada.
+ * Excepto para administradores logueados que acceden a /wp-admin.
+ * También permite el procesamiento de logout sin redirecciones conflictivas.
+ */
 add_action('init', 'ghd_redirect_wp_login_to_custom_page');
 function ghd_redirect_wp_login_to_custom_page() {
     // Obtener la URL de tu página de login personalizada
@@ -476,42 +514,59 @@ function ghd_redirect_wp_login_to_custom_page() {
         'fields'     => 'ids',
         'nopaging'   => true,
         'meta_key'   => '_wp_page_template',
-        'meta_value' => 'template-login.php' // Asumo que tu plantilla de login se llama template-login.php
+        'meta_value' => 'template-login.php'
     ]);
-    $custom_login_url = !empty($login_page_query) ? get_permalink($login_page_query[0]) : wp_login_url(); // Fallback a login de WP si no se encuentra
+    $custom_login_url = !empty($login_page_query) ? get_permalink($login_page_query[0]) : wp_login_url(); // Fallback
 
-    // --- MODIFICADO: NO redirigir a administradores logueados que intentan acceder al /wp-admin ---
+    $current_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+    $is_wp_login = strpos($current_url, 'wp-login.php') !== false;
+    $is_wp_admin = strpos($current_url, 'wp-admin') !== false;
+    $is_custom_login_page = strpos($current_url, untrailingslashit($custom_login_url)) !== false; 
+    
+    // --- CLAVE: Permitir la acción de logout sin interferencia de redirección ---
+    if (isset($_GET['action']) && $_GET['action'] === 'logout') {
+        return; // Permitir que WordPress procese el logout y luego el filtro 'logout_redirect' actúe
+    }
+
+    // Si el usuario ya está logueado:
     if (is_user_logged_in()) {
         $user = wp_get_current_user();
-        // Si el usuario es un administrador, permitimos que acceda al /wp-admin
+        // Si es un administrador, permitimos que acceda a /wp-admin
         if (in_array('administrator', (array) $user->roles)) {
-            return; // No redirigir al administrador logueado
+            return; // NO redirigir al administrador logueado
         }
         
-        // Para cualquier otro rol logueado que no sea administrador, redirigir a su dashboard
-        if (is_admin() && !defined('DOING_AJAX') && !defined('DOING_CRON')) {
-             $sector_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-sector-dashboard.php']);
-            if (!empty($sector_pages)) {
-                wp_redirect(get_permalink($sector_pages[0]));
+        // Para cualquier otro rol logueado (no-admin), si está intentando acceder a /wp-admin o wp-login.php,
+        // lo redirigimos a su dashboard de sector.
+        // Asegurarse de no redirigir AJAX o CRON requests
+        if (($is_wp_admin || $is_wp_login) && !defined('DOING_AJAX') && !defined('DOING_CRON')) { 
+            $sector_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-sector-dashboard.php']);
+            $sector_dashboard_url = !empty($sector_pages) ? get_permalink($sector_pages[0]) : home_url(); // Fallback: home
+            
+            $user_roles = $user->roles;
+            $user_role = !empty($user_roles) ? $user_roles[0] : '';
+            $mapa_roles = ghd_get_mapa_roles_a_campos();
+            if (array_key_exists($user_role, $mapa_roles)) {
+                $sector_name = ucfirst(str_replace(['rol_', '_'], ' ', $user_role));
+                $clean_sector_name = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $sector_name));
+                $final_redirect_url = add_query_arg('sector', urlencode($clean_sector_name), $sector_dashboard_url);
+                wp_redirect($final_redirect_url);
+                exit();
+            } else {
+                wp_redirect($sector_dashboard_url);
                 exit();
             }
         }
+        return; // Si está logueado y no está en wp-admin/wp-login, no hacer nada (ej. si está en una página del frontend).
     }
     
-    // Si el usuario NO está logueado e intenta acceder a wp-login.php o /wp-admin, redirigir a la página de login personalizada
+    // Si el usuario NO está logueado y está en wp-login.php o /wp-admin (y no es ya la página de login personalizada)
     // Asegurarse de no redirigir AJAX o CRON requests
-    if (!is_user_logged_in() && (!defined('DOING_AJAX') && !defined('DOING_CRON')) ) {
-        $current_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
-        $wp_login_regex = '/wp-login\.php/i';
-        $wp_admin_regex = '/wp-admin/i';
-
-        if ( preg_match($wp_login_regex, $current_url) || preg_match($wp_admin_regex, $current_url) ) {
-            wp_redirect( $custom_login_url );
-            exit();
-        }
+    if (!is_user_logged_in() && ($is_wp_login || $is_wp_admin) && !$is_custom_login_page && !defined('DOING_AJAX') && !defined('DOING_CRON') ) {
+        wp_redirect( $custom_login_url );
+        exit();
     }
 }
-
 
 // --- 5. LÓGICA AJAX ---
 add_action('wp_ajax_ghd_admin_action', function() {
@@ -941,161 +996,20 @@ function ghd_refresh_archived_orders_callback() {
 }
 
 /**
- * Registra la nueva plantilla de página para Configuración.
- *
- * @param array $templates Un array de plantillas de página.
- * @return array Un array modificado de plantillas de página.
+ * Redirige a la página de inicio de sesión personalizada después del logout.
  */
-add_filter( 'theme_page_templates', 'ghd_register_configuracion_template' );
-function ghd_register_configuracion_template( $templates ) {
-    $templates['template-configuracion.php'] = 'GHD - Configuración';
-    return $templates;
-}
-
-// --- Opcional: Registrar una página de opciones de ACF si quieres editar la razón social desde el admin ---
-if (function_exists('acf_add_options_page')) {
-    acf_add_options_page(array(
-        'page_title'    => 'Configuración del Tema GHD',
-        'menu_title'    => 'Configuración GHD',
-        'menu_slug'     => 'ghd-theme-settings',
-        'capability'    => 'manage_options',
-        'redirect'      => false
-    ));
-    acf_add_options_sub_page(array( // Si quieres sub-páginas
-        'page_title'    => 'Ajustes Generales',
-        'menu_title'    => 'Generales',
-        'parent_slug'   => 'ghd-theme-settings',
-    ));
-}
-
-/**
- * --- NUEVO: LÓGICA AJAX PARA EXPORTAR PEDIDOS A CSV ---
- * Genera un archivo CSV con los pedidos de un tipo específico.
- */
-add_action('wp_ajax_ghd_export_orders_csv', 'ghd_export_orders_csv_callback');
-function ghd_export_orders_csv_callback() {
-    check_ajax_referer('ghd-ajax-nonce', 'nonce');
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(['message' => 'No tienes permisos para exportar pedidos.']);
-    }
-
-    $export_type = isset($_POST['export_type']) ? sanitize_key($_POST['export_type']) : 'assignation'; // Por defecto, exportar asignación
-
-    $args = [];
-    $filename = '';
-    $headers = [];
-
-    // Definir la consulta y los encabezados según el tipo de exportación
-    switch ($export_type) {
-        case 'assignation':
-            $args = [
-                'post_type'      => 'orden_produccion',
-                'posts_per_page' => -1,
-                'meta_query'     => [
-                    [
-                        'key'     => 'estado_pedido',
-                        'value'   => 'Pendiente de Asignación',
-                        'compare' => '=',
-                    ],
-                ],
-            ];
-            $filename = 'pedidos_pendientes_asignacion_' . date('Y-m-d') . '.csv';
-            $headers = ['Código', 'Cliente', 'Producto', 'Estado', 'Prioridad', 'Fecha de Pedido'];
-            break;
-        // Puedes añadir más casos aquí para otros tipos de exportación (ej. 'production', 'closure', 'archived')
-        // case 'production':
-        //     $args = [ /* ... */ ];
-        //     $filename = 'pedidos_en_produccion_' . date('Y-m-d') . '.csv';
-        //     $headers = ['Código', 'Cliente', 'Producto', 'Material', 'Color', 'Observaciones', 'Estado General', 'Estado Carpinteria', /* ... otros estados ... */];
-        //     break;
-        // case 'archived':
-        //     $args = [ /* ... */ ];
-        //     $filename = 'pedidos_archivados_' . date('Y-m-d') . '.csv';
-        //     $headers = ['Código', 'Cliente', 'Producto', 'Fecha de Archivo', 'Estado'];
-        //     break;
-        default:
-            wp_send_json_error(['message' => 'Tipo de exportación no válido.']);
-    }
-
-    $pedidos_query = new WP_Query($args);
-
-    if (!$pedidos_query->have_posts()) {
-        wp_send_json_error(['message' => 'No hay pedidos para exportar en este momento.']);
-    }
-
-    // Preparar el contenido del CSV
-    $output = fopen('php://temp', 'r+'); // Abrir un flujo de memoria temporal
-    fputcsv($output, $headers); // Escribir los encabezados
-
-    while ($pedidos_query->have_posts()) : $pedidos_query->the_post();
-        $order_id = get_the_ID();
-        $row = [];
-
-        // Llenar la fila según el tipo de exportación
-        switch ($export_type) {
-            case 'assignation':
-                $row = [
-                    get_the_title($order_id),
-                    get_field('nombre_cliente', $order_id),
-                    get_field('nombre_producto', $order_id),
-                    get_field('estado_pedido', $order_id),
-                    get_field('prioridad_pedido', $order_id),
-                    get_the_date('Y-m-d', $order_id),
-                ];
-                break;
-            // Añadir lógica para otros tipos de exportación aquí
-        }
-        fputcsv($output, $row); // Escribir la fila
-    endwhile;
-    wp_reset_postdata();
-
-    rewind($output); // Rebobinar el puntero del archivo al principio
-    $csv_content = stream_get_contents($output); // Obtener todo el contenido
-    fclose($output); // Cerrar el flujo
-
-    // Enviar el CSV al navegador para descarga
-    header('Content-Type: text/csv; charset=' . get_option('blog_charset'));
-    header('Content-Disposition: attachment; filename="' . $filename . '"');
-    header('Pragma: no-cache');
-    header('Expires: 0');
-
-    echo $csv_content;
-
-    wp_die(); // Terminar la ejecución de WordPress
-}
-
-/**
- * --- NUEVO: LÓGICA AJAX PARA ACTUALIZAR PRIORIDAD DE PEDIDO ---
- * Permite al administrador actualizar la prioridad de un pedido directamente desde el selector.
- */
-add_action('wp_ajax_ghd_update_priority', 'ghd_update_priority_callback');
-function ghd_update_priority_callback() {
-    check_ajax_referer('ghd-ajax-nonce', 'nonce');
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(['message' => 'No tienes permisos para actualizar la prioridad.']);
-    }
-
-    $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
-    $new_priority = isset($_POST['priority']) ? sanitize_text_field($_POST['priority']) : '';
-
-    if (!$order_id) {
-        wp_send_json_error(['message' => 'ID de pedido no válido.']);
-    }
-    if (empty($new_priority) || $new_priority === 'Seleccionar Prioridad') {
-        // Podrías decidir qué hacer aquí: guardar como vacío, o como "Baja" o requerir una opción.
-        // Por ahora, simplemente no guardar si es la opción de placeholder.
-        // Si necesitas que siempre guarde "Baja" si no se selecciona otra: update_field('prioridad_pedido', 'Baja', $order_id);
-        wp_send_json_success(['message' => 'Prioridad no seleccionada, no se ha guardado.']);
-    }
-
-    update_field('prioridad_pedido', $new_priority, $order_id);
-
-    wp_insert_post([
-        'post_title' => 'Prioridad actualizada para ' . get_the_title($order_id),
-        'post_type' => 'ghd_historial',
-        'meta_input' => ['_orden_produccion_id' => $order_id, '_prioridad_anterior' => get_field('prioridad_pedido', $order_id), '_nueva_prioridad' => $new_priority]
+add_filter('logout_redirect', 'ghd_custom_logout_redirect', 10, 2);
+function ghd_custom_logout_redirect($logout_redirect, $requested_redirect_to) {
+    // Obtener la URL de tu página de login personalizada
+    $login_page_query = get_posts([
+        'post_type'  => 'page',
+        'fields'     => 'ids',
+        'nopaging'   => true,
+        'meta_key'   => '_wp_page_template',
+        'meta_value' => 'template-login.php' // Asumo que tu plantilla de login se llama template-login.php
     ]);
+    $custom_login_url = !empty($login_page_query) ? get_permalink($login_page_query[0]) : wp_login_url(); // Fallback
     
-    wp_send_json_success(['message' => 'Prioridad actualizada con éxito a ' . $new_priority . '.']);
-    wp_die();
+    // Siempre redirigir a la página de login personalizada
+    return $custom_login_url;
 }

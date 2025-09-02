@@ -126,8 +126,22 @@ function is_sidebar_link_active($template_name) {
                     <span>Configuración</span>
                 </a>
             </li>
+                        <?php
+            // Obtener la URL de tu página de login personalizada
+            $login_page_query = get_posts([
+                'post_type'  => 'page',
+                'fields'     => 'ids',
+                'nopaging'   => true,
+                'meta_key'   => '_wp_page_template',
+                'meta_value' => 'template-login.php' // Asumo que tu plantilla de login se llama template-login.php
+            ]);
+            $custom_login_url = !empty($login_page_query) ? get_permalink($login_page_query[0]) : wp_login_url(); // Fallback
+
+            // Generar la URL de logout con el redirect correcto
+            $logout_url = wp_logout_url( $custom_login_url );
+            ?>
             <li>
-                <a href="<?php echo wp_logout_url(home_url('/iniciar-sesion/')); ?>">
+                <a href="<?php echo esc_url($logout_url); ?>">
                     <i class="fa-solid fa-right-from-bracket"></i>
                     <span>Cerrar Sesión</span>
                 </a>

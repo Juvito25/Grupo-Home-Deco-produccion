@@ -78,12 +78,18 @@ function is_sector_link_active($template_name) {
                     <span style="font-size: 0.8em; margin-left: auto; color: #7f8c8d;"><?php echo esc_html($sector_name_for_sidebar); ?></span>
                 </a>
             </li>
+              <?php 
+              // La URL de logout siempre debe redirigir al login personalizado
+            // La función ghd_custom_logout_redirect en functions.php se encargará de esto.
+            // Aquí, simplemente generamos una URL de logout básica.
+            $logout_url = wp_logout_url(); // Genera la URL de logout con el nonce de seguridad
+            ?>
             <li>
-                <a href="<?php echo wp_logout_url(home_url('/iniciar-sesion/')); ?>">
+                <a href="<?php echo esc_url($logout_url); ?>">
                     <i class="fa-solid fa-right-from-bracket"></i>
                     <span>Cerrar Sesión</span>
                 </a>
-            </li>
+            </li>    
         </ul>
     </nav>
 </aside>
