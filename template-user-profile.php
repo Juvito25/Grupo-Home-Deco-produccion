@@ -44,7 +44,7 @@ $display_role = $mapa_roles_a_nombres_sector[$user_role] ?? 'Rol Desconocido';
 
     <main class="ghd-main-content">
         <header class="ghd-main-header">
-            <div class="header-title-wrapper">
+            <div class="header-title-wrapper header-with-back">
                 <button id="mobile-menu-toggle" class="ghd-btn-icon"><i class="fa-solid fa-bars"></i></button>
                 <h2>Perfil de Usuario: <?php echo esc_html($user_display_name); ?></h2>
                 

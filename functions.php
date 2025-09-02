@@ -431,40 +431,7 @@ function ghd_get_reports_data() {
 }
 
 
-// --- 4. LÓGICA DE LOGIN/LOGOUT (CORREGIDA FINALMENTE) ---
-
-/**
- * Redirige a los usuarios a sus paneles específicos DESPUÉS de un inicio de sesión exitoso.
- * Los administradores de WP no son redirigidos por esta función si van a /wp-admin.
- */
-add_filter('login_redirect', 'ghd_custom_login_redirect', 10, 3);
-function ghd_custom_login_redirect($redirect_to, $request, $user) {
-    // Si el usuario es un administrador de WP (y no va a /wp-admin), ir al dashboard admin
-    if (isset($user->roles) && is_array($user->roles) && in_array('administrator', (array) $user->roles)) {
-        // Redirigir al dashboard de admin principal
-        $admin_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-admin-dashboard.php']);
-        return !empty($admin_pages) ? get_permalink($admin_pages[0]) : admin_url(); // Fallback: /wp-admin para admin
-    } 
-    // Para cualquier otro rol logueado, redirigir a su dashboard de sector
-    elseif (isset($user->roles) && is_array($user->roles)) { // Confirma que tiene roles
-        $sector_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-sector-dashboard.php']);
-        $sector_dashboard_url = !empty($sector_pages) ? get_permalink($sector_pages[0]) : home_url(); // Fallback: home
-        
-        // Añadir el parámetro de sector si el usuario tiene un rol de sector
-        $user_roles = $user->roles;
-        $user_role = !empty($user_roles) ? $user_roles[0] : ''; // Tomar el primer rol
-        $mapa_roles = ghd_get_mapa_roles_a_campos();
-        if (array_key_exists($user_role, $mapa_roles)) {
-            $sector_name = ucfirst(str_replace(['rol_', '_'], ' ', $user_role));
-            $clean_sector_name = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $sector_name));
-            return add_query_arg('sector', urlencode($clean_sector_name), $sector_dashboard_url);
-        } else {
-            return $sector_dashboard_url; // Si no es un rol de sector mapeado, va al dashboard base
-        }
-    }
-    
-    return $redirect_to; // Por defecto, devolver la redirección de WordPress si no aplica nada
-}
+// --- 4. LÓGICA DE LOGIN/LOGOUT (REVISADA FINALMENTE) ---
 
 /**
  * Redirige los inicios de sesión fallidos a la página de login personalizada con un parámetro de error.
@@ -477,17 +444,16 @@ function ghd_login_fail_redirect($username) {
         'fields'     => 'ids',
         'nopaging'   => true,
         'meta_key'   => '_wp_page_template',
-        'meta_value' => 'template-login.php' // Asumo que tu plantilla de login se llama template-login.php
+        'meta_value' => 'template-login.php'
     ]);
     $custom_login_url = !empty($login_page_query) ? get_permalink($login_page_query[0]) : home_url('/iniciar-sesion/');
     
-    // Si viene de una URL que no es wp-login ni wp-admin, redirigir al custom login con error
-    // Esto asegura que el mensaje de error se muestre en tu formulario personalizado
-    if (!empty($_SERVER['HTTP_REFERER']) && !strpos($_SERVER['HTTP_REFERER'], 'wp-login') && !strpos($_SERVER['HTTP_REFERER'], 'wp-admin')) {
-        wp_redirect($custom_login_url . '?login=failed');
+    // Si la solicitud no es AJAX/CRON y el referrer no es ya una página de login de WP
+    if (!defined('DOING_AJAX') && !defined('DOING_CRON') && !empty($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'wp-login.php') === false && strpos($_SERVER['HTTP_REFERER'], 'wp-admin') === false ) {
+        wp_redirect($custom_login_url . '?login=failed'); // Redirigir con parámetro de error
         exit();
     }
-    // Si no hay referrer o ya viene de wp-login/wp-admin, el redirect_wp_login_to_custom_page se encargará.
+    // Si viene de una página de login de WP, la función ghd_redirect_wp_login_to_custom_page se encargará.
 }
 
 /**
@@ -495,7 +461,6 @@ function ghd_login_fail_redirect($username) {
  */
 add_action('after_setup_theme', 'ghd_hide_admin_bar');
 function ghd_hide_admin_bar() {
-    // Si NO estamos en el área de administración de WordPress, ocultar la barra.
     if (!is_admin()) {
         show_admin_bar(false);
     }
@@ -503,12 +468,16 @@ function ghd_hide_admin_bar() {
 
 /**
  * Redirige los accesos a wp-login.php y /wp-admin a la página de login personalizada.
- * Excepto para administradores logueados que acceden a /wp-admin.
- * También permite el procesamiento de logout sin redirecciones conflictivas.
+ * Excepto para administradores logueados.
+ * Permite que el procesamiento de logout se complete.
  */
 add_action('init', 'ghd_redirect_wp_login_to_custom_page');
 function ghd_redirect_wp_login_to_custom_page() {
-    // Obtener la URL de tu página de login personalizada
+    // No redirigir si es una petición AJAX o CRON, o si se está procesando un logout.
+    if (defined('DOING_AJAX') || defined('DOING_CRON') || (isset($_GET['action']) && $_GET['action'] === 'logout')) {
+        return;
+    }
+
     $login_page_query = get_posts([
         'post_type'  => 'page',
         'fields'     => 'ids',
@@ -516,58 +485,58 @@ function ghd_redirect_wp_login_to_custom_page() {
         'meta_key'   => '_wp_page_template',
         'meta_value' => 'template-login.php'
     ]);
-    $custom_login_url = !empty($login_page_query) ? get_permalink($login_page_query[0]) : wp_login_url(); // Fallback
+    $custom_login_url = !empty($login_page_query) ? get_permalink($login_page_query[0]) : wp_login_url();
 
     $current_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
     $is_wp_login = strpos($current_url, 'wp-login.php') !== false;
     $is_wp_admin = strpos($current_url, 'wp-admin') !== false;
-    $is_custom_login_page = strpos($current_url, untrailingslashit($custom_login_url)) !== false; 
-    
-    // --- CLAVE: Permitir la acción de logout sin interferencia de redirección ---
-    if (isset($_GET['action']) && $_GET['action'] === 'logout') {
-        return; // Permitir que WordPress procese el logout y luego el filtro 'logout_redirect' actúe
-    }
+    $is_custom_login_page = strpos($current_url, untrailingslashit($custom_login_url)) !== false;
 
     // Si el usuario ya está logueado:
     if (is_user_logged_in()) {
         $user = wp_get_current_user();
         // Si es un administrador, permitimos que acceda a /wp-admin
         if (in_array('administrator', (array) $user->roles)) {
-            return; // NO redirigir al administrador logueado
+            return; // No redirigir al administrador logueado
         }
         
-        // Para cualquier otro rol logueado (no-admin), si está intentando acceder a /wp-admin o wp-login.php,
-        // lo redirigimos a su dashboard de sector.
-        // Asegurarse de no redirigir AJAX o CRON requests
-        if (($is_wp_admin || $is_wp_login) && !defined('DOING_AJAX') && !defined('DOING_CRON')) { 
+        // Para cualquier otro rol logueado (no-admin), si está en /wp-admin o wp-login.php, redirigir a su dashboard de sector.
+        if ($is_wp_admin || $is_wp_login) {
             $sector_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-sector-dashboard.php']);
-            $sector_dashboard_url = !empty($sector_pages) ? get_permalink($sector_pages[0]) : home_url(); // Fallback: home
+            $sector_dashboard_url = !empty($sector_pages) ? get_permalink($sector_pages[0]) : home_url();
             
             $user_roles = $user->roles;
             $user_role = !empty($user_roles) ? $user_roles[0] : '';
             $mapa_roles = ghd_get_mapa_roles_a_campos();
             if (array_key_exists($user_role, $mapa_roles)) {
-                $sector_name = ucfirst(str_replace(['rol_', '_'], ' ', $user_role));
-                $clean_sector_name = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $sector_name));
-                $final_redirect_url = add_query_arg('sector', urlencode($clean_sector_name), $sector_dashboard_url);
-                wp_redirect($final_redirect_url);
+                // Ya no añadimos el parámetro ?sector aquí. La plantilla del sector debe detectarlo por el rol.
+                wp_redirect($sector_dashboard_url); 
                 exit();
             } else {
                 wp_redirect($sector_dashboard_url);
                 exit();
             }
+            // if (array_key_exists($user_role, $mapa_roles)) {
+            //     $sector_name = ucfirst(str_replace(['rol_', '_'], ' ', $user_role));
+            //     $clean_sector_name = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $sector_name));
+            //     $final_redirect_url = add_query_arg('sector', urlencode($clean_sector_name), $sector_dashboard_url);
+            //     wp_redirect($final_redirect_url);
+            //     exit();
+            // } else {
+            //     wp_redirect($sector_dashboard_url);
+            //     exit();
+            // }
         }
-        return; // Si está logueado y no está en wp-admin/wp-login, no hacer nada (ej. si está en una página del frontend).
+        return; // Si está logueado y no está en /wp-admin/wp-login, no hacer nada.
     }
     
     // Si el usuario NO está logueado y está en wp-login.php o /wp-admin (y no es ya la página de login personalizada)
-    // Asegurarse de no redirigir AJAX o CRON requests
-    if (!is_user_logged_in() && ($is_wp_login || $is_wp_admin) && !$is_custom_login_page && !defined('DOING_AJAX') && !defined('DOING_CRON') ) {
+    if (!is_user_logged_in() && ($is_wp_login || $is_wp_admin) && !$is_custom_login_page) {
         wp_redirect( $custom_login_url );
         exit();
     }
 }
-
+//////////////////////// FIN DEL LOGIN / LOGOUT //////////////////////////////////////
 // --- 5. LÓGICA AJAX ---
 add_action('wp_ajax_ghd_admin_action', function() {
     check_ajax_referer('ghd-ajax-nonce', 'nonce'); 

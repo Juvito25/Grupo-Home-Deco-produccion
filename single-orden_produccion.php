@@ -17,35 +17,40 @@ get_header(); ?>
 
     <main class="ghd-main-content">
         <header class="ghd-main-header">
-            <div class="header-title-wrapper">
+            <div class="header-title-wrapper header-with-back">
                 <button id="mobile-menu-toggle" class="ghd-btn-icon"><i class="fa-solid fa-bars"></i></button>
                 <h2>Detalles del Pedido: <?php the_title(); ?></h2>
                 
                 <?php
                 // Botón "Volver" inteligente
                 $referer_url = wp_get_referer();
-                // Si viene de un panel conocido, intentar volver a él
-                if (strpos($referer_url, 'template-admin-dashboard.php') !== false || strpos($referer_url, 'template-sector-dashboard.php') !== false || strpos($referer_url, 'template-pedidos-archivados.php') !== false) { // Añadido para pedidos archivados
+                $back_url = home_url(); // Fallback por defecto a la home
+                
+                // Si hay un referer válido de un panel conocido, intentar volver a él
+                if ($referer_url && (strpos($referer_url, 'template-admin-dashboard.php') !== false || strpos($referer_url, 'template-sector-dashboard.php') !== false || strpos($referer_url, 'template-pedidos-archivados.php') !== false || strpos($referer_url, 'template-user-profile.php') !== false)) {
                     $back_url = $referer_url;
                 } else {
-                    // Fallback si no se detecta el referer o es desconocido
+                    // Si no se detecta un referer válido o es desconocido, redirigir al dashboard principal del usuario
                     if (current_user_can('manage_options')) {
-                        // Admin, volver al panel de admin
+                        // Admin: volver al panel de admin
                         $admin_dashboard_page = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-admin-dashboard.php']);
                         $back_url = !empty($admin_dashboard_page) ? get_permalink($admin_dashboard_page[0]) : home_url();
                     } else {
-                        // Usuario de sector, volver a su panel de sector
+                        // Usuario de sector: volver a su panel de sector
                         $sector_dashboard_page = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-sector-dashboard.php']);
-                        $back_url = !empty($sector_dashboard_page) ? get_permalink($sector_dashboard_page[0]) : home_url();
+                        $sector_dashboard_base_url = !empty($sector_dashboard_page) ? get_permalink($sector_dashboard_page[0]) : home_url();
                         
-                        // Añadir el parámetro de sector si es un usuario de sector y viene del sidebar
                         $current_user_roles = wp_get_current_user()->roles;
                         $current_user_role = !empty($current_user_roles) ? $current_user_roles[0] : '';
                         $mapa_roles = ghd_get_mapa_roles_a_campos(); 
+                        
+                        // Si el rol del usuario es un rol de sector mapeado, construir la URL con el parámetro 'sector'
                         if (array_key_exists($current_user_role, $mapa_roles)) {
-                            $sector_name = ucfirst(str_replace(['rol_', '_'], ' ', $current_user_role));
-                            $clean_sector_name = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $clean_sector_name));
-                            $back_url = add_query_arg('sector', urlencode($clean_sector_name), $back_url);
+                            $sector_display_name = ucfirst(str_replace(['rol_', '_'], ' ', $current_user_role));
+                            $clean_sector_name_param = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $sector_display_name));
+                            $back_url = add_query_arg('sector', urlencode($clean_sector_name_param), $sector_dashboard_base_url);
+                        } else {
+                            $back_url = $sector_dashboard_base_url; // Si no es un rol de sector, ir al dashboard base
                         }
                     }
                 }

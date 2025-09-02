@@ -17,17 +17,22 @@ if (current_user_can('manage_options') && isset($_GET['sector'])) {
     $clean_sector_name = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $sector_name));
     $campo_estado = 'estado_' . $clean_sector_name;
 } 
-// Caso 2: Trabajador de producción viendo su propio panel
+// Caso 2: Trabajador de producción viendo su propio panel (sin el parámetro ?sector en la URL)
 elseif (!current_user_can('manage_options')) {
     $mapa_roles = ghd_get_mapa_roles_a_campos();
-    $campo_estado = $mapa_roles[$user_role] ?? '';
-    // Si el rol es 'rol_administrativo' y no es admin viendo, no tendrá un campo_estado para tareas activas aquí.
+    $user_roles = $current_user->roles;
+    $user_role = !empty($user_roles) ? $user_roles[0] : ''; // Obtener el rol del usuario logueado
+
+    $campo_estado = $mapa_roles[$user_role] ?? ''; // Mapear el rol a su campo_estado
+    
+    // Determinar el nombre del sector para el título H2
     if ($user_role === 'rol_administrativo') {
-        $sector_name = 'Cierre de Pedidos'; // Nombre para el panel del antiguo rol_administrativo
+        $sector_name = 'Cierre de Pedidos'; // Para el rol administrativo si por alguna razón accediera aquí
     } else {
         $sector_name = ucfirst(str_replace(['rol_', '_'], ' ', $user_role));
     }
-} 
+    // No necesitamos clean_sector_name aquí, ya que no se usa para parámetros de URL.
+}
 // Caso 3: Admin sin especificar sector (redirigir, aunque el login_redirect ya lo debería manejar)
 else {
     wp_redirect(home_url('/panel-de-control/'));

@@ -207,6 +207,9 @@ a:hover {
     margin-bottom: .5%;
     /* width: 100%; */
 }
+.header-with-back{
+    width: 100%;
+}
 .header-title-wrapper h2 {
     margin: 0;
 }
@@ -551,7 +554,7 @@ a:hover {
 }
 .login-form-box .login-title { margin: 0 0 0.5rem; font-size: 1.5rem; }
 .login-form-box .login-subtitle { margin: 0 0 1.5rem; color: var(--texto-secundario); }
-.login-form-box .login-error { background-color: #fff5f5; color: #c53030; border: 1px solid #fc8181; padding: 1rem; border-radius: 6px; }
+.login-form-box .login-error { background-color: #fff5f5; color: #c53030; border: 1px solid #fc8181; padding: 1rem; border-radius: 6px; margin: 1%;}
 .login-error, .login-error strong {
     color: var(--color-rojo)
 }

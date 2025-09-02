@@ -4,25 +4,51 @@
  * Descripción: Página de inicio de sesión personalizada.
  */
 
-// --- LÓGICA DE PROCESAMIENTO DEL FORMULARIO DE LOGIN (INICIO) ---
+// Si el usuario ya está logueado, redirigirlo a su dashboard
+if (is_user_logged_in()) {
+    $user = wp_get_current_user();
+    if (in_array('administrator', (array) $user->roles)) {
+        $admin_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-admin-dashboard.php']);
+        $redirect_url = !empty($admin_pages) ? get_permalink($admin_pages[0]) : admin_url();
+    } else {
+        $sector_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-sector-dashboard.php']);
+        $sector_dashboard_url = !empty($sector_pages) ? get_permalink($sector_pages[0]) : home_url();
+        
+        $user_roles = $user->roles;
+        $user_role = !empty($user_roles) ? $user_roles[0] : '';
+        $mapa_roles = ghd_get_mapa_roles_a_campos(); // Esta función debe estar definida en functions.php
+        if (array_key_exists($user_role, $mapa_roles)) {
+            $sector_name = ucfirst(str_replace(['rol_', '_'], ' ', $user_role));
+            $clean_sector_name = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $sector_name));
+            // Ya no añadimos el parámetro ?sector aquí, el template-sector-dashboard lo determinará.
+            $redirect_url = $sector_dashboard_url; 
+        } else {
+            $redirect_url = $sector_dashboard_url;
+        }
+    }
+    wp_redirect( $redirect_url );
+    exit;
+}
+
+// --- LÓGICA DE PROCESAMIENTO DEL FORMULARIO DE LOGIN (SI NO ESTÁ LOGUEADO) ---
+$login_error_message = '';
 if ( 'POST' === $_SERVER['REQUEST_METHOD'] ) {
     $creds = array();
-    $creds['user_login'] = sanitize_user( $_POST['log'] ); // Asumo que el campo de usuario/email se llama 'log'
-    $creds['user_password'] = $_POST['pwd']; // Asumo que el campo de contraseña se llama 'pwd'
-    $creds['remember'] = isset( $_POST['rememberme'] ); // Asumo que el checkbox se llama 'rememberme'
+    $creds['user_login'] = sanitize_user( $_POST['log'] );
+    $creds['user_password'] = $_POST['pwd'];
+    $creds['remember'] = isset( $_POST['rememberme'] );
 
-    $user = wp_signon( $creds, false ); // 'false' para no usar el redirect de WordPress por defecto
+    // Eliminar la redirección automática de wp_signon si ocurre, para control manual
+    add_filter( 'login_redirect', '__return_false' ); 
+    $user = wp_signon( $creds, false ); 
+    remove_filter( 'login_redirect', '__return_false' );
 
     if ( is_wp_error( $user ) ) {
         // Autenticación fallida
-        $error_message = $user->get_error_message();
-        // Redirigir de nuevo a la página de login con el error
-        wp_redirect( home_url('/iniciar-sesion/?login=failed&message=' . urlencode($error_message)) );
-        exit;
+        $login_error_message = $user->get_error_message();
     } else {
         // Autenticación exitosa
         // Redirigir al usuario a su dashboard según su rol
-
         if ( in_array('administrator', (array) $user->roles) ) {
             $admin_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-admin-dashboard.php']);
             $redirect_url = !empty($admin_pages) ? get_permalink($admin_pages[0]) : admin_url();
@@ -30,29 +56,27 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] ) {
             $sector_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-sector-dashboard.php']);
             $sector_dashboard_url = !empty($sector_pages) ? get_permalink($sector_pages[0]) : home_url();
             
-            // Añadir el parámetro de sector
             $user_roles = $user->roles;
             $user_role = !empty($user_roles) ? $user_roles[0] : '';
-            $mapa_roles = ghd_get_mapa_roles_a_campos(); // Esta función debe estar definida en functions.php
+            $mapa_roles = ghd_get_mapa_roles_a_campos();
             if (array_key_exists($user_role, $mapa_roles)) {
-                $sector_name = ucfirst(str_replace(['rol_', '_'], ' ', $user_role));
-                $clean_sector_name = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $sector_name));
-                $redirect_url = add_query_arg('sector', urlencode($clean_sector_name), $sector_dashboard_url);
+                // Ya no añadimos el parámetro ?sector aquí, el template-sector-dashboard lo determinará.
+                $redirect_url = $sector_dashboard_url; 
             } else {
-                $redirect_url = $sector_dashboard_url; // Fallback si no es un rol de sector mapeado
+                $redirect_url = $sector_dashboard_url;
             }
         }
-        
         wp_redirect( $redirect_url );
         exit;
     }
 }
-// --- LÓGICA DE PROCESAMIENTO DEL FORMULARIO DE LOGIN (FIN) ---
 
-// El resto de tu template-login.php (get_header(), HTML del formulario, etc.) va aquí abajo.
-// Asegúrate de que el formulario POST a la URL de esta página.
+// Mensaje de error si viene de una redirección con ?login=failed o del POST fallido
+if (empty($login_error_message) && isset($_GET['login']) && $_GET['login'] === 'failed') {
+    $login_error_message = isset($_GET['message']) ? sanitize_text_field(urldecode($_GET['message'])) : 'Usuario o contraseña incorrectos.';
+}
+
 ?>
-
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
 <head>
@@ -71,30 +95,28 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] ) {
                     <p class="login-subtitle">Inicia sesión para acceder a tu panel</p>
 
                     <?php 
-                    // Mostrar mensaje de error si el login falló
-                    if (isset($_GET['login']) && $_GET['login'] === 'failed') {
-                        $msg = isset($_GET['message']) ? sanitize_text_field(urldecode($_GET['message'])) : 'Usuario o contraseña incorrectos.';
-                        echo '<div class="login-error"><strong>Error:</strong> ' . esc_html($msg) . '</div>';
+                    if (!empty($login_error_message)) {
+                        echo '<div class="login-error"><strong>Error:</strong> ' . esc_html($login_error_message) . '</div>';
                     }
                     ?>
 
                     <form name="loginform" id="loginform" action="<?php echo esc_url( home_url('/iniciar-sesion/') ); ?>" method="post">
                         <p>
                             <label for="user_login">Correo Electrónico</label>
-                            <input type="text" name="log" id="user_login" class="input" value="" size="20" autocomplete="username" required>
+                            <input type="text" name="log" id="user_login" class="input" value="<?php echo ( isset( $_POST['log'] ) ? esc_attr( wp_unslash( $_POST['log'] ) ) : '' ); ?>" size="20" autocomplete="username" required>
                         </p>
                         <p>
                             <label for="user_pass">Contraseña</label>
                             <input type="password" name="pwd" id="user_pass" class="input" value="" size="20" autocomplete="current-password" required>
                         </p>
                         <p class="login-remember">
-                            <input name="rememberme" type="checkbox" id="rememberme" value="forever">
+                            <input name="rememberme" type="checkbox" id="rememberme" value="forever" <?php echo ( isset( $_POST['rememberme'] ) ? 'checked="checked"' : '' ); ?>>
                             <label for="rememberme">Recordarme</label>
                         </p>
                         <p class="login-submit">
                             <input type="submit" name="wp-submit" id="wp-submit" class="button button-primary" value="Iniciar Sesión">
                         </p>
-                        <?php wp_nonce_field( 'log-in' ); // Nonce para seguridad si tu formulario lo necesita ?>
+                        <?php // wp_nonce_field( 'log-in' ); // Nonce ya no es estrictamente necesario si wp_signon maneja la seguridad ?>
                         <input type="hidden" name="redirect_to" value="<?php echo esc_url( home_url('/') ); ?>">
                     </form>
                 </div>
