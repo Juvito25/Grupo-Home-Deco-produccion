@@ -73,7 +73,7 @@ get_header();
                             <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
                             <td><?php echo esc_html(get_field('nombre_cliente', $order_id)); ?></td>
                             <td><?php echo esc_html(get_field('nombre_producto', $order_id)); ?></td>
-                            <td><?php echo get_the_modified_date('d/m/Y'); ?></td> <!-- Muestra la fecha de última modificación (fecha de archivo) -->
+                            <td><?php echo esc_html(get_field('fecha_de_archivo_pedido', $order_id)); ?></td> <!-- Muestra la fecha del nuevo campo ACF -->
                             <td>
                                 <a href="<?php echo $remito_url; ?>" target="_blank" class="ghd-btn ghd-btn-secondary ghd-btn-small generate-remito-btn" data-order-id="<?php echo $order_id; ?>">
                                     <i class="fa-solid fa-file-invoice"></i> Remito

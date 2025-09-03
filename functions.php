@@ -698,9 +698,14 @@ function ghd_archive_order_callback() {
     }
 
     // Actualizar los campos a archivado
-    update_field('estado_administrativo', 'Archivado', $order_id); // Seguimos usando este campo para el estado final
+    update_field('estado_administrativo', 'Archivado', $order_id);
     update_field('estado_pedido', 'Completado y Archivado', $order_id);
-    wp_insert_post([ 'post_title' => 'Pedido Cerrado y Archivado', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id] ]);
+    update_field('fecha_de_archivo_pedido', current_time('mysql'), $order_id); // <-- NUEVO: Guardar fecha y hora exactas
+    wp_insert_post([ 
+        'post_title' => 'Pedido Cerrado y Archivado', 
+        'post_type' => 'ghd_historial', 
+        'meta_input' => ['_orden_produccion_id' => $order_id, '_fecha_archivo' => current_time('mysql')] 
+    ]);
 
     // --- RECALCULAR Y DEVOLVER KPIs para el panel del Admin principal ---
     // Pedidos pendientes de cierre para el Admin (nuevo estado)
