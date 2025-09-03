@@ -240,21 +240,21 @@ document.addEventListener('DOMContentLoaded', function() {
     } // Fin del if(mainContent)
 
         // --- LÓGICA PARA ASIGNAR PRIORIDAD EN EL PANEL DE ASIGNACIÓN ---
-        // --- LÓGICA PARA ASIGNAR PRIORIDAD EN EL PANEL DE ASIGNACIÓN ---
     const assignationPanel = document.querySelector('.page-template-template-admin-dashboard');
 
     if (assignationPanel) { // Solo si estamos en el panel de asignación del administrador
         const ordersTableBody = document.getElementById('ghd-orders-table-body');
 
         if (ordersTableBody) {
-            // --- NUEVO: Función para inicializar el estado del botón al cargar la página ---
+            // Función para inicializar el estado del botón al cargar la página
             const initializePriorityButtons = () => {
                 ordersTableBody.querySelectorAll('tr').forEach(row => {
                     const prioritySelector = row.querySelector('.ghd-priority-selector');
                     const startProductionBtn = row.querySelector('.start-production-btn');
                     if (prioritySelector && startProductionBtn) {
                         startProductionBtn.disabled = (prioritySelector.value === 'Seleccionar Prioridad');
-                        // Aplicar clase de prioridad al cargar la página
+
+                        // Aplicar clase de prioridad al cargar la página para los estilos visuales
                         prioritySelector.classList.remove('prioridad-alta', 'prioridad-media', 'prioridad-baja');
                         if (prioritySelector.value === 'Alta') {
                             prioritySelector.classList.add('prioridad-alta');
@@ -276,17 +276,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (prioritySelector) {
                     const orderId = prioritySelector.dataset.orderId;
                     const selectedPriority = prioritySelector.value;
-                    // Limpiar clases de prioridad existentes
-                    prioritySelector.classList.remove('prioridad-alta', 'prioridad-media', 'prioridad-baja');
-
-                    // Añadir clase según la prioridad seleccionada
-                    if (selectedPriority === 'Alta') {
-                        prioritySelector.classList.add('prioridad-alta');
-                    } else if (selectedPriority === 'Media') {
-                        prioritySelector.classList.add('prioridad-media');
-                    } else if (selectedPriority === 'Baja') {
-                        prioritySelector.classList.add('prioridad-baja');
-                    }
                     const startProductionBtn = ordersTableBody.querySelector(`button.start-production-btn[data-order-id="${orderId}"]`);
 
                     // Lógica: Habilitar/deshabilitar el botón "Iniciar Producción"
@@ -294,10 +283,21 @@ document.addEventListener('DOMContentLoaded', function() {
                         startProductionBtn.disabled = (selectedPriority === 'Seleccionar Prioridad');
                     }
 
+                    // Aplicar clase de prioridad al selector para los estilos visuales
+                    prioritySelector.classList.remove('prioridad-alta', 'prioridad-media', 'prioridad-baja');
+                    if (selectedPriority === 'Alta') {
+                        prioritySelector.classList.add('prioridad-alta');
+                    } else if (selectedPriority === 'Media') {
+                        prioritySelector.classList.add('prioridad-media');
+                    } else if (selectedPriority === 'Baja') {
+                        prioritySelector.classList.add('prioridad-baja');
+                    }
+
                     // Enviar la prioridad al backend vía AJAX para guardarla
+                    // Usamos ghd_ajax.ajax_url y ghd_ajax.nonce que se localizan en functions.php
                     const params = new URLSearchParams({
                         action: 'ghd_update_priority', // Endpoint AJAX
-                        nonce: ghd_ajax.nonce,
+                        nonce: ghd_ajax.nonce, // Tomar el nonce del objeto global
                         order_id: orderId,
                         priority: selectedPriority
                     });
@@ -318,10 +318,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         });
                 }
             });
-
-            // NOTA: El manejador del botón "Iniciar Producción" para enviar la prioridad
-            // ya está en el mainContent.addEventListener('click') y leerá el valor del selector.
-            // La validación del `disabled` ahora se hace directamente en ese manejador también.
         }
     }
     //// // // //// // // //// // // /// // // / Fin del if(assignationPanel)//// // // //// // // //// // // ///// // // //// // // //// // // /

@@ -1,6 +1,6 @@
 <?php
 /**
- * functions.php - Versión 3.3 - Corrección de Redirección de Login (Final)
+ * functions.php - Versión 3.3 
  */
 
 // --- 1. CARGA DE ESTILOS Y SCRIPTS ---
@@ -582,6 +582,49 @@ add_action('wp_ajax_ghd_admin_action', function() {
     
     wp_send_json_error(['message' => 'Acción no reconocida.']);
 });
+
+/**
+ * --- NUEVO: LÓGICA AJAX PARA ACTUALIZAR PRIORIDAD DE PEDIDO ---
+ * Permite al administrador actualizar la prioridad de un pedido directamente desde el selector.
+ */
+add_action('wp_ajax_ghd_update_priority', 'ghd_update_priority_callback');
+function ghd_update_priority_callback() {
+    // --- CLAVE: Verificación de Nonce de seguridad ---
+    if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( $_POST['nonce'], 'ghd-ajax-nonce' ) ) {
+        wp_send_json_error( ['message' => 'Nonce de seguridad inválido o faltante.'] );
+        wp_die();
+    }
+    // --- FIN CLAVE ---
+
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(['message' => 'No tienes permisos para actualizar la prioridad.']);
+        wp_die();
+    }
+
+    $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
+    $new_priority = isset($_POST['priority']) ? sanitize_text_field($_POST['priority']) : '';
+
+    if (!$order_id) {
+        wp_send_json_error(['message' => 'ID de pedido no válido.']);
+        wp_die();
+    }
+    if (empty($new_priority) || $new_priority === 'Seleccionar Prioridad') {
+        wp_send_json_success(['message' => 'Prioridad no seleccionada, no se ha guardado.']); // No es un error, solo no se guarda.
+        wp_die();
+    }
+
+    update_field('prioridad_pedido', $new_priority, $order_id);
+
+    wp_insert_post([
+        'post_title' => 'Prioridad actualizada para ' . get_the_title($order_id),
+        'post_type' => 'ghd_historial',
+        'meta_input' => ['_orden_produccion_id' => $order_id, '_nueva_prioridad' => $new_priority] // Guardar solo la nueva prioridad para el historial
+    ]);
+    
+    wp_send_json_success(['message' => 'Prioridad actualizada con éxito a ' . $new_priority . '.']);
+    wp_die();
+}
+/////////////////////////////////////////////////////fin de ghd_update_priority() //////////////////////////////////////////////////
 
 add_action('wp_ajax_ghd_update_task_status', function() {
     check_ajax_referer('ghd-ajax-nonce', 'nonce');
