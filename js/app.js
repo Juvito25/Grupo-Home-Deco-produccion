@@ -236,6 +236,88 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
             }
 
+                        // --- NUEVO: Lógica para abrir/cerrar el modal de registro de detalles ---
+            // Y para enviar el formulario de registro de detalles de tarea
+            const openModalButton = e.target.closest('.open-complete-task-modal');
+            if (openModalButton) {
+                e.preventDefault();
+                const orderId = openModalButton.dataset.orderId;
+                const modal = document.getElementById(`complete-task-modal-${orderId}`);
+                if (modal) {
+                    modal.style.display = 'flex'; // Mostrar el modal
+                }
+            }
+
+            const closeModalButton = e.target.closest('.close-button');
+            if (closeModalButton && closeModalButton.dataset.modalId) {
+                e.preventDefault();
+                const modal = document.getElementById(closeModalButton.dataset.modalId);
+                if (modal) {
+                    modal.style.display = 'none'; // Ocultar el modal
+                }
+            }
+
+            // Lógica para enviar el formulario de registro de detalles de tarea
+            const completeTaskForm = e.target.closest('.complete-task-form');
+            if (completeTaskForm && e.target.type === 'submit') { // Solo si es el botón de submit
+                e.preventDefault();
+                const orderId = completeTaskForm.dataset.orderId;
+                const fieldEstadoSector = completeTaskForm.dataset.field; // ej. 'estado_carpinteria'
+                const formData = new FormData(completeTaskForm); // Capturar todos los datos del formulario
+
+                // Añadir datos adicionales
+                formData.append('action', 'ghd_register_task_details_and_complete');
+                formData.append('nonce', ghd_ajax.nonce);
+                formData.append('order_id', orderId);
+                formData.append('field', fieldEstadoSector);
+
+                // Deshabilitar formulario y mostrar carga
+                const submitButton = completeTaskForm.querySelector('button[type="submit"]');
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.textContent = 'Guardando...';
+                }
+                completeTaskForm.style.opacity = '0.5';
+
+                fetch(ghd_ajax.ajax_url, {
+                    method: 'POST',
+                    body: formData // FormData se envía directamente con archivos
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        const modal = document.getElementById(`complete-task-modal-${orderId}`);
+                        if (modal) { modal.style.display = 'none'; } // Cerrar modal
+                        
+                        // Refrescar el panel del sector para ver que la tarea desapareció
+                        const refreshTasksBtn = document.getElementById('ghd-refresh-tasks');
+                        if (refreshTasksBtn) { refreshTasksBtn.click(); }
+                        // Si es el Admin quien está viendo un panel de sector, también refrescar sus paneles.
+                        if (document.body.classList.contains('is-admin-dashboard-panel')) {
+                            const refreshProdBtn = document.getElementById('ghd-refresh-production-tasks');
+                            if (refreshProdBtn) { refreshProdBtn.click(); }
+                            const refreshClosureBtn = document.getElementById('ghd-refresh-closure-tasks');
+                            if (refreshClosureBtn) { refreshClosureBtn.click(); }
+                        }
+
+                    } else {
+                        alert('Error al completar tarea: ' + (data.data?.message || 'Error desconocido.'));
+                    }
+                })
+                .catch(error => {
+                    console.error("Error de red al completar tarea:", error);
+                    alert('Error de red al completar tarea.');
+                })
+                .finally(() => {
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = '<i class="fa-solid fa-check"></i> Completar y Guardar';
+                    }
+                    completeTaskForm.style.opacity = '1';
+                });
+            }
+            // --- FIN NUEVO ---
         }); // Fin del mainContent.addEventListener('click')
     } // Fin del if(mainContent)
 
@@ -366,57 +448,105 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // NOTA: El manejador del botón "Iniciar Producción" ya está en mainContent.addEventListener('click')
             // y su lógica de habilitación/deshabilitación ya está actualizada.
+            
+                        // --- NUEVO: Manejar cambios en el selector de Asignación de Operarios ---
+            ordersTableBody.addEventListener('change', function(e) {
+                const assigneeSelector = e.target.closest('.ghd-assignee-selector');
+                if (assigneeSelector) {
+                    const orderId = assigneeSelector.dataset.orderId;
+                    const fieldPrefix = assigneeSelector.dataset.fieldPrefix; // ej. 'asignado_a_carpinteria'
+                    const selectedAssigneeId = assigneeSelector.value;
+                    const row = assigneeSelector.closest('tr');
+
+                    // Enviar la asignación al backend vía AJAX
+                    const params = new URLSearchParams({
+                        action: 'ghd_assign_task_to_member', // Endpoint AJAX
+                        nonce: ghd_ajax.nonce,
+                        order_id: orderId,
+                        field_prefix: fieldPrefix,
+                        assignee_id: selectedAssigneeId
+                    });
+
+                    fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (!data.success) {
+                                console.error('Error al asignar operario:', data.data?.message || 'Error desconocido.');
+                            } else {
+                                console.log('Operario asignado:', data.message);
+                                // Opcional: Refrescar la sección de producción del admin para ver el cambio
+                                const refreshProdBtn = document.getElementById('ghd-refresh-production-tasks');
+                                if (refreshProdBtn) { refreshProdBtn.click(); }
+                            }
+                        })
+                        .catch(error => {
+                            console.error("Error de red al asignar operario:", error);
+                        });
+                }
+            });
+            // --- FIN NUEVO ---
         }
     }
     //// // // //// // // //// // // /// // // / Fin del if(assignationPanel)//// // // //// // // //// // // ///// // // //// // // //// // // /
 
     // --- LÓGICA PARA EL BOTÓN "REFRESCAR" EN PANELES DE SECTOR ---
-    const refreshTasksBtn = document.getElementById('ghd-refresh-tasks');
-    if (refreshTasksBtn) {
-        refreshTasksBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            const sectorTasksList = document.querySelector('.ghd-sector-tasks-list');
-            const mainContentEl = document.querySelector('.ghd-main-content');
-            const campoEstado = mainContentEl ? mainContentEl.dataset.campoEstado : '';
+    // Este bloque solo se ejecuta si la página actual es un panel de sector
+    const sectorDashboard = document.querySelector('.is-sector-dashboard-panel');
+    if (sectorDashboard) { // Si estamos en un dashboard de sector
+        const refreshTasksBtn = document.getElementById('ghd-refresh-tasks');
+        
+        // --- NUEVA LÓGICA DE INICIALIZACIÓN MÁS SEGURA ---
+        const sectorTasksList = document.querySelector('.ghd-sector-tasks-list');
+        const mainContentEl = document.querySelector('.ghd-main-content');
+        const campoEstado = mainContentEl ? mainContentEl.dataset.campoEstado : ''; // Lee el campo_estado aquí
+        // --- FIN NUEVA LÓGICA ---
 
-            if (!sectorTasksList || !campoEstado) {
-                console.error("No se encontró la lista de tareas del sector o el campo_estado.");
-                return;
-            }
+        if (refreshTasksBtn) { // Si el botón de refresco existe en esta página
+            refreshTasksBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Si por alguna razón los elementos no se encontraron, registrar el error y salir
+                if (!sectorTasksList || !campoEstado) {
+                    console.error("No se encontró la lista de tareas del sector o el campo_estado. Verifique el HTML del template-sector-dashboard.php.");
+                    // Opcional: Recargar la página si el error es crítico
+                    // window.location.reload(); 
+                    return;
+                }
 
-            sectorTasksList.style.opacity = '0.5';
-            refreshTasksBtn.disabled = true;
+                sectorTasksList.style.opacity = '0.5';
+                refreshTasksBtn.disabled = true;
 
-            const params = new URLSearchParams({
-                action: 'ghd_refresh_sector_tasks',
-                nonce: ghd_ajax.nonce,
-                campo_estado: campoEstado
-            });
-
-            fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        sectorTasksList.innerHTML = data.data.tasks_html;
-                        if (data.data.kpi_data) {
-                            updateSectorKPIs(data.data.kpi_data);
-                        }
-                    } else {
-                        alert('Error al refrescar tareas: ' + (data.data?.message || ''));
-                        sectorTasksList.innerHTML = '<p class="no-tasks-message">Error al cargar tareas.</p>';
-                    }
-                })
-                .catch(error => {
-                    console.error("Error en la petición AJAX de refresco de sector:", error);
-                    alert('Error de red al refrescar tareas.');
-                    sectorTasksList.innerHTML = '<p class="no-tasks-message">Error de red. Inténtalo de nuevo.</p>';
-                })
-                .finally(() => {
-                    sectorTasksList.style.opacity = '1';
-                    refreshTasksBtn.disabled = false;
+                const params = new URLSearchParams({
+                    action: 'ghd_refresh_sector_tasks',
+                    nonce: ghd_ajax.nonce,
+                    campo_estado: campoEstado
                 });
-        });
-    }
+
+                fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            sectorTasksList.innerHTML = data.data.tasks_html;
+                            if (data.data.kpi_data) {
+                                updateSectorKPIs(data.data.kpi_data);
+                            }
+                        } else {
+                            alert('Error al refrescar tareas: ' + (data.data?.message || ''));
+                            sectorTasksList.innerHTML = '<p class="no-tasks-message">Error al cargar tareas.</p>';
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Error en la petición AJAX de refresco de sector:", error);
+                        alert('Error de red al refrescar tareas.');
+                        sectorTasksList.innerHTML = '<p class="no-tasks-message">Error de red. Inténtalo de nuevo.</p>';
+                    })
+                    .finally(() => {
+                        sectorTasksList.style.opacity = '1';
+                        refreshTasksBtn.disabled = false;
+                    });
+            });
+        }
+    } /// fin del if(sectorDashboard)
 
     // --- LÓGICA PARA EL BOTÓN "REFRESCAR" EN LA SECCIÓN DE CIERRE DEL ADMIN PRINCIPAL ---
     const refreshClosureTasksBtn = document.getElementById('ghd-refresh-closure-tasks');

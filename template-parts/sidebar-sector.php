@@ -70,12 +70,29 @@ function is_sector_link_active($template_name) {
                 'meta_value' => 'template-user-profile.php'
             ]);
             $profile_url = !empty($user_profile_page_url) ? get_permalink($user_profile_page_url[0]) : '#';
+                 // Ajustar el nombre del sector para el sidebar
+            $sidebar_sector_display_name = '';
+            if (strpos($user_role, 'lider_') !== false) {
+                $sidebar_sector_display_name = ucfirst(str_replace('lider_', '', $user_role));
+            } elseif (strpos($user_role, 'operario_') !== false) {
+                $sidebar_sector_display_name = ucfirst(str_replace('operario_', '', $user_role));
+            } elseif ($user_role === 'control_final_macarena') {
+                $sidebar_sector_display_name = 'Control Final';
+            }
+            $sidebar_sector_display_name = str_replace('_', ' ', $sidebar_sector_display_name); // Limpiar guiones
+            $sidebar_sector_display_name = $sector_display_map[$sidebar_sector_display_name] ?? $sidebar_sector_display_name; // Mapear a nombre legible
+            
+            // Si el nombre del usuario y el rol son los mismos, solo mostrar uno.
+            $display_role_text = ($user_display_name === $sidebar_sector_display_name) ? '' : ' - ' . $sidebar_sector_display_name;
+
             ?>
             <li class="<?php echo is_sector_link_active('template-user-profile.php'); ?>">
                 <a href="<?php echo esc_url($profile_url); ?>">
                     <i class="fa-solid fa-user"></i>
                     <span><?php echo esc_html($user_display_name); ?></span>
-                    <span style="font-size: 0.8em; margin-left: auto; color: #7f8c8d;"><?php echo esc_html($sector_name_for_sidebar); ?></span>
+                    <?php if (!empty($sidebar_sector_display_name)) : ?>
+                        <span style="font-size: 0.8em; margin-left: auto; color: #7f8c8d;"><?php echo esc_html($sidebar_sector_display_name); ?></span>
+                    <?php endif; ?>
                 </a>
             </li>
               <?php 

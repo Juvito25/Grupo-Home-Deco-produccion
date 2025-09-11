@@ -148,14 +148,25 @@ function ghd_get_sectores() {
 }
 function ghd_get_mapa_roles_a_campos() {
     return [
-        'rol_carpinteria' => 'estado_carpinteria', 
-        'rol_corte' => 'estado_corte', 
-        'rol_costura' => 'estado_costura', 
-        'rol_tapiceria' => 'estado_tapiceria', 
-        'rol_embalaje' => 'estado_embalaje', 
-        'rol_logistica' => 'estado_logistica',
+        // Mapeo de roles REALES a campos de estado ACF
+        'lider_carpinteria' => 'estado_carpinteria', 
+        'operario_carpinteria' => 'estado_carpinteria',
+        'lider_corte' => 'estado_corte', 
+        'operario_corte' => 'estado_corte',
+        'lider_costura' => 'estado_costura', 
+        'operario_costura' => 'estado_costura',
+        'lider_tapiceria' => 'estado_tapiceria', 
+        'operario_tapiceria' => 'estado_tapiceria',
+        'lider_embalaje' => 'estado_embalaje', 
+        'operario_embalaje' => 'estado_embalaje',
+        'lider_logistica' => 'estado_logistica', 
+        'operario_logistica' => 'estado_logistica',
+        'control_final_macarena' => 'estado_administrativo', // Macarena usa este campo
+        // 'vendedora' y 'gerente_ventas' no tienen un 'estado_X' asociado para tareas,
+        // ya que su panel es de ventas/comisiones.
     ];
 }
+
 /**
  * Función para calcular los KPIs de un sector dado un campo de estado.
  * Reutilizable para la carga inicial y las respuestas AJAX.

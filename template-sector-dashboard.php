@@ -17,28 +17,66 @@ if (current_user_can('manage_options') && isset($_GET['sector'])) {
     $clean_sector_name = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $sector_name));
     $campo_estado = 'estado_' . $clean_sector_name;
 } 
-// Caso 2: Trabajador de producción viendo su propio panel (sin el parámetro ?sector en la URL)
+// Caso 2: Trabajador de producción viendo su propio panel
 elseif (!current_user_can('manage_options')) {
-    $mapa_roles = ghd_get_mapa_roles_a_campos();
-    $user_roles = $current_user->roles;
-    $user_role = !empty($user_roles) ? $user_roles[0] : ''; // Obtener el rol del usuario logueado
+    $mapa_roles = ghd_get_mapa_roles_a_campos(); // Mapea rol_X a estado_X (ej: lider_carpinteria -> estado_carpinteria)
+    $user_roles = (array) $current_user->roles; // Asegurarse de que $user->roles es un array
+    $user_role = !empty($user_roles) ? $user_roles[0] : ''; // Obtener el rol principal del usuario logueado
 
-    $campo_estado = $mapa_roles[$user_role] ?? ''; // Mapear el rol a su campo_estado
-    
-    // Determinar el nombre del sector para el título H2
-    if ($user_role === 'rol_administrativo') {
-        $sector_name = 'Cierre de Pedidos'; // Para el rol administrativo si por alguna razón accediera aquí
-    } else {
-        $sector_name = ucfirst(str_replace(['rol_', '_'], ' ', $user_role));
+    $campo_estado = $mapa_roles[$user_role] ?? ''; // <--- ESTA LÍNEA ES CLAVE Y DEBE RECUPERAR EL CAMPO CORRECTO
+
+    // Determinar el nombre legible del sector para el título H2 y para el sidebar
+    $sector_name = ''; 
+    $base_sector_key = ''; // ej: 'carpinteria' de 'lider_carpinteria'
+
+    if (strpos($user_role, 'lider_') !== false) {
+        $base_sector_key = str_replace('lider_', '', $user_role);
+    } elseif (strpos($user_role, 'operario_') !== false) {
+        $base_sector_key = str_replace('operario_', '', $user_role);
+    } elseif ($user_role === 'control_final_macarena') {
+        $base_sector_key = 'control_final'; // Clave para Macarena
+    } elseif ($user_role === 'vendedora') {
+        $base_sector_key = 'ventas'; // Clave para Vendedoras
+    } elseif ($user_role === 'gerente_ventas') {
+        $base_sector_key = 'gerente_ventas'; // Clave para Gerente de Ventas
     }
-    // No necesitamos clean_sector_name aquí, ya que no se usa para parámetros de URL.
-}
+    
+    $sector_display_map = [ // Mapeo de claves a nombres de sector legibles
+        'carpinteria' => 'Carpintería', 'corte' => 'Corte', 'costura' => 'Costura', 
+        'tapiceria' => 'Tapicería', 'embalaje' => 'Embalaje', 'logistica' => 'Logística',
+        'control_final' => 'Control Final de Pedidos', // Nombre específico para Macarena
+        'ventas' => 'Mis Ventas', // Nombre específico para Vendedoras
+        'gerente_ventas' => 'Gerencia de Ventas', // Nombre específico para Gerente de Ventas
+    ];
+    $sector_name = $sector_display_map[$base_sector_key] ?? ucfirst(str_replace('_', ' ', $base_sector_key)); // Título del H2
+
+    // --- Lógica para operarios_del_sector (para líderes) ---
+    $is_leader = (strpos($user_role, 'lider_') !== false);
+    $operarios_del_sector = [];
+    // Solo obtener operarios del sector si el usuario actual es un líder de producción
+    if ($is_leader && !empty($base_sector_key)) {
+        $operarios_del_sector = get_users([
+            'role__in' => ['lider_' . $base_sector_key, 'operario_' . $base_sector_key], 
+            'orderby'  => 'display_name',
+            'order'    => 'ASC'
+        ]);
+    }
+    // --- FIN Lógica para operarios_del_sector ---
+}/////// fin de elseif
+
 // Caso 3: Admin sin especificar sector (redirigir, aunque el login_redirect ya lo debería manejar)
 else {
     wp_redirect(home_url('/panel-de-control/'));
     exit;
 }
 
+// Añadir una clase al body para identificar este panel en JS
+add_filter('body_class', function($classes) {
+    $classes[] = 'is-sector-dashboard-panel';
+    return $classes;
+});
+
+get_header();
 get_header();
 
 // --- CALCULAR KPIs DEL SECTOR (AHORA USANDO LA FUNCIÓN REUTILIZABLE) ---
@@ -61,8 +99,8 @@ $total_prioridad_alta = $sector_kpi_data['total_prioridad_alta'];
 $completadas_hoy = $sector_kpi_data['completadas_hoy'];
 $tiempo_promedio_str = $sector_kpi_data['tiempo_promedio_str'];
 
-// --- CONSULTA PARA LAS TARJETAS DE TAREA (AHORA UNIFICADA) ---
-$pedidos_query = new WP_Query([
+// --- CONSULTA PARA LAS TARJETAS DE TAREA ---
+$pedidos_query_args = [
     'post_type'      => 'orden_produccion', 
     'posts_per_page' => -1, 
     'meta_query'     => [
@@ -72,8 +110,25 @@ $pedidos_query = new WP_Query([
             'compare' => 'IN'
         ]
     ]
-]);
+];
 
+// --- NUEVO: Lógica de filtrado para operarios y líderes ---
+if (!current_user_can('manage_options')) { // Si NO es Admin Principal
+    if ($user_role === 'control_final_macarena') {
+        // Macarena ve solo los pedidos pendientes de cierre administrativo
+        $pedidos_query_args['meta_query'] = [
+            ['key' => 'estado_pedido', 'value' => 'Pendiente de Cierre Admin', 'compare' => '='],
+        ];
+    } elseif (!$is_leader) { // Si es un operario (no un líder)
+        // Un operario solo ve las tareas asignadas a su ID
+        $asignado_a_field = str_replace('estado_', 'asignado_a_', $campo_estado); // ej. 'asignado_a_carpinteria'
+        $pedidos_query_args['meta_query'][] = ['key' => $asignado_a_field, 'value' => $current_user->ID, 'compare' => '='];
+    }
+    // Si es un líder, la consulta base ya le trae todas las tareas del sector (Pendiente/En Progreso)
+}
+// --- FIN NUEVO ---
+
+$pedidos_query = new WP_Query($pedidos_query_args);
 ?>
 
 <div class="ghd-app-wrapper">
