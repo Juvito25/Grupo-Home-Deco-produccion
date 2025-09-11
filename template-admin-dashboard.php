@@ -1,7 +1,7 @@
 <?php
 /**
  * Template Name: GHD - Panel de Administrador
- * Versión V5 - Pedidos en Producción (con Material/Color/Observaciones)
+ * Versión V6 - Pedidos en Producción (con Material/Color/Observaciones) y Vendedoras
  */
 
 if (!is_user_logged_in() || !current_user_can('manage_options')) {
@@ -38,12 +38,13 @@ get_header();
         <!-- TABLA DE PEDIDOS PENDIENTES DE ASIGNACIÓN -->
         <div class="ghd-card ghd-table-wrapper">
             <table class="ghd-table">
-                    <thead>
+               <thead>
                     <tr>
                         <th>Código</th>
                         <th>Cliente</th>
                         <th>Producto</th>
-                        <th>Prioridad</th> <!-- NUEVA COLUMNA -->
+                        <th>Vendedora</th> <!-- NUEVA COLUMNA: Vendedora para asignación inicial -->
+                        <th>Prioridad</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
@@ -65,24 +66,59 @@ get_header();
                     if ($pedidos_asignacion_query->have_posts()) :
                         while ($pedidos_asignacion_query->have_posts()) : $pedidos_asignacion_query->the_post();
                     ?>
-                                            <tr id="order-row-<?php echo get_the_ID(); ?>">
-                            <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
+                        <tr id="order-row-<?php echo get_the_ID(); ?>">
+                                                <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
                             <td><?php echo esc_html(get_field('nombre_cliente')); ?></td>
                             <td><?php echo esc_html(get_field('nombre_producto')); ?></td>
                             <td>
                                 <?php 
-                                $current_priority = get_field('prioridad_pedido', get_the_ID());
-                                $is_priority_set = !empty($current_priority) && $current_priority !== 'Seleccionar Prioridad';
+                                // Obtener USUARIOS Vendedoras
+                                $vendedoras_users_objs = get_users([
+                                    'role__in' => ['vendedora', 'gerente_ventas'],
+                                    'orderby'  => 'display_name',
+                                    'order'    => 'ASC'
+                                ]);
+                                $current_vendedora_id = get_field('vendedora_asignada', get_the_ID());
+                                $is_vendedora_set = !empty($current_vendedora_id) && $current_vendedora_id !== '0'; // '0' es nuestro valor de "no asignado"
                                 ?>
-                                <select class="ghd-priority-selector" data-order-id="<?php echo get_the_ID(); ?>">
-                                    <option value="Seleccionar Prioridad" <?php selected($current_priority, 'Seleccionar Prioridad'); ?> <?php if(empty($current_priority)) echo 'selected'; ?>>Seleccionar Prioridad</option>
-                                    <option value="Alta" <?php selected($current_priority, 'Alta'); ?>>Alta</option>
-                                    <option value="Media" <?php selected($current_priority, 'Media'); ?>>Media</option>
-                                    <option value="Baja" <?php selected($current_priority, 'Baja'); ?>>Baja</option>
+                                <select class="ghd-vendedora-selector" data-order-id="<?php echo get_the_ID(); ?>">
+                                    <option value="0" <?php selected($current_vendedora_id, '0'); ?>>Asignar Vendedora</option>
+                                    <?php 
+                                    if (!empty($vendedoras_users_objs)) { 
+                                        foreach ($vendedoras_users_objs as $vendedora_obj) : 
+                                            // Asegurarse de que sea un usuario real, no un rol o un objeto vacío
+                                            if (isset($vendedora_obj->ID) && !empty($vendedora_obj->display_name)) :
+                                            ?>
+                                            <option value="<?php echo esc_attr($vendedora_obj->ID); ?>" <?php selected($current_vendedora_id, $vendedora_obj->ID); ?>>
+                                                <?php echo esc_html($vendedora_obj->display_name); ?>
+                                            </option>
+                                            <?php 
+                                            endif;
+                                        endforeach; 
+                                    }
+                                    ?>
                                 </select>
                             </td>
                             <td>
-                                <button class="ghd-btn ghd-btn-primary start-production-btn" data-order-id="<?php echo get_the_ID(); ?>" <?php if(!$is_priority_set) echo 'disabled'; ?>>
+                                <?php 
+                                $current_priority = get_field('prioridad_pedido', get_the_ID());
+                                // Lógica MEJORADA: Seleccionar "Seleccionar Prioridad" si el campo está vacío o no es una prioridad válida
+                                // Además, si el campo ACF "prioridad_pedido" está vacío, setearlo a "Seleccionar Prioridad" para que el `selected()` funcione.
+                                $display_priority = (empty($current_priority) || !in_array($current_priority, ['Alta', 'Media', 'Baja'])) ? 'Seleccionar Prioridad' : $current_priority; 
+                                $is_priority_set = ($display_priority !== 'Seleccionar Prioridad');
+                                
+                                // El botón se habilita si la prioridad Y la vendedora están asignadas
+                                $can_initiate_production = $is_priority_set && $is_vendedora_set;
+                                ?>
+                                <select class="ghd-priority-selector" data-order-id="<?php echo get_the_ID(); ?>">
+                                    <option value="Seleccionar Prioridad" <?php selected($display_priority, 'Seleccionar Prioridad'); ?>>Seleccionar Prioridad</option>
+                                    <option value="Alta" <?php selected($display_priority, 'Alta'); ?>>Alta</option>
+                                    <option value="Media" <?php selected($display_priority, 'Media'); ?>>Media</option>
+                                    <option value="Baja" <?php selected($display_priority, 'Baja'); ?>>Baja</option>
+                                </select>
+                            </td>
+                            <td>
+                                <button class="ghd-btn ghd-btn-primary start-production-btn" data-order-id="<?php echo get_the_ID(); ?>" <?php if(!$can_initiate_production) echo 'disabled'; ?>>
                                     Iniciar Producción
                                 </button>
                             </td>
@@ -91,7 +127,7 @@ get_header();
                         endwhile;
                     else: 
                     ?>
-                        <tr><td colspan="4" style="text-align:center;">No hay pedidos pendientes de asignación.</td></tr>
+                        <tr><td colspan="6" style="text-align:center;">No hay pedidos pendientes de asignación.</td></tr>
                     <?php
                     endif;
                     wp_reset_postdata(); 
@@ -124,12 +160,13 @@ get_header();
                     <tr>
                         <th>Código</th>
                         <th>Cliente</th>
+                        <th>Vendedora</th> <!-- NUEVA COLUMNA: Vendedora -->
                         <th>Producto</th>
-                        <th>Material</th> <!-- NUEVA COLUMNA -->
-                        <th>Color</th>   <!-- NUEVA COLUMNA -->
-                        <th>Observaciones</th> <!-- NUEVA COLUMNA -->
+                        <th>Material</th>
+                        <th>Color</th>
+                        <th>Observaciones</th>
                         <th>Estado General</th>
-                        <th>Sub-estados de Producción</th>
+                        <th>Asignación/Completado por</th> <!-- CAMBIADO: Nombre de la columna -->
                         <th>Acciones</th>
                     </tr>
                 </thead>
@@ -153,7 +190,7 @@ get_header();
         <div class="ghd-kpi-grid" style="margin-bottom: 30px;">
             <div class="ghd-kpi-card"><div class="kpi-icon icon-blue"><i class="fa-solid fa-list-check"></i></div><div class="kpi-info"><span id="kpi-cierre-activas" class="kpi-value"><?php echo $admin_closure_kpis['total_pedidos_cierre']; ?></span><span class="kpi-label">Activas</span></div></div>
             <div class="ghd-kpi-card"><div class="kpi-icon icon-red"><i class="fa-solid fa-triangle-exclamation"></i></div><div class="kpi-info"><span id="kpi-cierre-prioridad-alta" class="kpi-value"><?php echo $admin_closure_kpis['total_prioridad_alta_cierre']; ?></span><span class="kpi-label">Prioridad Alta</span></div></div>
-            <div class="ghd-kpi-card"><div class="kpi-icon icon-green"><i class="fa-solid fa-check"></i></div><div class="kpi-info"><span id="kpi-cierre-completadas-hoy" class="kpi-value"><?php echo $admin_closure_kpis['completadas_hoy_cierre']; ?></span><span class="kpi-label">Completadas Hoy</span></div></div>
+                <div class="ghd-kpi-card"><div class="kpi-icon icon-green"><i class="fa-solid fa-check"></i></div><div class="kpi-info"><span id="kpi-cierre-completadas-hoy" class="kpi-value"><?php echo $admin_closure_kpis['completadas_hoy_cierre']; ?></span><span class="kpi-label">Completadas Hoy</span></div></div>
             <div class="ghd-kpi-card"><div class="kpi-icon icon-yellow"><i class="fa-solid fa-clock"></i></div><div class="kpi-info"><span id="kpi-cierre-tiempo-promedio" class="kpi-value"><?php echo esc_html($admin_closure_kpis['tiempo_promedio_str_cierre']); ?></span><span class="kpi-label">Tiempo Promedio</span></div></div>
         </div>
 

@@ -29,11 +29,13 @@ if (
 <header class="ghd-pro-header">
     <div class="header-logo-title">
         <a href="<?php echo home_url(); ?>" class="site-logo-link">
-            <img src="<?php echo get_stylesheet_directory_uri(); ?>/img/logo.png" alt="GRUPO DECO HOME S.R.L" class="header-app-logo">
+            <h1 class="main-title">GRUPO DECO HOME</h1> <!-- Texto grande -->
+            <span class="sub-title">S.R.L</span> <!-- Texto pequeño debajo -->
+            <!-- La imagen del logo.png ya NO va aquí si el texto la reemplaza visualmente -->
         </a>
-        <div class="header-title-group">
-            <h1 class="main-title">Gestor de Flujo de Producción</h1>
-            <span class="sub-title">Panel de Control</span> <!-- Esto podría ser dinámico según la página si lo deseas, o estático -->
+        <div class="app-name-group"> <!-- Nuevo div para el nombre de la aplicación -->
+            <h1 class="main-title-app">Gestor de Flujo de Producción</h1>
+            <span class="sub-title-app">Panel de Control</span>
         </div>
     </div>
     <?php $current_user = wp_get_current_user(); ?>

@@ -242,48 +242,96 @@ document.addEventListener('DOMContentLoaded', function() {
         // --- LÓGICA PARA ASIGNAR PRIORIDAD EN EL PANEL DE ASIGNACIÓN ---
     const assignationPanel = document.querySelector('.page-template-template-admin-dashboard');
 
-    if (assignationPanel) { // Solo si estamos en el panel de asignación del administrador
+     if (assignationPanel) { // Solo si estamos en el panel de asignación del administrador
         const ordersTableBody = document.getElementById('ghd-orders-table-body');
 
         if (ordersTableBody) {
-            // Función para inicializar el estado del botón al cargar la página
-            const initializePriorityButtons = () => {
-                ordersTableBody.querySelectorAll('tr').forEach(row => {
-                    const prioritySelector = row.querySelector('.ghd-priority-selector');
-                    const startProductionBtn = row.querySelector('.start-production-btn');
-                    if (prioritySelector && startProductionBtn) {
-                        startProductionBtn.disabled = (prioritySelector.value === 'Seleccionar Prioridad');
+            // Función auxiliar para actualizar el estado del botón "Iniciar Producción"
+            const updateStartProductionButtonState = (row) => {
+                const prioritySelector = row.querySelector('.ghd-priority-selector');
+                const vendedoraSelector = row.querySelector('.ghd-vendedora-selector');
+                const startProductionBtn = row.querySelector('.start-production-btn');
 
-                        // Aplicar clase de prioridad al cargar la página para los estilos visuales
-                        prioritySelector.classList.remove('prioridad-alta', 'prioridad-media', 'prioridad-baja');
-                        if (prioritySelector.value === 'Alta') {
-                            prioritySelector.classList.add('prioridad-alta');
-                        } else if (prioritySelector.value === 'Media') {
-                            prioritySelector.classList.add('prioridad-media');
-                        } else if (prioritySelector.value === 'Baja') {
-                            prioritySelector.classList.add('prioridad-baja');
-                        }
+                if (prioritySelector && vendedoraSelector && startProductionBtn) {
+                    const isPrioritySet = (prioritySelector.value !== 'Seleccionar Prioridad');
+                    const isVendedoraSet = (vendedoraSelector.value !== '0'); // '0' es el valor para "Asignar Vendedora"
+
+                    startProductionBtn.disabled = !(isPrioritySet && isVendedoraSet);
+
+                    // Añadir/quitar clases visuales de "no seleccionado"
+                    if (!isPrioritySet) {
+                        prioritySelector.classList.add('prioridad-no-seleccionada');
+                    } else {
+                        prioritySelector.classList.remove('prioridad-no-seleccionada');
                     }
-                });
+                    if (!isVendedoraSet) {
+                        vendedoraSelector.classList.add('vendedora-no-seleccionada');
+                    } else {
+                        vendedoraSelector.classList.remove('vendedora-no-seleccionada');
+                    }
+                }
             };
 
-            // Ejecutar la inicialización al cargar la página
-            initializePriorityButtons();
+            // --- NUEVO: Inicializar el estado de los botones y selectores al cargar la página ---
+            ordersTableBody.querySelectorAll('tr').forEach(row => {
+                updateStartProductionButtonState(row); // Inicializa el estado del botón
+                
+                // Aplicar clase de color al selector de prioridad si ya tiene un valor
+                const prioritySelector = row.querySelector('.ghd-priority-selector');
+                if (prioritySelector && prioritySelector.value !== 'Seleccionar Prioridad') {
+                    prioritySelector.classList.remove('prioridad-no-seleccionada'); // Quitar si ya tiene valor
+                    if (prioritySelector.value === 'Alta') {
+                        prioritySelector.classList.add('prioridad-alta');
+                    } else if (prioritySelector.value === 'Media') {
+                        prioritySelector.classList.add('prioridad-media');
+                    } else if (prioritySelector.value === 'Baja') {
+                        prioritySelector.classList.add('prioridad-baja');
+                    }
+                }
+            });
 
-            // Manejar cambios en el selector de prioridad
+            // --- Manejar cambios en el selector de Vendedora ---
             ordersTableBody.addEventListener('change', function(e) {
+                const vendedoraSelector = e.target.closest('.ghd-vendedora-selector');
+                if (vendedoraSelector) {
+                    const orderId = vendedoraSelector.dataset.orderId;
+                    const selectedVendedoraId = vendedoraSelector.value;
+                    const row = vendedoraSelector.closest('tr'); // Obtener la fila para actualizar el botón
+
+                    updateStartProductionButtonState(row); // Actualiza el estado del botón y clases visuales
+
+                    // Enviar la vendedora al backend vía AJAX para guardarla
+                    const params = new URLSearchParams({
+                        action: 'ghd_update_vendedora', // Endpoint AJAX
+                        nonce: ghd_ajax.nonce,
+                        order_id: orderId,
+                        vendedora_id: selectedVendedoraId
+                    });
+
+                    fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (!data.success) {
+                                console.error('Error al guardar vendedora:', data.data?.message || 'Error desconocido.');
+                            } else {
+                                console.log('Vendedora guardada:', data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error("Error de red al guardar vendedora:", error);
+                        });
+                }
+
+                // --- Manejar cambios en el selector de Prioridad (este bloque se mueve aquí) ---
                 const prioritySelector = e.target.closest('.ghd-priority-selector');
                 if (prioritySelector) {
                     const orderId = prioritySelector.dataset.orderId;
                     const selectedPriority = prioritySelector.value;
-                    const startProductionBtn = ordersTableBody.querySelector(`button.start-production-btn[data-order-id="${orderId}"]`);
+                    const row = prioritySelector.closest('tr'); // Obtener la fila para actualizar el botón
 
-                    // Lógica: Habilitar/deshabilitar el botón "Iniciar Producción"
-                    if (startProductionBtn) {
-                        startProductionBtn.disabled = (selectedPriority === 'Seleccionar Prioridad');
-                    }
-
-                    // Aplicar clase de prioridad al selector para los estilos visuales
+                    updateStartProductionButtonState(row); // Actualiza el estado del botón y clases visuales
+                    
+                    // Limpiar clases de prioridad existentes y añadir la nueva
                     prioritySelector.classList.remove('prioridad-alta', 'prioridad-media', 'prioridad-baja');
                     if (selectedPriority === 'Alta') {
                         prioritySelector.classList.add('prioridad-alta');
@@ -294,10 +342,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
 
                     // Enviar la prioridad al backend vía AJAX para guardarla
-                    // Usamos ghd_ajax.ajax_url y ghd_ajax.nonce que se localizan en functions.php
                     const params = new URLSearchParams({
                         action: 'ghd_update_priority', // Endpoint AJAX
-                        nonce: ghd_ajax.nonce, // Tomar el nonce del objeto global
+                        nonce: ghd_ajax.nonce,
                         order_id: orderId,
                         priority: selectedPriority
                     });
@@ -307,17 +354,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         .then(data => {
                             if (!data.success) {
                                 console.error('Error al guardar prioridad:', data.data?.message || 'Error desconocido.');
-                                // Opcional: alert('Error al guardar la prioridad.');
                             } else {
                                 console.log('Prioridad guardada:', data.message);
                             }
                         })
                         .catch(error => {
                             console.error("Error de red al guardar prioridad:", error);
-                            // Opcional: alert('Error de red al guardar la prioridad.');
                         });
                 }
             });
+
+            // NOTA: El manejador del botón "Iniciar Producción" ya está en mainContent.addEventListener('click')
+            // y su lógica de habilitación/deshabilitación ya está actualizada.
         }
     }
     //// // // //// // // //// // // /// // // / Fin del if(assignationPanel)//// // // //// // // //// // // ///// // // //// // // //// // // /
