@@ -67,29 +67,30 @@ get_header();
                         while ($pedidos_asignacion_query->have_posts()) : $pedidos_asignacion_query->the_post();
                     ?>
                         <tr id="order-row-<?php echo get_the_ID(); ?>">
-                                                <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
+                            <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
                             <td><?php echo esc_html(get_field('nombre_cliente')); ?></td>
                             <td><?php echo esc_html(get_field('nombre_producto')); ?></td>
                             <td>
                                 <?php 
-                                // Obtener USUARIOS Vendedoras
                                 $vendedoras_users_objs = get_users([
                                     'role__in' => ['vendedora', 'gerente_ventas'],
                                     'orderby'  => 'display_name',
                                     'order'    => 'ASC'
                                 ]);
                                 $current_vendedora_id = get_field('vendedora_asignada', get_the_ID());
-                                $is_vendedora_set = !empty($current_vendedora_id) && $current_vendedora_id !== '0'; // '0' es nuestro valor de "no asignado"
+                                // Si el ID de vendedora guardado es 0 (Asignar Vendedora), forzamos current_vendedora_id a '0' string para selected()
+                                $selected_vendedora_value = (empty($current_vendedora_id) || $current_vendedora_id === 0) ? '0' : (string)$current_vendedora_id;
+
+                                $is_vendedora_set = ($selected_vendedora_value !== '0');
                                 ?>
                                 <select class="ghd-vendedora-selector" data-order-id="<?php echo get_the_ID(); ?>">
-                                    <option value="0" <?php selected($current_vendedora_id, '0'); ?>>Asignar Vendedora</option>
+                                    <option value="0" <?php selected($selected_vendedora_value, '0'); ?>>Asignar Vendedora</option>
                                     <?php 
                                     if (!empty($vendedoras_users_objs)) { 
                                         foreach ($vendedoras_users_objs as $vendedora_obj) : 
-                                            // Asegurarse de que sea un usuario real, no un rol o un objeto vacío
                                             if (isset($vendedora_obj->ID) && !empty($vendedora_obj->display_name)) :
                                             ?>
-                                            <option value="<?php echo esc_attr($vendedora_obj->ID); ?>" <?php selected($current_vendedora_id, $vendedora_obj->ID); ?>>
+                                            <option value="<?php echo esc_attr($vendedora_obj->ID); ?>" <?php selected($selected_vendedora_value, (string)$vendedora_obj->ID); ?>>
                                                 <?php echo esc_html($vendedora_obj->display_name); ?>
                                             </option>
                                             <?php 
@@ -102,12 +103,9 @@ get_header();
                             <td>
                                 <?php 
                                 $current_priority = get_field('prioridad_pedido', get_the_ID());
-                                // Lógica MEJORADA: Seleccionar "Seleccionar Prioridad" si el campo está vacío o no es una prioridad válida
-                                // Además, si el campo ACF "prioridad_pedido" está vacío, setearlo a "Seleccionar Prioridad" para que el `selected()` funcione.
                                 $display_priority = (empty($current_priority) || !in_array($current_priority, ['Alta', 'Media', 'Baja'])) ? 'Seleccionar Prioridad' : $current_priority; 
                                 $is_priority_set = ($display_priority !== 'Seleccionar Prioridad');
                                 
-                                // El botón se habilita si la prioridad Y la vendedora están asignadas
                                 $can_initiate_production = $is_priority_set && $is_vendedora_set;
                                 ?>
                                 <select class="ghd-priority-selector" data-order-id="<?php echo get_the_ID(); ?>">

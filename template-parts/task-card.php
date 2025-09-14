@@ -4,7 +4,11 @@
  * Recibe sus datos a través de la variable $args.
  */
 if (!isset($args) || !is_array($args)) { return; }
-
+// --- DEBUG: Mostrar los $args que recibe task-card.php ---
+// echo '<pre>DEBUG: task-card.php $args: ';
+// var_dump($args);
+// echo '</pre>';
+// --- FIN DEBUG ---
 $post_id         = esc_attr($args['post_id']);
 $titulo          = esc_html($args['titulo']);
 $prioridad_class = esc_attr($args['prioridad_class']);
@@ -26,7 +30,6 @@ $logged_in_user_id = $args['logged_in_user_id'] ?? 0; // ID del usuario logueado
 $button_text = '';
 $button_value = '';
 $button_class = '';
-// ... (resto del código del archivo) ...
 
 if ($estado_actual === 'Pendiente') {
     $button_text = 'Iniciar Tarea';
@@ -36,12 +39,9 @@ if ($estado_actual === 'Pendiente') {
     $button_text = 'Marcar Completa';
     $button_value = 'Completado';
     $button_class = 'ghd-btn-success'; // Un color diferente para "Completar"
-} 
-// Si el estado es 'Completado' para este sector, no se muestra el botón de acción,
-// ya que la consulta de pedidos en template-sector-dashboard.php solo trae 'Pendiente' y 'En Progreso'.
-// Si por alguna razón un pedido 'Completado' llegara aquí, simplemente no mostraría el botón.
+}
+// Si el estado es 'Completado' para este sector, no se muestra el botón de acción.
 
-?>
 ?>
 <div class="ghd-order-card" id="order-<?php echo $post_id; ?>">
     <div class="order-card-main">
@@ -64,7 +64,8 @@ if ($estado_actual === 'Pendiente') {
     </div>
     <div class="order-card-actions">
         <!-- NUEVO: Selector de Asignación (solo para líderes) -->
-        <?php if ($is_leader && !empty($operarios_del_sector)) : 
+        <?php if ($is_leader && !empty($operarios_del_sector)) :
+            // Determina el valor seleccionado para el selector
             $current_assignee_id_for_select = $asignado_a_id ? $asignado_a_id : '0'; // Valor '0' para "Sin asignar"
         ?>
             <select class="ghd-btn ghd-btn-secondary ghd-assignee-selector ghd-btn-small" data-order-id="<?php echo $post_id; ?>" data-field-prefix="<?php echo str_replace('estado_', 'asignado_a_', $campo_estado); ?>">
@@ -78,30 +79,29 @@ if ($estado_actual === 'Pendiente') {
         <?php endif; ?>
 
         <!-- Botón de acción principal: Iniciar Tarea / Marcar Completa -->
-        <?php 
+        <?php
         $can_action_task = false;
-        // Si el usuario es líder, puede actuar en cualquier tarea de su sector
-        // Si es operario, solo puede actuar en tareas asignadas a él
+        // Lógica para determinar si el usuario actual puede realizar la acción en esta tarea.
         if ($is_leader) {
-            $can_action_task = true;
-        } elseif ($asignado_a_id === $logged_in_user_id) { // Es operario y la tarea está asignada a él
+            $can_action_task = true; // Los líderes pueden actuar en cualquier tarea de su sector
+        } elseif ($asignado_a_id === $logged_in_user_id) { // Si es operario y la tarea está asignada a él
             $can_action_task = true;
         }
 
-        if ($button_text && $can_action_task) : 
-            if ($estado_actual === 'En Progreso') : // Si está en progreso, el botón es "Marcar Completa y Registrar Detalles"
+        if ($button_text && $can_action_task) :
+            if ($estado_actual === 'En Progreso') : // Si la tarea está En Progreso, se muestra el botón para Completar y Registrar Detalles
             ?>
-                <button class="ghd-btn ghd-btn-success action-button open-complete-task-modal" 
-                        data-order-id="<?php echo $post_id; ?>" 
-                        data-field="<?php echo $campo_estado; ?>" 
-                        data-assignee-id="<?php echo esc_attr($asignado_a_id); ?>"> <!-- Necesitamos el ID del asignado para el modal -->
-                    <i class="fa-solid fa-check"></i> Marcar Completa y Registrar
+                <button class="ghd-btn ghd-btn-success action-button open-complete-task-modal"
+                        data-order-id="<?php echo $post_id; ?>"
+                        data-field="<?php echo $campo_estado; ?>"
+                        data-assignee-id="<?php echo esc_attr($asignado_a_id); ?>"> <!-- Paso el ID del asignado por si fuera necesario en el modal -->
+                    <i class="fa-solid fa-check"></i> <span>Marcar Completa y Registrar</span>
                 </button>
-            <?php else : // Si está Pendiente, el botón es "Iniciar Tarea"
+            <?php else : // Si la tarea está Pendiente, se muestra el botón para Iniciar Tarea
             ?>
-                <button class="ghd-btn <?php echo $button_class; ?> action-button" 
-                        data-order-id="<?php echo $post_id; ?>" 
-                        data-field="<?php echo $campo_estado; ?>" 
+                <button class="ghd-btn <?php echo $button_class; ?> action-button"
+                        data-order-id="<?php echo $post_id; ?>"
+                        data-field="<?php echo $campo_estado; ?>"
                         data-value="<?php echo $button_value; ?>">
                     <i class="fa-solid fa-play"></i> <?php echo $button_text; ?>
                 </button>

@@ -1113,12 +1113,12 @@ body.page-template-template-login {
 
 /* --- Estilo para Selectores de Prioridad y Vendedora cuando NO tienen una opción válida seleccionada --- */
 .ghd-priority-selector.prioridad-no-seleccionada,
-.ghd-vendedora-selector.vendedora-no-seleccionada { /* Añadimos la clase para vendedora */
+.ghd-vendedora-selector.vendedora-no-seleccionada { /* ¡Clase para Vendedora añadida aquí! */
     border-color: var(--color-rojo); /* Borde rojo sutil para indicar que falta seleccionar */
     box-shadow: 0 0 0 1px rgba(179, 74, 73, 0.4);
 }
 .ghd-priority-selector.prioridad-no-seleccionada:hover,
-.ghd-vendedora-selector.vendedora-no-seleccionada:hover {
+.ghd-vendedora-selector.vendedora-no-seleccionada:hover { /* ¡Clase para Vendedora añadida aquí! */
     border-color: var(--color-rojo-hover);
     box-shadow: 0 0 0 2px rgba(179, 74, 73, 0.6);
 }
@@ -1188,6 +1188,7 @@ body.page-template-template-login {
     background-color: var(--color-fondo-claro);
     margin: auto;
     padding: 30px;
+    padding-top: 60px; /* AUMENTAR EL PADDING SUPERIOR PARA EL BOTÓN DE CIERRE */
     border: 1px solid #888;
     border-radius: 10px;
     width: 90%;
@@ -1204,13 +1205,15 @@ body.page-template-template-login {
 
 .close-button {
     color: #aaa;
-    float: right;
+    /* float: right; <<-- ELIMINAR ESTA LÍNEA */
     font-size: 28px;
     font-weight: bold;
     cursor: pointer;
     position: absolute;
     right: 20px;
     top: 15px;
+    line-height: 1; /* Para que la 'x' sea más compacta */
+    z-index: 1001; /* Asegurar que esté por encima de todo lo demás en el modal */
 }
 
 .close-button:hover,
@@ -1226,6 +1229,7 @@ body.page-template-template-login {
     border-bottom: 1px solid var(--color-borde);
     padding-bottom: 10px;
     margin-bottom: 20px;
+    padding-right: 40px; /* AÑADIR PADDING A LA DERECHA PARA DEJAR ESPACIO A LA 'X' */
 }
 
 .ghd-modal-content .form-group {
@@ -1268,5 +1272,72 @@ body.page-template-template-login {
     .ghd-modal-content {
         width: 95%;
         padding: 20px;
+    }
+}
+
+
+/* ==========================================================================
+   MEJORAS PARA EL SCROLL HORIZONTAL Y DESBORDAMIENTO
+   ========================================================================== */
+
+/* Asegura que las celdas de tabla no tengan contenido que desborde */
+.ghd-table td {
+    /* Permite saltos de línea en el contenido de las celdas */
+    white-space: normal !important; 
+    word-wrap: break-word; /* Rompe palabras largas si es necesario */
+    /* Si necesitas un control más estricto sobre la altura de la celda, considera max-height */
+}
+
+/* Contenedores específicos que pueden causar desbordamiento */
+.assigned-completed-info,
+.production-substatus-badges {
+    overflow-x: auto; /* Añade scroll horizontal solo si es necesario */
+    white-space: nowrap; /* Evita que el contenido se rompa en varias líneas dentro de estos divs */
+    padding-bottom: 5px; /* Pequeño padding para que el scroll no tape el contenido */
+}
+
+/* Ajuste para los badges individuales si también se desbordan */
+.ghd-badge {
+    white-space: normal; /* Permite que el texto de los badges se envuelva */
+    display: inline-block; /* Asegura que los badges se comporten como bloques inline */
+    text-align: center;
+    padding: 4px 6px; /* Ajuste de padding */
+}
+
+/* Si necesitas que el texto dentro de los badges se ajuste */
+.ghd-badge span { 
+    display: inline-block;
+    word-break: break-word; /* Permite romper palabras largas dentro del span */
+}
+
+/* Si las tarjetas de tarea (`.ghd-order-card`) son la causa */
+/* .ghd-order-card {
+   /* overflow-x: hidden; -> Ya está definido */
+   /* Puedes añadir ajustes aquí si el problema persiste 
+} */
+
+/* Ajuste para el selector de operarios, para que no cause scroll si el nombre es muy largo */
+.ghd-assignee-selector {
+    max-width: 150px; /* Limita el ancho del selector */
+    overflow: hidden; /* Oculta el texto que no cabe */
+    text-overflow: ellipsis; /* Muestra puntos suspensivos (...) */
+    white-space: nowrap; /* Mantiene el texto en una sola línea */
+}
+
+/* --- CORRECCIÓN DE ESTILO PARA BOTONES LARGOS --- */
+.open-complete-task-modal span {
+    display: inline;
+}
+
+/* En pantallas más pequeñas, ocultar el texto y dejar solo el ícono */
+@media (max-width: 480px) {
+    .ghd-btn span {
+        display: none; /* Oculta el texto dentro de los botones */
+    }
+    .ghd-btn i {
+        margin-right: 0; /* Quita el margen del ícono cuando no hay texto */
+    }
+    .open-complete-task-modal {
+        min-width: 44px; /* Un ancho mínimo para que sea fácil de tocar */
     }
 }

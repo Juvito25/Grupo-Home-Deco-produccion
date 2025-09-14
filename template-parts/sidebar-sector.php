@@ -1,112 +1,86 @@
 <?php
 /**
- * Template Part: Sidebar para los Sectores
+ * Template Part para la barra lateral del panel de sector.
+ * V2 - Ahora es dinámico y muestra enlaces para cada rol de líder del usuario.
  */
 
 $current_user = wp_get_current_user();
-$user_roles = $current_user->roles;
-$user_role = !empty($user_roles) ? $user_roles[0] : '';
-$user_display_name = $current_user->display_name;
+$user_roles = (array) $current_user->roles;
 
-// Determinar el nombre del sector para mostrar en el sidebar
-$mapa_roles_a_nombres_sector = [
-    'rol_carpinteria'    => 'Carpintería',
-    'rol_corte'          => 'Corte',
-    'rol_costura'        => 'Costura',
-    'rol_tapiceria'      => 'Tapicería',
-    'rol_embalaje'       => 'Embalaje',
-    'rol_logistica'      => 'Logística',
-    'rol_administrativo' => 'Administrativo', // Aunque este rol ya no gestiona tareas activas aquí, su nombre puede seguir siendo útil.
+// Obtener la URL base de la página del panel de tareas
+// Es importante que el slug de la página sea 'panel-de-tareas' o el que corresponda.
+// $dashboard_page = get_page_by_path('panel-de-tareas');
+$dashboard_page = get_page_by_path('mis-tareas');
+$dashboard_url = $dashboard_page ? get_permalink($dashboard_page->ID) : home_url('/');
+
+// Identificar el sector activo desde la URL
+$active_sector = isset($_GET['sector']) ? sanitize_text_field($_GET['sector']) : '';
+
+// Mapeo de claves de sector a nombres legibles
+$sector_display_map = [ 
+    'carpinteria' => 'Carpintería', 
+    'corte' => 'Corte', 
+    'costura' => 'Costura', 
+    'tapiceria' => 'Tapicería', 
+    'embalaje' => 'Embalaje', 
+    'logistica' => 'Logística',
 ];
-$sector_name_for_sidebar = $mapa_roles_a_nombres_sector[$user_role] ?? 'Desconocido';
 
-// Obtener la URL de la página de "Mis Tareas" (el propio dashboard de sector)
-$sector_dashboard_url = get_posts([
-    'post_type'  => 'page',
-    'fields'     => 'ids',
-    'nopaging'   => true,
-    'meta_key'   => '_wp_page_template',
-    'meta_value' => 'template-sector-dashboard.php'
-]);
-$sector_dashboard_url = !empty($sector_dashboard_url) ? get_permalink($sector_dashboard_url[0]) : home_url();
-
-// Si el usuario no es un administrador viendo un sector, se añade el parámetro de sector a la URL
-if (!current_user_can('manage_options')) {
-    $clean_sector_name_param = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $sector_name_for_sidebar));
-    $sector_dashboard_url = add_query_arg('sector', urlencode($clean_sector_name_param), $sector_dashboard_url);
-}
-
-// Función para determinar si un enlace está activo (simple para este sidebar)
-function is_sector_link_active($template_name) {
-    global $post;
-    if (is_page_template($template_name)) {
-        return 'active';
+// Identificar todos los roles de líder del usuario para construir el menú
+$leader_roles = [];
+$first_leader_key = '';
+foreach ($user_roles as $role) {
+    if (strpos($role, 'lider_') !== false) {
+        $sector_key = str_replace('lider_', '', $role);
+        $leader_roles[$sector_key] = $sector_display_map[$sector_key] ?? ucfirst($sector_key);
+        if (empty($first_leader_key)) {
+            $first_leader_key = $sector_key;
+        }
     }
-    return '';
 }
 
+// Si el sector activo no está definido en la URL, el primero de la lista será el activo.
+if (empty($active_sector)) {
+    $active_sector = $first_leader_key;
+}
 ?>
-
 <aside class="ghd-sidebar">
     <div class="sidebar-header">
-        <h1 class="logo">Mi Puesto</h1>
+        <h3 class="logo">Mi Puesto</h3>
     </div>
     <nav class="sidebar-nav">
         <ul>
-            <li class="<?php echo is_sector_link_active('template-sector-dashboard.php'); ?>">
-                <a href="<?php echo esc_url($sector_dashboard_url); ?>">
-                    <i class="fa-solid fa-list-check"></i>
-                    <span>Mis Tareas</span>
-                </a>
-            </li>
-            <!-- Enlace al perfil/nombre del usuario, no a una página específica sino a su rol/nombre -->
-                        <?php
-            // Obtener la URL de la página de perfil
-            $user_profile_page_url = get_posts([
-                'post_type'  => 'page',
-                'fields'     => 'ids',
-                'nopaging'   => true,
-                'meta_key'   => '_wp_page_template',
-                'meta_value' => 'template-user-profile.php'
-            ]);
-            $profile_url = !empty($user_profile_page_url) ? get_permalink($user_profile_page_url[0]) : '#';
-                 // Ajustar el nombre del sector para el sidebar
-            $sidebar_sector_display_name = '';
-            if (strpos($user_role, 'lider_') !== false) {
-                $sidebar_sector_display_name = ucfirst(str_replace('lider_', '', $user_role));
-            } elseif (strpos($user_role, 'operario_') !== false) {
-                $sidebar_sector_display_name = ucfirst(str_replace('operario_', '', $user_role));
-            } elseif ($user_role === 'control_final_macarena') {
-                $sidebar_sector_display_name = 'Control Final';
-            }
-            $sidebar_sector_display_name = str_replace('_', ' ', $sidebar_sector_display_name); // Limpiar guiones
-            $sidebar_sector_display_name = $sector_display_map[$sidebar_sector_display_name] ?? $sidebar_sector_display_name; // Mapear a nombre legible
-            
-            // Si el nombre del usuario y el rol son los mismos, solo mostrar uno.
-            $display_role_text = ($user_display_name === $sidebar_sector_display_name) ? '' : ' - ' . $sidebar_sector_display_name;
+            <?php if (!empty($leader_roles)) : ?>
+                <!-- Bucle para mostrar un enlace por cada rol de líder -->
+                <?php foreach ($leader_roles as $sector_key => $sector_name) : ?>
+                    <?php
+                    $link_url = add_query_arg('sector', $sector_key, $dashboard_url);
+                    $li_class = ($active_sector === $sector_key) ? 'active' : '';
+                    ?>
+                    <li class="<?php echo esc_attr($li_class); ?>">
+                        <a href="<?php echo esc_url($link_url); ?>">
+                            <i class="fa-solid fa-list-check"></i>
+                            <span>Tareas de <?php echo esc_html($sector_name); ?></span>
+                        </a>
+                    </li>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <!-- Fallback si el usuario no tiene roles de líder (aunque no debería llegar aquí) -->
+                <li class="active">
+                    <a href="<?php echo esc_url($dashboard_url); ?>">
+                        <i class="fa-solid fa-list-check"></i>
+                        <span>Mis Tareas</span>
+                    </a>
+                </li>
+            <?php endif; ?>
 
-            ?>
-            <li class="<?php echo is_sector_link_active('template-user-profile.php'); ?>">
-                <a href="<?php echo esc_url($profile_url); ?>">
-                    <i class="fa-solid fa-user"></i>
-                    <span><?php echo esc_html($user_display_name); ?></span>
-                    <?php if (!empty($sidebar_sector_display_name)) : ?>
-                        <span style="font-size: 0.8em; margin-left: auto; color: #7f8c8d;"><?php echo esc_html($sidebar_sector_display_name); ?></span>
-                    <?php endif; ?>
-                </a>
-            </li>
-              <?php 
-              // La URL de logout siempre debe redirigir al login personalizado
-            // La función ghd_custom_logout_redirect en functions.php se encargará de esto.
-            // Aquí, simplemente generamos una URL de logout básica.
-            $logout_url = wp_logout_url(); // Genera la URL de logout con el nonce de seguridad
-            ?>
-            <li>
-                <a href="<?php echo esc_url($logout_url); ?>">
+            <!-- Enlace para Cerrar Sesión -->
+            <li style="margin-top: auto; padding-top: 1rem; border-top: 1px solid #555;">
+                <a href="<?php echo wp_logout_url(home_url()); ?>">
                     <i class="fa-solid fa-right-from-bracket"></i>
                     <span>Cerrar Sesión</span>
                 </a>
-            </li>    
+            </li>
         </ul>
     </nav>
 </aside>
