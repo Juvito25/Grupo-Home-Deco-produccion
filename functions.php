@@ -1207,8 +1207,6 @@ function ghd_register_task_details_and_complete_callback() {
 
     $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
     $field_estado_sector = isset($_POST['field']) ? sanitize_key($_POST['field']) : '';
-    $modelo_principal_hecho = isset($_POST['modelo_principal_hecho']) ? sanitize_text_field($_POST['modelo_principal_hecho']) : '';
-    $cantidad_principal_hecha = isset($_POST['cantidad_principal_hecha']) ? intval($_POST['cantidad_principal_hecha']) : 0;
     $observaciones_tarea_completa = isset($_POST['observaciones_tarea_completa']) ? sanitize_textarea_field($_POST['observaciones_tarea_completa']) : '';
 
     if (!$order_id || empty($field_estado_sector)) {
@@ -1217,88 +1215,65 @@ function ghd_register_task_details_and_complete_callback() {
     }
 
     $current_user_id = get_current_user_id();
-    $completed_by_field_name = str_replace('estado_', 'completado_por_', $field_estado_sector);
-    $modelo_hecho_field_name = str_replace('estado_', '', $field_estado_sector) . '_modelo_principal_hecho';
-    $cantidad_hecha_field_name = str_replace('estado_', '', $field_estado_sector) . '_cantidad_principal_hecha';
-    $observaciones_field_name = str_replace('estado_', '', $field_estado_sector) . '_observaciones_tarea_completa';
-    $fecha_completado_field_name = str_replace('estado_', 'fecha_completado_', $field_estado_sector);
-
+    
+    // Guardar los datos de la tarea que se está completando
     update_field($field_estado_sector, 'Completado', $order_id);
-    update_field($fecha_completado_field_name, current_time('mysql'), $order_id);
-    
-    if ($current_user_id) {
-        update_field($completed_by_field_name, $current_user_id, $order_id);
-    }
-    
-    update_field($modelo_hecho_field_name, $modelo_principal_hecho, $order_id);
-    update_field($cantidad_hecha_field_name, $cantidad_principal_hecha, $order_id);
-    update_field($observaciones_field_name, $observaciones_tarea_completa, $order_id);
+    update_field(str_replace('estado_', 'fecha_completado_', $field_estado_sector), current_time('mysql'), $order_id);
+    update_field(str_replace('estado_', 'completado_por_', $field_estado_sector), $current_user_id, $order_id);
+    update_field(str_replace('estado_', '', $field_estado_sector) . '_observaciones_tarea_completa', $observaciones_tarea_completa, $order_id);
 
-    $foto_tarea_field_name = str_replace('estado_', '', $field_estado_sector) . '_foto_principal_tarea';
     if (isset($_FILES['foto_tarea']) && !empty($_FILES['foto_tarea']['name'])) {
         require_once(ABSPATH . 'wp-admin/includes/image.php');
         require_once(ABSPATH . 'wp-admin/includes/file.php');
         require_once(ABSPATH . 'wp-admin/includes/media.php');
-
         $attachment_id = media_handle_upload('foto_tarea', $order_id);
         if (!is_wp_error($attachment_id)) {
-            $image_url = wp_get_attachment_url($attachment_id);
-            update_field($foto_tarea_field_name, $image_url, $order_id);
+            update_field(str_replace('estado_', '', $field_estado_sector) . '_foto_principal_tarea', $attachment_id, $order_id);
         }
     }
     
     wp_insert_post([
         'post_title' => ucfirst(str_replace('estado_', '', $field_estado_sector)) . ' completado por ' . get_the_author_meta('display_name', $current_user_id),
         'post_type' => 'ghd_historial',
-        'meta_input' => [
-            '_orden_produccion_id' => $order_id,
-            '_completed_by_user_id' => $current_user_id,
-            '_details' => json_encode(['modelo' => $modelo_principal_hecho, 'cantidad' => $cantidad_principal_hecha])
-        ]
+        'meta_input' => ['_orden_produccion_id' => $order_id]
     ]);
 
-    // --- Lógica de Transiciones de Flujo (basada en 'Completado') ---
+    // --- LÓGICA DE TRANSICIONES DE FLUJO (ESTRICTAMENTE SECUENCIAL) ---
     
-     // --- NUEVA REGLA: Carpintería -> Corte ---
-    if ($field_estado_sector === 'estado_carpinteria' && get_field('estado_corte', $order_id) !== 'Pendiente') {
-        update_field('estado_corte', 'Pendiente', $order_id); 
-        wp_insert_post(['post_title' => 'Fase Carpintería completa -> A Corte', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id]]);
-    }
-    // --- FIN NUEVA REGLA ---
-    
-    // Regla: Corte -> Costura
-    if ($field_estado_sector === 'estado_corte' && get_field('estado_costura', $order_id) !== 'Pendiente' && get_field('estado_costura', $order_id) !== 'Completado') {
-        update_field('estado_costura', 'Pendiente', $order_id); 
-        update_field('estado_pedido', 'En Costura', $order_id);
-        wp_insert_post(['post_title' => 'Fase Corte completa -> A Costura', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id]]);
-    }
+    switch ($field_estado_sector) {
+        case 'estado_carpinteria':
+            update_field('estado_corte', 'Pendiente', $order_id);
+            wp_insert_post(['post_title' => 'Fase Carpintería completa -> A Corte', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id]]);
+            break;
+        
+        case 'estado_corte':
+            update_field('estado_costura', 'Pendiente', $order_id);
+            update_field('estado_pedido', 'En Costura', $order_id);
+            wp_insert_post(['post_title' => 'Fase Corte completa -> A Costura', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id]]);
+            break;
 
-    // Regla: Costura Y Carpintería -> Tapicería y Embalaje
-    if (($field_estado_sector === 'estado_costura' || $field_estado_sector === 'estado_carpinteria') && get_field('estado_carpinteria', $order_id) === 'Completado' && get_field('estado_costura', $order_id) === 'Completado') {
-        if(get_field('estado_tapiceria', $order_id) !== 'Pendiente' && get_field('estado_tapiceria', $order_id) !== 'Completado') {
+        case 'estado_costura':
             update_field('estado_tapiceria', 'Pendiente', $order_id);
-        }
-        if(get_field('estado_embalaje', $order_id) !== 'Pendiente' && get_field('estado_embalaje', $order_id) !== 'Completado') {
+            update_field('estado_pedido', 'En Tapicería/Embalaje', $order_id); // Cambiamos el estado general
+            wp_insert_post(['post_title' => 'Fase Costura completa -> A Tapicería', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id]]);
+            break;
+        
+        case 'estado_tapiceria':
             update_field('estado_embalaje', 'Pendiente', $order_id);
-        }
-        update_field('estado_pedido', 'En Tapicería/Embalaje', $order_id);
-        wp_insert_post(['post_title' => 'Fases Carpintería y Costura completas -> A Tapicería/Embalaje', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id]]);
-    }
+            wp_insert_post(['post_title' => 'Fase Tapicería completa -> A Embalaje', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id]]);
+            break;
 
-    // Regla: Tapicería y Embalaje -> Logística
-    if (($field_estado_sector === 'estado_embalaje' || $field_estado_sector === 'estado_tapiceria') && get_field('estado_tapiceria', $order_id) === 'Completado' && get_field('estado_embalaje', $order_id) === 'Completado') {
-        if(get_field('estado_logistica', $order_id) !== 'Pendiente' && get_field('estado_logistica', $order_id) !== 'Completado') {
-            update_field('estado_logistica', 'Pendiente', $order_id); 
+        case 'estado_embalaje':
+            update_field('estado_logistica', 'Pendiente', $order_id);
             update_field('estado_pedido', 'Listo para Entrega', $order_id);
-            wp_insert_post(['post_title' => 'Fase Tapicería/Embalaje completa -> A Logística', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id]]);
-        }
-    }
-
-    // Regla: Logística -> Pendiente de Cierre Admin
-    if ($field_estado_sector === 'estado_logistica' && get_field('estado_pedido', $order_id) !== 'Pendiente de Cierre Admin') {
-        update_field('estado_pedido', 'Pendiente de Cierre Admin', $order_id);
-        update_field('estado_administrativo', 'Listo para Archivar', $order_id);
-        wp_insert_post(['post_title' => 'Entrega Completada -> Pendiente de Cierre Admin', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id]]);
+            wp_insert_post(['post_title' => 'Fase Embalaje completa -> A Logística', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id]]);
+            break;
+        
+        case 'estado_logistica':
+            update_field('estado_pedido', 'Pendiente de Cierre Admin', $order_id);
+            update_field('estado_administrativo', 'Listo para Archivar', $order_id);
+            wp_insert_post(['post_title' => 'Entrega Completada -> Pendiente de Cierre Admin', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id]]);
+            break;
     }
 
     $sector_kpi_data = ghd_calculate_sector_kpis($field_estado_sector);
@@ -1307,6 +1282,8 @@ function ghd_register_task_details_and_complete_callback() {
     wp_die();
 }
 ///////////////////////////////////////////////////// fin ghd_register_task_details_and_complete() //////////////////////////////////////////////////
+
+
 /**
  * --- NUEVO: LÓGICA AJAX PARA ACTUALIZAR VENDEDORA ASIGNADA ---
  * Permite al administrador asignar una vendedora a un pedido directamente desde el selector.
@@ -1578,36 +1555,58 @@ function ghd_filter_orders_callback() {
 
 /**
  * Maneja las redirecciones para el panel de tareas del sector.
- * Se ejecuta antes de que se cargue la plantilla para evitar errores de "headers already sent".
+ * V2 - Ahora redirige al primer panel en el flujo de producción que tenga tareas pendientes.
  */
 add_action('template_redirect', 'ghd_handle_sector_dashboard_redirects');
 function ghd_handle_sector_dashboard_redirects() {
-    // Solo ejecutar esta lógica si estamos en la página del panel de tareas
     if (is_page_template('template-sector-dashboard.php')) {
         
         $current_user = wp_get_current_user();
         if (!$current_user->ID || current_user_can('manage_options')) {
-            // Si el usuario no está logueado o es admin, no hacemos nada aquí.
             return;
         }
 
         $user_roles = (array) $current_user->roles;
         $requested_sector = isset($_GET['sector']) ? sanitize_text_field($_GET['sector']) : '';
 
-        // Identificar todos los roles de líder del usuario
-        $allowed_leader_sectors = [];
-        foreach ($user_roles as $role) {
-            if (strpos($role, 'lider_') !== false) {
-                $allowed_leader_sectors[] = str_replace('lider_', '', $role);
+        // 1. Definir el orden correcto del flujo de producción
+        $production_flow_order = ['carpinteria', 'corte', 'costura', 'tapiceria', 'embalaje', 'logistica'];
+        
+        // 2. Filtrar los roles de líder del usuario y ordenarlos según el flujo
+        $user_leader_sectors = [];
+        foreach ($production_flow_order as $sector_key) {
+            if (in_array('lider_' . $sector_key, $user_roles)) {
+                $user_leader_sectors[] = $sector_key;
             }
         }
 
-        // Si el usuario es un líder pero no se ha especificado un sector en la URL,
-        // lo redirigimos a su primer panel por defecto.
-        if (empty($requested_sector) && !empty($allowed_leader_sectors)) {
+        // Si el usuario no tiene roles de líder, no debería estar aquí.
+        if (empty($user_leader_sectors)) {
+            wp_redirect(home_url('/panel-de-control/'));
+            exit;
+        }
+        
+        // 3. Si se accede a la página sin un sector específico, encontrar el más urgente y redirigir
+        if (empty($requested_sector)) {
             $dashboard_url = get_permalink(get_queried_object_id());
-            $redirect_url = add_query_arg('sector', $allowed_leader_sectors[0], $dashboard_url);
-            wp_redirect($redirect_url);
+            $redirect_sector = $user_leader_sectors[0]; // Por defecto, su primer sector en el flujo
+
+            // Buscar el primer sector con tareas pendientes
+            foreach ($user_leader_sectors as $sector_key) {
+                $query_args = [
+                    'post_type' => 'orden_produccion',
+                    'posts_per_page' => 1, // Solo necesitamos saber si existe al menos una
+                    'meta_query' => [['key' => 'estado_' . $sector_key, 'value' => 'Pendiente', 'compare' => '=']],
+                    'fields' => 'ids', // Consulta más rápida
+                ];
+                $pending_tasks = get_posts($query_args);
+                if (!empty($pending_tasks)) {
+                    $redirect_sector = $sector_key; // Encontramos un sector con tareas, este será el destino
+                    break;
+                }
+            }
+
+            wp_redirect(add_query_arg('sector', $redirect_sector, $dashboard_url));
             exit;
         }
     }

@@ -91,11 +91,12 @@ if ($estado_actual === 'Pendiente') {
         if ($button_text && $can_action_task) :
             if ($estado_actual === 'En Progreso') : // Si la tarea está En Progreso, se muestra el botón para Completar y Registrar Detalles
             ?>
-                <button class="ghd-btn ghd-btn-success action-button open-complete-task-modal"
-                        data-order-id="<?php echo $post_id; ?>"
-                        data-field="<?php echo $campo_estado; ?>"
-                        data-assignee-id="<?php echo esc_attr($asignado_a_id); ?>"> <!-- Paso el ID del asignado por si fuera necesario en el modal -->
-                    <i class="fa-solid fa-check"></i> <span>Marcar Completa y Registrar</span>
+                <button class="ghd-btn ghd-btn-success action-button open-complete-task-modal" 
+                        data-order-id="<?php echo $post_id; ?>" 
+                        data-field="<?php echo $campo_estado; ?>" 
+                        data-assignee-id="<?php echo esc_attr($asignado_a_id); ?>">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Completar Tarea</span>
                 </button>
             <?php else : // Si la tarea está Pendiente, se muestra el botón para Iniciar Tarea
             ?>
@@ -117,25 +118,16 @@ if ($estado_actual === 'Pendiente') {
     <div class="ghd-modal-content">
         <span class="close-button" data-modal-id="complete-task-modal-<?php echo $post_id; ?>">&times;</span>
         <h3>Registrar Detalles y Completar Tarea: <?php echo $titulo; ?></h3>
-        <form class="complete-task-form" data-order-id="<?php echo $post_id; ?>" data-field="<?php echo $campo_estado; ?>">
-            <div class="form-group">
-                <label for="modelo_item_<?php echo $post_id; ?>">Modelo de Sillón:</label>
-                <input type="text" id="modelo_item_<?php echo $post_id; ?>" name="modelo_principal_hecho" required>
-            </div>
-            <div class="form-group">
-                <label for="cantidad_item_<?php echo $post_id; ?>">Cantidad:</label>
-                <input type="number" id="cantidad_item_<?php echo $post_id; ?>" name="cantidad_principal_hecha" min="1" required>
-            </div>
+        <form class="complete-task-form" data-order-id="<?php echo $post_id; ?>" data-field="<?php echo $campo_estado; ?>" enctype="multipart/form-data">
             <div class="form-group">
                 <label for="foto_tarea_<?php echo $post_id; ?>">Foto de la Tarea (Opcional):</label>
                 <input type="file" id="foto_tarea_<?php echo $post_id; ?>" name="foto_tarea" accept="image/*">
             </div>
             <div class="form-group">
                 <label for="observaciones_tarea_<?php echo $post_id; ?>">Observaciones (Opcional):</label>
-                <textarea id="observaciones_tarea_<?php echo $post_id; ?>" name="observaciones_tarea_completa"></textarea>
+                <textarea id="observaciones_tarea_<?php echo $post_id; ?>" name="observaciones_tarea_completa" rows="4"></textarea>
             </div>
-            <button type="submit" class="ghd-btn ghd-btn-success"><i class="fa-solid fa-check"></i> Completar y Guardar</button>
-            <button type="button" class="ghd-btn ghd-btn-secondary close-button" data-modal-id="complete-task-modal-<?php echo $post_id; ?>">Cancelar</button>
+            <button type="submit" class="ghd-btn ghd-btn-success"><i class="fa-solid fa-check"></i> Completar Tarea</button>
         </form>
     </div>
 </div>

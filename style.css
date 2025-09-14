@@ -1310,12 +1310,6 @@ body.page-template-template-login {
     word-break: break-word; /* Permite romper palabras largas dentro del span */
 }
 
-/* Si las tarjetas de tarea (`.ghd-order-card`) son la causa */
-/* .ghd-order-card {
-   /* overflow-x: hidden; -> Ya está definido */
-   /* Puedes añadir ajustes aquí si el problema persiste 
-} */
-
 /* Ajuste para el selector de operarios, para que no cause scroll si el nombre es muy largo */
 .ghd-assignee-selector {
     max-width: 150px; /* Limita el ancho del selector */
@@ -1339,5 +1333,26 @@ body.page-template-template-login {
     }
     .open-complete-task-modal {
         min-width: 44px; /* Un ancho mínimo para que sea fácil de tocar */
+    }
+}
+
+/* --- MEJORA DE ESTILO PARA BOTONES LARGOS EN TARJETAS --- */
+
+/* Asegura que el texto junto al ícono se muestre por defecto */
+.order-card-actions .ghd-btn span {
+    display: inline;
+}
+
+/* En pantallas pequeñas (ej. móviles), ocultar el texto y dejar solo el ícono */
+@media (max-width: 480px) {
+    .order-card-actions .ghd-btn span {
+        display: none; 
+    }
+    .order-card-actions .ghd-btn i {
+        margin-right: 0; /* Quita el espacio extra del ícono cuando no hay texto */
+    }
+    .order-card-actions .ghd-btn {
+        min-width: 44px; /* Un ancho mínimo para que el botón-ícono sea fácil de tocar */
+        justify-content: center;
     }
 }
