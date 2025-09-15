@@ -48,16 +48,21 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tiempoEl) tiempoEl.textContent = kpiData.tiempo_promedio_str_produccion;
     };
 
-        const mainContent = document.querySelector('.ghd-main-content');
+    // --- LÓGICA UNIVERSAL DE EVENTOS EN EL CONTENIDO PRINCIPAL ---
+    const mainContent = document.querySelector('.ghd-main-content');
     if (mainContent) {
 
+        // Listener para todos los CLICKS dentro de mainContent
         mainContent.addEventListener('click', function(e) {
+            
             const target = e.target;
             const actionButton = target.closest('.action-button');
             const openModalButton = target.closest('.open-complete-task-modal');
             const closeModalButton = target.closest('.close-button');
             const refreshTasksBtn = target.closest('#ghd-refresh-tasks');
+            const archiveBtn = target.closest('.archive-order-btn'); // Unificado aquí
 
+            // Lógica para el botón "Refrescar" en el panel de sector
             if (refreshTasksBtn) {
                 e.preventDefault();
                 const sectorTasksList = document.querySelector('.ghd-sector-tasks-list');
@@ -83,6 +88,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
             }
             
+            // Lógica para el botón "Iniciar Tarea" en el Panel de Sector
             if (actionButton && !openModalButton) {
                 e.preventDefault();
                 const card = actionButton.closest('.ghd-order-card');
@@ -114,19 +120,54 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
             }
 
+            // Lógica para abrir el modal de registro de detalles
             if (openModalButton) {
                 e.preventDefault();
                 const modal = document.getElementById(`complete-task-modal-${openModalButton.dataset.orderId}`);
                 if (modal) modal.style.display = 'flex';
             }
 
+            // Lógica para cerrar el modal
             if (closeModalButton) {
                 e.preventDefault();
                 const modal = closeModalButton.closest('.ghd-modal');
                 if (modal) modal.style.display = 'none';
             }
+            
+            // --- CORRECCIÓN: Lógica unificada para el botón "Archivar Pedido" ---
+            if (archiveBtn) { 
+                e.preventDefault();
+                if (!confirm('¿Archivar este pedido? Esta acción es final.')) return;
+
+                const orderId = archiveBtn.dataset.orderId;
+                const container = archiveBtn.closest('tr');
+                if (!container) return;
+                
+                container.style.opacity = '0.5';
+                archiveBtn.disabled = true;
+                archiveBtn.textContent = 'Archivando...';
+                
+                const params = new URLSearchParams({ action: 'ghd_archive_order', nonce: ghd_ajax.nonce, order_id: orderId });
+
+                fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            container.remove();
+                            if (data.data && data.data.kpi_data) {
+                                updateAdminClosureKPIs(data.data.kpi_data);
+                            }
+                        } else {
+                            alert('Error: ' + (data.data?.message || 'No se pudo archivar.'));
+                            container.style.opacity = '1';
+                            archiveBtn.disabled = false;
+                            archiveBtn.textContent = 'Archivar Pedido';
+                        }
+                    });
+            }
         }); 
 
+        // Listener para los SUBMITS (envío de formularios)
         mainContent.addEventListener('submit', function(e) {
             const completeTaskForm = e.target.closest('.complete-task-form');
             if (completeTaskForm) {
@@ -162,7 +203,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
         }); 
-    }// fin if mainContent 
+    } // fin if (mainContent)
 ///////////////////////////// ////////////////////////////////////////////////////
     // --- LÓGICA PARA ASIGNAR PRIORIDAD EN EL PANEL DE ASIGNACIÓN ---
     const assignationPanel = document.querySelector('.page-template-template-admin-dashboard');

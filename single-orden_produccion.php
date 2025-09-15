@@ -87,14 +87,17 @@ $current_user_can_control = current_user_can('control_final_macarena') || curren
 
                 <div class="details-main ghd-card product-details-section">
                     <?php 
-                    $product_image_id = get_field('imagen_del_producto', $current_post_id);
+                    // --- CORRECCIÓN: Lógica robusta para obtener la imagen del producto ---
+                    $product_image = get_field('imagen_del_producto', $current_post_id);
+                    if ($product_image) :
+                        // ACF puede devolver un array, un ID o una URL. Este código maneja los casos más comunes.
+                        $image_url = is_array($product_image) ? $product_image['url'] : (is_numeric($product_image) ? wp_get_attachment_url($product_image) : $product_image);
+                        $image_alt = is_array($product_image) ? $product_image['alt'] : get_the_title();
                     ?>
-                    <?php if ($product_image_id) : ?>
                         <div class="product-image-wrapper">
-                            <?php echo wp_get_attachment_image($product_image_id, 'medium_large'); ?>
+                            <img src="<?php echo esc_url($image_url); ?>" alt="<?php echo esc_attr($image_alt); ?>">
                         </div>
                     <?php endif; ?>
-
                     <div class="product-info-wrapper">
                         <h3 class="card-section-title">Información del Producto</h3>
                         <div class="product-main-info">

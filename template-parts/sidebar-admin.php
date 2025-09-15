@@ -1,8 +1,11 @@
 <?php
 /**
  * Template Part para la barra lateral del panel de Administrador / Control Final.
- * V2 - Muestra enlaces condicionalmente según el rol del usuario.
+ * V3 - Lógica de enlace activo corregida.
  */
+
+// Obtener el slug de la página actual para determinar el enlace activo.
+$current_slug = get_post_field('post_name', get_queried_object_id());
 ?>
 <aside class="ghd-sidebar">
     <div class="sidebar-header">
@@ -10,17 +13,16 @@
     </div>
     <nav class="sidebar-nav">
         <ul>
-            <li class="active">
+            <li class="<?php if ($current_slug === 'panel-de-control' || is_singular('orden_produccion')) echo 'active'; ?>">
                 <a href="<?php echo esc_url(home_url('/panel-de-control/')); ?>">
                     <i class="fa-solid fa-tachometer-alt"></i>
                     <span>Panel de Control</span>
                 </a>
             </li>
 
-            <?php // --- ENLACES SOLO PARA ADMINISTRADORES --- ?>
             <?php if (current_user_can('manage_options')) : ?>
                 <li>
-                    <a href="#"> <!-- Actualiza este enlace a la página de Nuevo Pedido -->
+                    <a href="#">
                         <i class="fa-solid fa-plus"></i>
                         <span>Nuevo Pedido</span>
                     </a>
@@ -32,22 +34,21 @@
                     </a>
                 </li>
                 <li>
-                    <a href="#"> <!-- Actualiza este enlace a la página de Clientes -->
+                    <a href="#">
                         <i class="fa-solid fa-users"></i>
                         <span>Clientes</span>
                     </a>
                 </li>
                 <li>
-                    <a href="#"> <!-- Actualiza este enlace a la página de Reportes -->
+                    <a href="#">
                         <i class="fa-solid fa-chart-line"></i>
                         <span>Reportes</span>
                     </a>
                 </li>
             <?php endif; ?>
-            <?php // --- FIN DE ENLACES SOLO PARA ADMINISTRADORES --- ?>
 
-            <li>
-                <a href="#"> <!-- Actualiza este enlace a la página de Pedidos Archivados -->
+            <li class="<?php if ($current_slug === 'pedidos-archivados') echo 'active'; ?>">
+                <a href="<?php echo esc_url(home_url('/pedidos-archivados/')); ?>">
                     <i class="fa-solid fa-archive"></i>
                     <span>Pedidos Archivados</span>
                 </a>
@@ -55,7 +56,7 @@
 
             <?php if (current_user_can('manage_options')) : ?>
                 <li>
-                    <a href="#"> <!-- Actualiza este enlace a la página de Configuración -->
+                    <a href="#">
                         <i class="fa-solid fa-cog"></i>
                         <span>Configuración</span>
                     </a>

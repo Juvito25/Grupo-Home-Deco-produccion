@@ -690,10 +690,13 @@ add_action('wp_ajax_ghd_update_task_status', function() {
 add_action('wp_ajax_ghd_archive_order', 'ghd_archive_order_callback');
 function ghd_archive_order_callback() {
     check_ajax_referer('ghd-ajax-nonce', 'nonce');
-    // Ahora, solo el Admin principal puede archivar
-    if (!current_user_can('manage_options')) {
+
+    // --- CORRECCIÓN: Permitir acceso a Admin Y a Control Final ---
+    if (!current_user_can('manage_options') && !current_user_can('control_final_macarena')) {
         wp_send_json_error(['message' => 'No tienes permisos para archivar pedidos.']);
-    }
+        wp_die();
+    }    
+
     $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
     if (!$order_id) {
         wp_send_json_error(['message' => 'ID de pedido no válido.']);
