@@ -856,3 +856,37 @@ window.addEventListener('load', function() {
         history.pushState("", document.title, window.location.pathname + window.location.search);
     }
 });
+
+
+// --- LÓGICA PARA EL BOTÓN "REFRESCAR" EN LA PÁGINA DE PEDIDOS ARCHIVADOS ---
+const refreshArchivedBtn = document.getElementById('ghd-refresh-archived-orders');
+if (refreshArchivedBtn) {
+    refreshArchivedBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        
+        const tableBody = document.getElementById('ghd-archived-orders-table-body');
+        if (!tableBody) return;
+
+        tableBody.style.opacity = '0.5';
+        refreshArchivedBtn.disabled = true;
+
+        const params = new URLSearchParams({
+            action: 'ghd_refresh_archived_orders',
+            nonce: ghd_ajax.nonce
+        });
+
+        fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    tableBody.innerHTML = data.data.table_html;
+                } else {
+                    alert('Error: ' + (data.data?.message || 'No se pudo refrescar la lista.'));
+                }
+            })
+            .finally(() => {
+                tableBody.style.opacity = '1';
+                refreshArchivedBtn.disabled = false;
+            });
+    });
+}

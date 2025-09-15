@@ -23,7 +23,7 @@ get_header();
                 <h2>Pedidos Archivados</h2>
             </div> 
             <div class="header-actions">
-                <button onclick="window.location.reload();" class="ghd-btn ghd-btn-secondary"><i class="fa-solid fa-sync"></i> <span>Refrescar</span></button>
+                <button id="ghd-refresh-archived-orders" class="ghd-btn ghd-btn-secondary"><i class="fa-solid fa-sync"></i> <span>Refrescar</span></button>
             </div>
         </header>
 

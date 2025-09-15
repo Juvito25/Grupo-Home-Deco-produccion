@@ -985,75 +985,6 @@ function ghd_register_archived_orders_template( $templates ) {
     return $templates;
 }
 
-/**
- * AJAX Handler para refrescar la sección de Pedidos Archivados.
- */
-add_action('wp_ajax_ghd_refresh_archived_orders', 'ghd_refresh_archived_orders_callback');
-function ghd_refresh_archived_orders_callback() {
-    check_ajax_referer('ghd-ajax-nonce', 'nonce');
-    if (!current_user_can('manage_options')) wp_send_json_error(['message' => 'No tienes permisos.']);
-
-    ob_start();
-    $args_archivados = array(
-        'post_type'      => 'orden_produccion',
-        'posts_per_page' => -1,
-        'meta_query'     => array(
-            array(
-                'key'     => 'estado_pedido',
-                'value'   => 'Completado y Archivado',
-                'compare' => '=',
-            ),
-        ),
-        'orderby' => 'modified',
-        'order'   => 'DESC',
-    );
-    $pedidos_archivados_query = new WP_Query($args_archivados);
-
-    $remito_page_id = get_posts([
-        'post_type'  => 'page',
-        'fields'     => 'ids',
-        'nopaging'   => true,
-        'meta_key'   => '_wp_page_template',
-        'meta_value' => 'template-remito.php'
-    ]);
-    $remito_base_url = !empty($remito_page_id) ? get_permalink($remito_page_id[0]) : home_url();
-
-    if ($pedidos_archivados_query->have_posts()) :
-        while ($pedidos_archivados_query->have_posts()) : $pedidos_archivados_query->the_post();
-            $order_id = get_the_ID();
-            $remito_url = esc_url( add_query_arg( 'order_id', $order_id, $remito_base_url ) );
-        ?>
-            <tr id="order-row-archived-<?php echo $order_id; ?>">
-                <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
-                <td><?php echo esc_html(get_field('nombre_cliente', $order_id)); ?></td>
-                <td><?php echo esc_html(get_field('nombre_producto', $order_id)); ?></td>
-                <td><?php echo get_the_modified_date('d/m/Y', $order_id); ?></td>
-                <td>
-                    <a href="<?php echo $remito_url; ?>" target="_blank" class="ghd-btn ghd-btn-secondary ghd-btn-small generate-remito-btn" data-order-id="<?php echo $order_id; ?>">
-                        <i class="fa-solid fa-file-invoice"></i> Remito
-                    </a>
-                    <a href="<?php the_permalink(); ?>" class="ghd-btn ghd-btn-secondary ghd-btn-small">
-                        <i class="fa-solid fa-eye"></i> Detalles
-                    </a>
-                </td>
-            </tr>
-        <?php
-        endwhile;
-    else: 
-    ?>
-        <tr><td colspan="5" style="text-align:center;">No hay pedidos archivados.</td></tr>
-    <?php
-    endif;
-    wp_reset_postdata(); 
-    $archived_orders_html = ob_get_clean();
-
-    wp_send_json_success([
-        'message' => 'Pedidos archivados actualizados.',
-        'table_html' => $archived_orders_html
-    ]);
-    wp_die();
-}
-
 
 /**
  * --- NUEVO ENDPOINT AJAX: Registrar Detalles de Tarea y Marcar como Completada ---
@@ -1582,3 +1513,55 @@ function ghd_sync_admin_status_on_save($post_id) {
         }
     }
 }
+
+/**
+ * AJAX Handler para refrescar la tabla de Pedidos Archivados.
+ */
+add_action('wp_ajax_ghd_refresh_archived_orders', 'ghd_refresh_archived_orders_callback');
+function ghd_refresh_archived_orders_callback() {
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+    if (!current_user_can('manage_options') && !current_user_can('control_final_macarena')) {
+        wp_send_json_error(['message' => 'No tienes permisos.']);
+        wp_die();
+    }
+
+    ob_start();
+
+    $args_archivados = array(
+        'post_type'      => 'orden_produccion',
+        'posts_per_page' => -1,
+        'meta_query'     => [['key' => 'estado_pedido', 'value' => 'Completado y Archivado']],
+        'orderby'        => 'modified',
+        'order'          => 'DESC',
+    );
+    $pedidos_archivados_query = new WP_Query($args_archivados);
+
+    if ($pedidos_archivados_query->have_posts()) :
+        while ($pedidos_archivados_query->have_posts()) : $pedidos_archivados_query->the_post();
+            $order_id = get_the_ID();
+    ?>
+            <tr id="order-row-archived-<?php echo $order_id; ?>">
+                <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
+                <td><?php echo esc_html(get_field('nombre_cliente', $order_id)); ?></td>
+                <td><?php echo esc_html(get_field('nombre_producto', $order_id)); ?></td>
+                <td><?php echo get_the_modified_date('d/m/Y H:i', $order_id); ?></td>
+                <td>
+                    <a href="<?php the_permalink(); ?>" class="ghd-btn ghd-btn-secondary ghd-btn-small">
+                        <i class="fa-solid fa-eye"></i> Ver Detalles
+                    </a>
+                </td>
+            </tr>
+    <?php
+        endwhile;
+    else: 
+    ?>
+        <tr><td colspan="5" style="text-align:center;">No hay pedidos archivados.</td></tr>
+    <?php
+    endif;
+    wp_reset_postdata(); 
+
+    $html = ob_get_clean();
+
+    wp_send_json_success(['table_html' => $html]);
+    wp_die();
+} // fin ghd_refresh_archived_orders_callback()
