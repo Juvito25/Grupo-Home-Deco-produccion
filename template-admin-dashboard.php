@@ -124,15 +124,52 @@ get_header();
                 </thead>
                 <tbody id="ghd-closure-table-body">
                     <?php
-                    $pedidos_cierre_query = new WP_Query(['post_type' => 'orden_produccion', 'posts_per_page' => -1, 'meta_query' => [['key' => 'estado_pedido', 'value' => 'Pendiente de Cierre Admin']]]);
+                    $args_cierre = array(
+                        'post_type'      => 'orden_produccion',
+                        'posts_per_page' => -1,
+                        'meta_query'     => array(
+                            array(
+                                'key'     => 'estado_pedido',
+                                'value'   => 'Pendiente de Cierre Admin',
+                                'compare' => '=',
+                            ),
+                        ),
+                        'orderby' => 'date',
+                        'order'   => 'ASC',
+                    );
+                    $pedidos_cierre_query = new WP_Query($args_cierre);
+
+                    // Obtener la URL base para el remito una sola vez
+                    $remito_page = get_page_by_path('generador-de-remitos'); // Asegúrate de que el slug de tu página de remito sea 'remito'
+                    $remito_base_url = $remito_page ? get_permalink($remito_page->ID) : home_url();
+
                     if ($pedidos_cierre_query->have_posts()) :
                         while ($pedidos_cierre_query->have_posts()) : $pedidos_cierre_query->the_post();
-                            // Lógica para mostrar cada fila...
+                            $order_id = get_the_ID();
+                            $remito_url = esc_url(add_query_arg('order_id', $order_id, $remito_base_url));
+                    ?>
+                        <tr id="order-row-closure-<?php echo $order_id; ?>">
+                            <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
+                            <td><?php echo esc_html(get_field('nombre_cliente', $order_id)); ?></td>
+                            <td><?php echo esc_html(get_field('nombre_producto', $order_id)); ?></td>
+                            <td><?php echo get_the_date('d/m/Y', $order_id); ?></td>
+                            <td>
+                                <a href="<?php echo $remito_url; ?>" target="_blank" class="ghd-btn ghd-btn-secondary ghd-btn-small">
+                                    <i class="fa-solid fa-file-invoice"></i> Generar Remito
+                                </a>
+                                <button class="ghd-btn ghd-btn-success archive-order-btn" data-order-id="<?php echo $order_id; ?>">
+                                    Archivar Pedido
+                                </button>
+                            </td>
+                        </tr>
+                    <?php
                         endwhile;
-                    else:
-                        echo '<tr><td colspan="5" style="text-align:center;">No hay pedidos pendientes de cierre.</td></tr>';
+                    else: 
+                    ?>
+                        <tr><td colspan="5" style="text-align:center;">No hay pedidos pendientes de cierre.</td></tr>
+                    <?php
                     endif;
-                    wp_reset_postdata();
+                    wp_reset_postdata(); 
                     ?>
                 </tbody>
             </table>

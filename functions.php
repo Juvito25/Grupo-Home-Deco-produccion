@@ -901,14 +901,19 @@ function ghd_refresh_admin_closure_section_callback() {
     );
     $pedidos_cierre_query = new WP_Query($args_cierre);
 
-    $remito_page_id = get_posts([
-        'post_type'  => 'page',
-        'fields'     => 'ids',
-        'nopaging'   => true,
-        'meta_key'   => '_wp_page_template',
-        'meta_value' => 'template-remito.php'
-    ]);
-    $remito_base_url = !empty($remito_page_id) ? get_permalink($remito_page_id[0]) : home_url();
+    // $remito_page_id = get_posts([
+    //     'post_type'  => 'page',
+    //     'fields'     => 'ids',
+    //     'nopaging'   => true,
+    //     'meta_key'   => '_wp_page_template',
+    //     'meta_value' => 'template-remito.php'
+    // ]);
+    // $remito_base_url = !empty($remito_page_id) ? get_permalink($remito_page_id[0]) : home_url();
+    
+
+    // --- CORRECCIÓN: Usar get_page_by_path para obtener la URL de la página de remito ---
+    $remito_page = get_page_by_path('remito'); // ASEGÚRATE DE QUE EL SLUG DE TU PÁGINA SEA 'remito'
+    $remito_base_url = $remito_page ? get_permalink($remito_page->ID) : home_url();
 
     if ($pedidos_cierre_query->have_posts()) :
         while ($pedidos_cierre_query->have_posts()) : $pedidos_cierre_query->the_post();
@@ -924,7 +929,7 @@ function ghd_refresh_admin_closure_section_callback() {
                     <a href="<?php echo $remito_url; ?>" target="_blank" class="ghd-btn ghd-btn-secondary ghd-btn-small generate-remito-btn" data-order-id="<?php echo $order_id; ?>">
                         <i class="fa-solid fa-file-invoice"></i> Generar Remito
                     </a>
-                    <button class="ghd-btn ghd-btn-primary archive-order-btn" data-order-id="<?php echo $order_id; ?>">
+                    <button class="ghd-btn ghd-btn-success archive-order-btn" data-order-id="<?php echo $order_id; ?>">
                         Archivar Pedido
                     </button>
                 </td>

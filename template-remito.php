@@ -5,8 +5,9 @@
  */
 
 // Asegurarse de que el usuario está logueado y es administrador
-if (!is_user_logged_in() || !current_user_can('manage_options')) {
-    wp_die('No tienes permisos para acceder a esta página.', 'Acceso Denegado', ['response' => 403]);
+// --- CORRECCIÓN: Permitir acceso a Admin Y a Control Final(administrativo) ---
+if ( ! is_user_logged_in() || ( ! current_user_can('manage_options') && ! current_user_can('control_final_macarena') ) ) {
+    wp_die('No tienes permisos para acceder a esta página.');
 }
 
 // Obtener el ID del pedido de la URL
