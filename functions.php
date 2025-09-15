@@ -594,137 +594,6 @@ function ghd_hide_admin_bar() {
 }
 
 /**
- * Redirige los accesos a wp-login.php y /wp-admin a la página de login personalizada.
- * Excepto para administradores logueados.
- * Permite que el procesamiento de logout se complete.
- */
-add_action('init', 'ghd_redirect_wp_login_to_custom_page');
-function ghd_redirect_wp_login_to_custom_page() {
-    // No redirigir si es una petición AJAX o CRON, o si se está procesando un logout.
-    if (defined('DOING_AJAX') || defined('DOING_CRON') || (isset($_GET['action']) && $_GET['action'] === 'logout')) {
-        return;
-    }
-
-    $login_page_query = get_posts([
-        'post_type'  => 'page',
-        'fields'     => 'ids',
-        'nopaging'   => true,
-        'meta_key'   => '_wp_page_template',
-        'meta_value' => 'template-login.php'
-    ]);
-    $custom_login_url = !empty($login_page_query) ? get_permalink($login_page_query[0]) : wp_login_url();
-
-    $current_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
-    $is_wp_login = strpos($current_url, 'wp-login.php') !== false;
-    $is_wp_admin = strpos($current_url, 'wp-admin') !== false;
-    $is_custom_login_page = strpos($current_url, untrailingslashit($custom_login_url)) !== false;
-
-    // Si el usuario ya está logueado:
-    if (is_user_logged_in()) {
-        $user = wp_get_current_user();
-        // Si es un administrador, permitimos que acceda a /wp-admin
-        if (in_array('administrator', (array) $user->roles)) {
-            return; // No redirigir al administrador logueado
-        }
-        
-        // Para cualquier otro rol logueado (no-admin), si está en /wp-admin o wp-login.php, redirigir a su dashboard de sector.
-        if ($is_wp_admin || $is_wp_login) {
-            $sector_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-sector-dashboard.php']);
-            $sector_dashboard_url = !empty($sector_pages) ? get_permalink($sector_pages[0]) : home_url();
-            
-            $user_roles = $user->roles;
-            $user_role = !empty($user_roles) ? $user_roles[0] : '';
-            $mapa_roles = ghd_get_mapa_roles_a_campos();
-            if (array_key_exists($user_role, $mapa_roles)) {
-                // Ya no añadimos el parámetro ?sector aquí. La plantilla del sector debe detectarlo por el rol.
-                wp_redirect($sector_dashboard_url); 
-                exit();
-            } else {
-                wp_redirect($sector_dashboard_url);
-                exit();
-            }
-            // if (array_key_exists($user_role, $mapa_roles)) {
-            //     $sector_name = ucfirst(str_replace(['rol_', '_'], ' ', $user_role));
-            //     $clean_sector_name = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $sector_name));
-            //     $final_redirect_url = add_query_arg('sector', urlencode($clean_sector_name), $sector_dashboard_url);
-            //     wp_redirect($final_redirect_url);
-            //     exit();
-            // } else {
-            //     wp_redirect($sector_dashboard_url);
-            //     exit();
-            // }
-        }
-        return; // Si está logueado y no está en /wp-admin/wp-login, no hacer nada.
-    }
-    
-    // Si el usuario NO está logueado y está en wp-login.php o /wp-admin (y no es ya la página de login personalizada)
-    if (!is_user_logged_in() && ($is_wp_login || $is_wp_admin) && !$is_custom_login_page) {
-        wp_redirect( $custom_login_url );
-        exit();
-    }
-}
-//////////////////////// FIN DEL LOGIN / LOGOUT //////////////////////////////////////
-// --- 5. LÓGICA AJAX ---
-add_action('wp_ajax_ghd_admin_action', function() {
-    check_ajax_referer('ghd-ajax-nonce', 'nonce'); 
-    if (!current_user_can('edit_posts')) wp_send_json_error(['message' => 'No tienes permisos para editar posts.']);
-
-    $id = intval($_POST['order_id']); 
-    $type = sanitize_key($_POST['type']);
-
-    if ($type === 'start_production') {
-        if (get_post_type($id) !== 'orden_produccion') {
-            wp_send_json_error(['message' => 'ID de pedido no válido.']);
-        }
-        if (get_field('estado_pedido', $id) !== 'Pendiente de Asignación') {
-            wp_send_json_error(['message' => 'El pedido no está pendiente de asignación.']);
-        }
-        // --- NUEVO: Obtener la prioridad seleccionada desde el frontend ---
-        $selected_priority = isset($_POST['priority']) ? sanitize_text_field($_POST['priority']) : '';
-        
-        // Opcional: Requerir que una prioridad válida sea seleccionada antes de iniciar
-        if (empty($selected_priority) || $selected_priority === 'Seleccionar Prioridad') {
-            wp_send_json_error(['message' => 'Por favor, selecciona una prioridad para el pedido antes de iniciar la producción.']);
-        }
-        // Actualizar la prioridad en el campo de ACF si es diferente o no estaba guardada
-        if (get_field('prioridad_pedido', $id) !== $selected_priority) {
-            update_field('prioridad_pedido', $selected_priority, $id);
-            wp_insert_post(['post_title' => 'Prioridad fijada a ' . $selected_priority . ' al iniciar producción.', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $id, '_nueva_prioridad' => $selected_priority]]);
-        }
-        // --- FIN NUEVO BLOQUE ---
-        
-        // --- NUEVO: Capturar y guardar la vendedora asignada al iniciar producción ---
-        $vendedora_asignada_id = isset($_POST['vendedora_id']) ? intval($_POST['vendedora_id']) : 0;
-        if ($vendedora_asignada_id === 0) { // Si el frontend no envió una vendedora válida
-            wp_send_json_error(['message' => 'Por favor, selecciona una vendedora para el pedido antes de iniciar la producción.']);
-        }
-        // Actualizar la vendedora en el campo de ACF si es diferente o no estaba guardada
-        if (get_field('vendedora_asignada', $id) !== $vendedora_asignada_id) {
-            update_field('vendedora_asignada', $vendedora_asignada_id, $id);
-            $vendedora_obj = get_userdata($vendedora_asignada_id);
-            $vendedora_name = $vendedora_obj ? $vendedora_obj->display_name : 'ID Desconocido';
-            wp_insert_post(['post_title' => 'Vendedora ' . $vendedora_name . ' asignada al iniciar producción.', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $id, '_vendedora_id' => $vendedora_asignada_id]]);
-        }
-        // --- FIN NUEVO ---
-
-        update_field('estado_carpinteria', 'Pendiente', $id);
-        // update_field('estado_corte', 'Pendiente', $id);
-        update_field('estado_pedido', 'En Producción', $id);
-        update_post_meta($id, 'historial_produccion_iniciada_timestamp', current_time('U'));
-
-        wp_insert_post([
-            'post_title' => 'Producción Iniciada para ' . get_the_title($id),
-            'post_type' => 'ghd_historial',
-            'meta_input' => ['_orden_produccion_id' => $id]
-        ]);
-        
-        wp_send_json_success(['message' => 'Producción iniciada con éxito.']);
-    }
-    
-    wp_send_json_error(['message' => 'Acción no reconocida.']);
-});
-
-/**
  * --- NUEVO: LÓGICA AJAX PARA ACTUALIZAR PRIORIDAD DE PEDIDO ---
  * Permite al administrador actualizar la prioridad de un pedido directamente desde el selector.
  */
@@ -1006,7 +875,11 @@ function ghd_refresh_sector_tasks_callback() {
 add_action('wp_ajax_ghd_refresh_admin_closure_section', 'ghd_refresh_admin_closure_section_callback');
 function ghd_refresh_admin_closure_section_callback() {
     check_ajax_referer('ghd-ajax-nonce', 'nonce');
-    if (!current_user_can('manage_options')) wp_send_json_error(['message' => 'No tienes permisos.']);
+     // --- CORRECCIÓN: Permitir acceso a Admin Y a Control Final ---
+    if (!current_user_can('manage_options') && !current_user_can('control_final_macarena')) {
+        wp_send_json_error(['message' => 'No tienes permisos.']);
+        wp_die();
+    }
 
     // 1. Recalcular KPIs para la sección de cierre
     $admin_closure_kpis = ghd_calculate_admin_closure_kpis();
@@ -1173,24 +1046,6 @@ function ghd_refresh_archived_orders_callback() {
     wp_die();
 }
 
-/**
- * Redirige a la página de inicio de sesión personalizada después del logout.
- */
-add_filter('logout_redirect', 'ghd_custom_logout_redirect', 10, 2);
-function ghd_custom_logout_redirect($logout_redirect, $requested_redirect_to) {
-    // Obtener la URL de tu página de login personalizada
-    $login_page_query = get_posts([
-        'post_type'  => 'page',
-        'fields'     => 'ids',
-        'nopaging'   => true,
-        'meta_key'   => '_wp_page_template',
-        'meta_value' => 'template-login.php' // Asumo que tu plantilla de login se llama template-login.php
-    ]);
-    $custom_login_url = !empty($login_page_query) ? get_permalink($login_page_query[0]) : wp_login_url(); // Fallback
-    
-    // Siempre redirigir a la página de login personalizada
-    return $custom_login_url;
-}
 
 /**
  * --- NUEVO ENDPOINT AJAX: Registrar Detalles de Tarea y Marcar como Completada ---
@@ -1553,61 +1408,169 @@ function ghd_filter_orders_callback() {
     wp_die();
 }
 
+
+/// // // // // // // // // // // // // / 
 /**
- * Maneja las redirecciones para el panel de tareas del sector.
- * V2 - Ahora redirige al primer panel en el flujo de producción que tenga tareas pendientes.
+ * AJAX Handler para que el control administrativo (Macarena) actualice los datos de cierre del pedido.
  */
-add_action('template_redirect', 'ghd_handle_sector_dashboard_redirects');
-function ghd_handle_sector_dashboard_redirects() {
-    if (is_page_template('template-sector-dashboard.php')) {
-        
-        $current_user = wp_get_current_user();
-        if (!$current_user->ID || current_user_can('manage_options')) {
-            return;
+add_action('wp_ajax_ghd_admin_final_update', 'ghd_admin_final_update_callback');
+function ghd_admin_final_update_callback() {
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+    if (!current_user_can('control_final_macarena') && !current_user_can('manage_options')) {
+        wp_send_json_error(['message' => 'No tienes permisos para esta acción.']);
+        wp_die();
+    }
+
+    $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
+    if (!$order_id) {
+        wp_send_json_error(['message' => 'ID de pedido no válido.']);
+        wp_die();
+    }
+
+    // Actualizar campos de texto y selección
+    if (isset($_POST['estado_pago'])) {
+        update_field('estado_pago', sanitize_text_field($_POST['estado_pago']), $order_id);
+    }
+    if (isset($_POST['notas_administrativas'])) {
+        update_field('notas_administrativas', sanitize_textarea_field($_POST['notas_administrativas']), $order_id);
+    }
+
+    // Manejar subida de archivo de imagen
+    if (isset($_FILES['foto_remito_firmado']) && !empty($_FILES['foto_remito_firmado']['name'])) {
+        require_once(ABSPATH . 'wp-admin/includes/image.php');
+        require_once(ABSPATH . 'wp-admin/includes/file.php');
+        require_once(ABSPATH . 'wp-admin/includes/media.php');
+
+        $attachment_id = media_handle_upload('foto_remito_firmado', $order_id);
+        if (!is_wp_error($attachment_id)) {
+            update_field('foto_remito_firmado', $attachment_id, $order_id);
+        } else {
+            // Si la subida falla, no es un error fatal, pero se puede notificar
+            wp_send_json_error(['message' => 'Datos guardados, pero la foto del remito no se pudo subir: ' . $attachment_id->get_error_message()]);
+            wp_die();
         }
+    }
 
-        $user_roles = (array) $current_user->roles;
-        $requested_sector = isset($_GET['sector']) ? sanitize_text_field($_GET['sector']) : '';
+    wp_insert_post([
+        'post_title' => 'Control Administrativo actualizado por ' . wp_get_current_user()->display_name,
+        'post_type'  => 'ghd_historial',
+        'meta_input' => ['_orden_produccion_id' => $order_id]
+    ]);
+    
+    wp_send_json_success(['message' => 'Datos administrativos guardados con éxito.']);
+    wp_die();
+} // fin ghd_admin_final_update_callback()
 
-        // 1. Definir el orden correcto del flujo de producción
-        $production_flow_order = ['carpinteria', 'corte', 'costura', 'tapiceria', 'embalaje', 'logistica'];
-        
-        // 2. Filtrar los roles de líder del usuario y ordenarlos según el flujo
-        $user_leader_sectors = [];
-        foreach ($production_flow_order as $sector_key) {
-            if (in_array('lider_' . $sector_key, $user_roles)) {
-                $user_leader_sectors[] = $sector_key;
-            }
-        }
+// --- LÓGICA DE LOGIN, LOGOUT Y REDIRECCIONES (VERSIÓN FINAL UNIFICADA) ---
 
-        // Si el usuario no tiene roles de líder, no debería estar aquí.
-        if (empty($user_leader_sectors)) {
-            wp_redirect(home_url('/panel-de-control/'));
+/**
+ * Redirige a los usuarios desde /wp-login.php a la página de login personalizada.
+ */
+add_action('init', 'ghd_redirect_default_login_page');
+function ghd_redirect_default_login_page() {
+    // Usamos $GLOBALS['pagenow'] que es más fiable que $_SERVER['SCRIPT_NAME']
+    if ($GLOBALS['pagenow'] === 'wp-login.php' && !is_user_logged_in() && !isset($_GET['action'])) {
+        $login_page = get_page_by_path('iniciar-sesion');
+        if ($login_page) {
+            wp_redirect(get_permalink($login_page->ID));
             exit;
         }
+    }
+}
+
+/**
+ * Redirige a los usuarios a su panel correspondiente DESPUÉS de un inicio de sesión exitoso.
+ */
+add_filter('login_redirect', 'ghd_custom_login_redirect', 10, 3);
+function ghd_custom_login_redirect($redirect_to, $requested_redirect_to, $user) {
+    if (is_wp_error($user)) {
+        return $redirect_to; // Si hay error, devuelve al login
+    }
+
+    $user_roles = (array) $user->roles;
+    
+    // 1. Administradores van al backend de WordPress
+    if (in_array('administrator', $user_roles)) {
+        return admin_url();
+    }
+
+    // 2. Revisar si el usuario es un líder de producción
+    $is_production_leader = false;
+    foreach ($user_roles as $role) {
+        if (strpos($role, 'lider_') !== false) {
+            $is_production_leader = true;
+            break;
+        }
+    }
+
+    // 3. Redirigir a los líderes de producción a su panel de tareas
+    if ($is_production_leader) {
+        $sector_page = get_page_by_path('mis-tareas');
+        if ($sector_page) {
+            return get_permalink($sector_page->ID);
+        }
+    }
+
+    // 4. Para TODOS los demás roles (Macarena, Vendedoras, Operarios), redirigir al panel de control principal
+    $control_page = get_page_by_path('panel-de-control');
+    if ($control_page) {
+        return get_permalink($control_page->ID);
+    }
+
+    // 5. Fallback final si ninguna de las páginas existe
+    return home_url();
+}
+
+/**
+ * Redirige al usuario a la página de login personalizada DESPUÉS de cerrar sesión.
+ */
+add_filter('logout_redirect', 'ghd_custom_logout_redirect', 10, 2);
+function ghd_custom_logout_redirect($logout_url, $redirect) {
+    $login_page = get_page_by_path('iniciar-sesion');
+    if ($login_page) {
+        return get_permalink($login_page->ID);
+    }
+    return home_url(); // Fallback
+}
+
+/**
+ * Previene el acceso directo al backend de WordPress (/wp-admin/) para usuarios que no son administradores.
+ */
+add_action('admin_init', 'ghd_prevent_backend_access');
+function ghd_prevent_backend_access() {
+    // La condición is_admin() asegura que esto solo se ejecute en páginas del backend.
+    if (is_admin() && !current_user_can('manage_options') && !(defined('DOING_AJAX') && DOING_AJAX)) {
+        wp_redirect(home_url()); // Redirigir a la página de inicio si intentan acceder al backend
+        exit;
+    }
+}
+
+/**
+ * Sincroniza el estado del pedido cuando se actualiza el estado administrativo.
+ * Si el estado administrativo se pone en "Pendiente", el estado general del pedido
+ * se actualiza a "Pendiente de Cierre Admin" para que aparezca en el panel de Macarena.
+ */
+add_action('acf/save_post', 'ghd_sync_admin_status_on_save', 20);
+function ghd_sync_admin_status_on_save($post_id) {
+    // Solo ejecutar para nuestro tipo de post
+    if (get_post_type($post_id) !== 'orden_produccion') {
+        return;
+    }
+
+    // Verificar si el campo 'estado_administrativo' fue enviado en el guardado
+    if (isset($_POST['acf']['field_68b1a71b7c0b1'])) { // Reemplaza 'field_xxxxxxxxxxxxxx' con la KEY del campo 'estado_administrativo'
         
-        // 3. Si se accede a la página sin un sector específico, encontrar el más urgente y redirigir
-        if (empty($requested_sector)) {
-            $dashboard_url = get_permalink(get_queried_object_id());
-            $redirect_sector = $user_leader_sectors[0]; // Por defecto, su primer sector en el flujo
+        $estado_admin = get_field('estado_administrativo', $post_id);
 
-            // Buscar el primer sector con tareas pendientes
-            foreach ($user_leader_sectors as $sector_key) {
-                $query_args = [
-                    'post_type' => 'orden_produccion',
-                    'posts_per_page' => 1, // Solo necesitamos saber si existe al menos una
-                    'meta_query' => [['key' => 'estado_' . $sector_key, 'value' => 'Pendiente', 'compare' => '=']],
-                    'fields' => 'ids', // Consulta más rápida
-                ];
-                $pending_tasks = get_posts($query_args);
-                if (!empty($pending_tasks)) {
-                    $redirect_sector = $sector_key; // Encontramos un sector con tareas, este será el destino
-                    break;
-                }
-            }
+        if ($estado_admin === 'Pendiente') {
+            // Para evitar un bucle infinito al guardar, removemos temporalmente la acción
+            remove_action('acf/save_post', 'ghd_sync_admin_status_on_save', 20);
 
-            wp_redirect(add_query_arg('sector', $redirect_sector, $dashboard_url));
-            exit;
+            // Actualizamos el campo principal 'estado_pedido'
+            update_field('estado_pedido', 'Pendiente de Cierre Admin', $post_id);
+
+            // Volvemos a añadir la acción para futuras ediciones
+            add_action('acf/save_post', 'ghd_sync_admin_status_on_save', 20);
         }
     }
 }

@@ -52,45 +52,29 @@ document.addEventListener('DOMContentLoaded', function() {
     if (mainContent) {
 
         mainContent.addEventListener('click', function(e) {
-            
             const target = e.target;
             const actionButton = target.closest('.action-button');
             const openModalButton = target.closest('.open-complete-task-modal');
             const closeModalButton = target.closest('.close-button');
-            const startProductionBtn = target.closest('.start-production-btn');
-            const archiveBtn = target.closest('.archive-order-btn');
             const refreshTasksBtn = target.closest('#ghd-refresh-tasks');
 
             if (refreshTasksBtn) {
                 e.preventDefault();
                 const sectorTasksList = document.querySelector('.ghd-sector-tasks-list');
-                const mainContentEl = document.querySelector('.ghd-main-content');
-                const campoEstado = mainContentEl ? mainContentEl.dataset.campoEstado : '';
-
-                if (!sectorTasksList || !campoEstado) {
-                    console.error("Error: Elementos necesarios para el refresco no encontrados.");
-                    return;
-                }
+                const campoEstado = mainContent.dataset.campoEstado || '';
+                if (!sectorTasksList || !campoEstado) return;
 
                 sectorTasksList.style.opacity = '0.5';
                 refreshTasksBtn.disabled = true;
 
-                const params = new URLSearchParams({
-                    action: 'ghd_refresh_sector_tasks',
-                    nonce: ghd_ajax.nonce,
-                    campo_estado: campoEstado
-                });
+                const params = new URLSearchParams({ action: 'ghd_refresh_sector_tasks', nonce: ghd_ajax.nonce, campo_estado: campoEstado });
 
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                     .then(res => res.json())
                     .then(data => {
-                        if (data.success) {
+                        if (data.success && data.data) {
                             sectorTasksList.innerHTML = data.data.tasks_html;
-                            if (data.data.kpi_data) {
-                                updateSectorKPIs(data.data.kpi_data);
-                            }
-                        } else {
-                            alert('Error al refrescar tareas: ' + (data.data?.message || 'Error desconocido.'));
+                            if (data.data.kpi_data) updateSectorKPIs(data.data.kpi_data);
                         }
                     })
                     .finally(() => {
@@ -109,17 +93,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('Por favor, asigna un operario antes de iniciar la tarea.');
                     return;
                 }
-
                 card.style.opacity = '0.5';
                 actionButton.disabled = true;
                 
                 const params = new URLSearchParams({ 
-                    action: 'ghd_update_task_status', 
-                    nonce: ghd_ajax.nonce, 
-                    order_id: actionButton.dataset.orderId, 
-                    field: actionButton.dataset.field, 
-                    value: actionButton.dataset.value,
-                    assignee_id: assigneeId
+                    action: 'ghd_update_task_status', nonce: ghd_ajax.nonce, order_id: actionButton.dataset.orderId, 
+                    field: actionButton.dataset.field, value: actionButton.dataset.value, assignee_id: assigneeId
                 });
 
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
@@ -128,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (data.success) {
                             document.getElementById('ghd-refresh-tasks')?.click();
                         } else { 
-                            alert('Error al actualizar: ' + (data.data?.message || 'Error desconocido')); 
+                            alert('Error: ' + (data.data?.message || 'Error desconocido')); 
                             card.style.opacity = '1';
                             actionButton.disabled = false;
                         }
@@ -146,84 +125,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 const modal = closeModalButton.closest('.ghd-modal');
                 if (modal) modal.style.display = 'none';
             }
-
-            if (startProductionBtn && document.body.classList.contains('is-admin-dashboard-panel')) {
-                e.preventDefault(); 
-                const orderId = startProductionBtn.dataset.orderId;
-                const row = startProductionBtn.closest('tr');
-                const prioritySelector = row.querySelector('.ghd-priority-selector');
-                const vendedoraSelector = row.querySelector('.ghd-vendedora-selector');
-                const priorityToInitiate = prioritySelector ? prioritySelector.value : '';
-                const vendedoraToInitiateId = vendedoraSelector ? vendedoraSelector.value : '0';
-
-                if (!priorityToInitiate || priorityToInitiate === 'Seleccionar Prioridad') {
-                    alert('Por favor, selecciona una prioridad para el pedido.');
-                    return;
-                }
-                if (vendedoraToInitiateId === '0') {
-                    alert('Por favor, asigna una vendedora al pedido.');
-                    return;
-                }
-                if (!confirm('¿Deseas iniciar la producción de este pedido?')) return;
-
-                row.style.opacity = '0.5';
-                startProductionBtn.disabled = true;
-                startProductionBtn.textContent = 'Iniciando...';
-                
-                const params = new URLSearchParams({ 
-                    action: 'ghd_admin_action', 
-                    nonce: ghd_ajax.nonce, 
-                    order_id: orderId,
-                    type: 'start_production',
-                    priority: priorityToInitiate,
-                    vendedora_id: vendedoraToInitiateId
-                });
-
-                fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.success) {
-                            row.remove(); 
-                            const refreshProdBtn = document.getElementById('ghd-refresh-production-tasks');
-                            if (refreshProdBtn) { refreshProdBtn.click(); }
-                        } else {
-                            alert('Error: ' + (data.data?.message || 'No se pudo iniciar.'));
-                            row.style.opacity = '1';
-                            startProductionBtn.disabled = false;
-                            startProductionBtn.textContent = 'Iniciar Producción';
-                        }
-                    });
-            }
-
-            if (archiveBtn) { 
-                e.preventDefault();
-                if (!confirm('¿Archivar este pedido? Esta acción es final.')) return;
-                const orderId = archiveBtn.dataset.orderId;
-                const container = archiveBtn.closest('tr');
-                if (!container) return;
-                
-                container.style.opacity = '0.5';
-                archiveBtn.disabled = true;
-                archiveBtn.textContent = 'Archivando...';
-                
-                const params = new URLSearchParams({ action: 'ghd_archive_order', nonce: ghd_ajax.nonce, order_id: orderId });
-                fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.success) {
-                            container.remove();
-                            if (data.data && data.data.kpi_data) {
-                                updateAdminClosureKPIs(data.data.kpi_data);
-                            }
-                        } else {
-                            alert('Error: ' + (data.data?.message || 'No se pudo archivar.'));
-                            container.style.opacity = '1';
-                            archiveBtn.disabled = false;
-                            archiveBtn.textContent = 'Archivar Pedido';
-                        }
-                    });
-            }
-
         }); 
 
         mainContent.addEventListener('submit', function(e) {
@@ -232,7 +133,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 e.preventDefault();
                 const orderId = completeTaskForm.dataset.orderId;
                 const formData = new FormData(completeTaskForm);
-
                 formData.append('action', 'ghd_register_task_details_and_complete');
                 formData.append('nonce', ghd_ajax.nonce);
 
@@ -257,13 +157,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 .finally(() => {
                     if (submitButton) {
                         submitButton.disabled = false;
-                        submitButton.innerHTML = '<i class="fa-solid fa-check"></i> Completar y Guardar';
+                        submitButton.innerHTML = '<i class="fa-solid fa-check"></i> Completar Tarea';
                     }
                 });
             }
         }); 
-    }// fin mainContent
-    
+    }// fin if mainContent 
 ///////////////////////////// ////////////////////////////////////////////////////
     // --- LÓGICA PARA ASIGNAR PRIORIDAD EN EL PANEL DE ASIGNACIÓN ---
     const assignationPanel = document.querySelector('.page-template-template-admin-dashboard');

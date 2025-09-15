@@ -1,13 +1,16 @@
 <?php
 /**
  * The template for displaying all single posts of the 'orden_produccion' CPT.
+ * V2 - Añadida sección de Control Administrativo para Macarena.
  */
 
-get_header(); ?>
+get_header();
+
+$current_user_can_control = current_user_can('control_final_macarena') || current_user_can('manage_options');
+?>
 
 <div class="ghd-app-wrapper">
     <?php 
-    // Decidir qué sidebar mostrar, si el de admin o el de sector
     if (current_user_can('manage_options')) {
         get_template_part('template-parts/sidebar-admin');
     } else {
@@ -16,141 +19,117 @@ get_header(); ?>
     ?>
 
     <main class="ghd-main-content">
+        <?php while ( have_posts() ) : the_post(); 
+            $current_post_id = get_the_ID();
+        ?>
         <header class="ghd-main-header">
             <div class="header-title-wrapper header-with-back">
                 <button id="mobile-menu-toggle" class="ghd-btn-icon"><i class="fa-solid fa-bars"></i></button>
                 <h2>Detalles del Pedido: <?php the_title(); ?></h2>
-                
-                <?php
-                // Botón "Volver" inteligente
-                $referer_url = wp_get_referer();
-                $back_url = home_url(); // Fallback por defecto a la home
-                
-                // Si hay un referer válido de un panel conocido, intentar volver a él
-                if ($referer_url && (strpos($referer_url, 'template-admin-dashboard.php') !== false || strpos($referer_url, 'template-sector-dashboard.php') !== false || strpos($referer_url, 'template-pedidos-archivados.php') !== false || strpos($referer_url, 'template-user-profile.php') !== false)) {
-                    $back_url = $referer_url;
-                } else {
-                    // Si no se detecta un referer válido o es desconocido, redirigir al dashboard principal del usuario
-                    if (current_user_can('manage_options')) {
-                        // Admin: volver al panel de admin
-                        $admin_dashboard_page = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-admin-dashboard.php']);
-                        $back_url = !empty($admin_dashboard_page) ? get_permalink($admin_dashboard_page[0]) : home_url();
-                    } else {
-                        // Usuario de sector: volver a su panel de sector
-                        $sector_dashboard_page = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-sector-dashboard.php']);
-                        $sector_dashboard_base_url = !empty($sector_dashboard_page) ? get_permalink($sector_dashboard_page[0]) : home_url();
-                        
-                        $current_user_roles = wp_get_current_user()->roles;
-                        $current_user_role = !empty($current_user_roles) ? $current_user_roles[0] : '';
-                        $mapa_roles = ghd_get_mapa_roles_a_campos(); 
-                        
-                        // Si el rol del usuario es un rol de sector mapeado, construir la URL con el parámetro 'sector'
-                        if (array_key_exists($current_user_role, $mapa_roles)) {
-                            $sector_display_name = ucfirst(str_replace(['rol_', '_'], ' ', $current_user_role));
-                            $clean_sector_name_param = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $sector_display_name));
-                            $back_url = add_query_arg('sector', urlencode($clean_sector_name_param), $sector_dashboard_base_url);
-                        } else {
-                            $back_url = $sector_dashboard_base_url; // Si no es un rol de sector, ir al dashboard base
-                        }
-                    }
-                }
-                ?>
-                <a href="<?php echo esc_url($back_url); ?>" class="ghd-btn ghd-btn-secondary"><i class="fa-solid fa-arrow-left"></i> Volver</a>
-            </div>
-            <div class="header-actions">
-                <!-- Otros botones de acción si los hubiera en detalles -->
+                <a href="javascript:history.back()" class="ghd-btn ghd-btn-secondary"><i class="fa-solid fa-arrow-left"></i> Volver</a>
             </div>
         </header>
 
         <div class="ghd-main-content-body">
-            <?php while ( have_posts() ) : the_post(); 
-                $current_post_id = get_the_ID();
-            ?>
-
-                <div class="ghd-details-grid">
-                    <div class="details-main ghd-card">
-                        <h3 class="card-section-title">Información del Cliente</h3>
-                        <p><strong>Nombre:</strong> <?php echo esc_html(get_field('nombre_cliente', $current_post_id)); ?></p>
-                        <p><strong>Email:</strong> <?php echo esc_html(get_field('cliente_email', $current_post_id)); ?></p>
-                        <p><strong>Teléfono:</strong> <?php echo esc_html(get_field('cliente_telefono', $current_post_id)); ?></p>
-                    </div>
-
-                    <div class="details-sidebar ghd-card">
-                        <h3 class="card-section-title">Estado General</h3>
-                        <p><strong>Estado:</strong> <?php echo esc_html(get_field('estado_pedido', $current_post_id)); ?></p>
-                        <p><strong>Prioridad:</strong> <?php echo esc_html(get_field('prioridad_pedido', $current_post_id)); ?></p>
-                    </div>
-
-                    <!-- NUEVA ESTRUCTURA PARA "INFORMACIÓN DEL PRODUCTO" -->
-                    <div class="details-main ghd-card product-details-section">
-                        <?php 
-                        $product_image = get_field('imagen_del_producto', $current_post_id);
-                        $image_url = '';
-                        $image_alt = '';
-
-                        if ($product_image) {
-                            $image_url = is_array($product_image) ? $product_image['url'] : $product_image;
-                            $image_alt = is_array($product_image) && !empty($product_image['alt']) ? $product_image['alt'] : get_the_title($current_post_id) . ' - ' . get_field('nombre_producto', $current_post_id);
-                        }
-                        // --- Nuevos campos de Material, Color, Observaciones ---
-                        $material_producto = get_field('material_del_producto', $current_post_id); // Asumo este nombre de campo ACF
-                        $color_producto = get_field('color_del_producto', $current_post_id);     // Asumo este nombre de campo ACF
-                        $observaciones_personalizacion = get_field('observaciones_personalizacion', $current_post_id); // Asumo este nombre de campo ACF
-                        ?>
-                        
-                        <?php if ($product_image) : ?>
-                            <div class="product-image-wrapper">
-                                <img src="<?php echo esc_url($image_url); ?>" alt="<?php echo esc_attr($image_alt); ?>">
+            
+            <!-- NUEVA SECCIÓN DE CONTROL ADMINISTRATIVO PARA MACARENA -->
+            <?php if ($current_user_can_control && get_field('estado_pedido', $current_post_id) === 'Pendiente de Cierre Admin') : ?>
+                <div class="ghd-card admin-control-card">
+                    <h3 class="card-section-title">Control Administrativo y Cierre</h3>
+                    <form id="admin-control-form" data-order-id="<?php echo $current_post_id; ?>">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="estado_pago">Estado del Pago</label>
+                                <select name="estado_pago" id="estado_pago">
+                                    <?php $current_pago = get_field('estado_pago', $current_post_id); ?>
+                                    <option value="Pendiente" <?php selected($current_pago, 'Pendiente'); ?>>Pendiente</option>
+                                    <option value="Pagado" <?php selected($current_pago, 'Pagado'); ?>>Pagado</option>
+                                    <option value="Pago Parcial" <?php selected($current_pago, 'Pago Parcial'); ?>>Pago Parcial</option>
+                                </select>
                             </div>
-                        <?php endif; ?>
-
-                        <div class="product-info-wrapper">
-                            <h3 class="card-section-title">Información del Producto</h3>
-                            <div class="product-main-info">
-                                <p><strong>Producto:</strong> <?php echo esc_html(get_field('nombre_producto', $current_post_id)); ?></p>
-                                <?php if ($material_producto) : ?><p><strong>Material:</strong> <?php echo esc_html($material_producto); ?></p><?php endif; ?>
-                                <?php if ($color_producto) : ?>
-                                    <p>
-                                        <strong>Color:</strong> 
-                                        <span class="color-swatch" style="background-color: <?php echo esc_attr($color_producto); ?>; margin-left: 5px;"></span>
-                                        <?php echo esc_html($color_producto); ?>
-                                    </p>
-                                <?php endif; ?>
+                            <div class="form-group">
+                                <label for="foto_remito_firmado">Foto del Remito Firmado</label>
+                                <input type="file" name="foto_remito_firmado" id="foto_remito_firmado" accept="image/*">
+                                <?php 
+                                $remito_id = get_field('foto_remito_firmado', $current_post_id);
+                                if ($remito_id) {
+                                    echo '<a href="' . wp_get_attachment_url($remito_id) . '" target="_blank" style="font-size: 0.9em; display: block; margin-top: 5px;">Ver remito actual</a>';
+                                }
+                                ?>
                             </div>
-                            <?php 
-                            $especificaciones = get_field('especificaciones_producto', $current_post_id);
-                            if ($especificaciones) : ?>
-                                <div class="product-specifications">
-                                    <p><strong>Especificaciones:</strong></p>
-                                    <p><?php echo esc_html($especificaciones); ?></p>
-                                </div>
-                            <?php endif; ?>
-                            <?php if ($observaciones_personalizacion) : ?>
-                                <div class="product-specifications" style="margin-top: 1rem;">
-                                    <p><strong>Observaciones de Personalización:</strong></p>
-                                    <p><?php echo nl2br(esc_html($observaciones_personalizacion)); ?></p>
-                                </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="notas_administrativas">Notas Administrativas</label>
+                            <textarea name="notas_administrativas" id="notas_administrativas" rows="3"><?php echo esc_textarea(get_field('notas_administrativas', $current_post_id)); ?></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="ghd-btn ghd-btn-primary"><i class="fa-solid fa-save"></i> Guardar Cambios</button>
+                            <button type="button" class="ghd-btn ghd-btn-success archive-order-btn" data-order-id="<?php echo $current_post_id; ?>"><i class="fa-solid fa-archive"></i> Archivar Pedido</button>
+                        </div>
+                    </form>
+                </div>
+            <?php endif; ?>
+            <!-- FIN DE LA SECCIÓN DE CONTROL ADMINISTRATIVO -->
+
+            <div class="ghd-details-grid">
+                <div class="details-main ghd-card">
+                    <h3 class="card-section-title">Información del Cliente</h3>
+                    <p><strong>Nombre:</strong> <?php echo esc_html(get_field('nombre_cliente', $current_post_id)); ?></p>
+                    <p><strong>Email:</strong> <?php echo esc_html(get_field('cliente_email', $current_post_id)); ?></p>
+                    <p><strong>Teléfono:</strong> <?php echo esc_html(get_field('cliente_telefono', $current_post_id)); ?></p>
+                </div>
+
+                <div class="details-sidebar ghd-card">
+                    <h3 class="card-section-title">Estado General</h3>
+                    <p><strong>Estado:</strong> <?php echo esc_html(get_field('estado_pedido', $current_post_id)); ?></p>
+                    <p><strong>Prioridad:</strong> <?php echo esc_html(get_field('prioridad_pedido', $current_post_id)); ?></p>
+                </div>
+
+                <div class="details-main ghd-card product-details-section">
+                    <?php 
+                    $product_image_id = get_field('imagen_del_producto', $current_post_id);
+                    ?>
+                    <?php if ($product_image_id) : ?>
+                        <div class="product-image-wrapper">
+                            <?php echo wp_get_attachment_image($product_image_id, 'medium_large'); ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <div class="product-info-wrapper">
+                        <h3 class="card-section-title">Información del Producto</h3>
+                        <div class="product-main-info">
+                            <p><strong>Producto:</strong> <?php echo esc_html(get_field('nombre_producto', $current_post_id)); ?></p>
+                            <?php if ($material = get_field('material_del_producto', $current_post_id)) : ?><p><strong>Material:</strong> <?php echo esc_html($material); ?></p><?php endif; ?>
+                            <?php if ($color = get_field('color_del_producto', $current_post_id)) : ?>
+                                <p><strong>Color:</strong> <span class="color-swatch" style="background-color: <?php echo esc_attr($color); ?>;"></span> <?php echo esc_html($color); ?></p>
                             <?php endif; ?>
                         </div>
-                    </div>
-                    <!-- FIN DE LA NUEVA ESTRUCTURA -->
-
-
-                    <div class="details-sidebar ghd-card">
-                        <h3 class="card-section-title">Sub-estados de Producción</h3>
-                        <ul class="sub-status-list">
-                            <?php foreach (ghd_get_mapa_roles_a_campos() as $role_key => $field_key) : ?>
-                                <li>
-                                    <strong><?php echo ucfirst(str_replace(['estado_', '_'], ' ', $field_key)); ?>:</strong> 
-                                    <span><?php echo esc_html(get_field($field_key, $current_post_id)); ?></span>
-                                </li>
-                            <?php endforeach; ?>
-                        </ul>
+                        <?php if ($observaciones = get_field('observaciones_personalizacion', $current_post_id)) : ?>
+                            <div class="product-specifications" style="margin-top: 1rem;">
+                                <p><strong>Observaciones:</strong></p>
+                                <p><?php echo nl2br(esc_html($observaciones)); ?></p>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
-            <?php endwhile; // End of the loop. ?>
+                <div class="details-sidebar ghd-card">
+                    <h3 class="card-section-title">Sub-estados de Producción</h3>
+                    <ul class="sub-status-list">
+                        <?php 
+                        $sectores = ['carpinteria', 'corte', 'costura', 'tapiceria', 'embalaje', 'logistica'];
+                        foreach ($sectores as $sector) : ?>
+                            <li>
+                                <strong><?php echo ucfirst($sector); ?>:</strong> 
+                                <span><?php echo esc_html(get_field('estado_' . $sector, $current_post_id) ?: 'No Asignado'); ?></span>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            </div>
+
         </div>
+        <?php endwhile; ?>
     </main>
 </div>
 
