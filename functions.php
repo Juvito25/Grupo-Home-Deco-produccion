@@ -1565,3 +1565,85 @@ function ghd_refresh_archived_orders_callback() {
     wp_send_json_success(['table_html' => $html]);
     wp_die();
 } // fin ghd_refresh_archived_orders_callback()
+
+/**
+ * AJAX Handler para crear un nuevo pedido desde el popup.
+ * V3 - Ahora devuelve el HTML de la nueva fila para la actualización por AJAX.
+ */
+add_action('wp_ajax_ghd_crear_nuevo_pedido', 'ghd_crear_nuevo_pedido_callback');
+function ghd_crear_nuevo_pedido_callback() {
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(['message' => 'No tienes permisos para crear pedidos.']);
+        wp_die();
+    }
+
+    $nombre_cliente = sanitize_text_field($_POST['nombre_cliente']);
+    $nombre_producto = sanitize_text_field($_POST['nombre_producto']);
+    
+    if (empty($nombre_cliente) || empty($nombre_producto)) {
+        wp_send_json_error(['message' => 'El nombre del cliente y del producto son obligatorios.']);
+        wp_die();
+    }
+
+    $new_post_id = wp_insert_post([
+        'post_type'   => 'orden_produccion',
+        'post_title'  => 'Pedido para ' . $nombre_cliente,
+        'post_status' => 'publish',
+    ], true);
+
+    if (is_wp_error($new_post_id)) {
+        wp_send_json_error(['message' => $new_post_id->get_error_message()]);
+        wp_die();
+    }
+
+    $nuevo_codigo = 'PED-' . date('Y') . '-' . str_pad($new_post_id, 3, '0', STR_PAD_LEFT);
+    wp_update_post(['ID' => $new_post_id, 'post_title' => $nuevo_codigo]);
+
+    update_field('nombre_cliente', $nombre_cliente, $new_post_id);
+    update_field('nombre_producto', $nombre_producto, $new_post_id);
+    update_field('cliente_email', sanitize_email($_POST['cliente_email']), $new_post_id);
+    update_field('color_del_producto', sanitize_text_field($_POST['color_del_producto']), $new_post_id);
+    update_field('direccion_de_entrega', sanitize_textarea_field($_POST['direccion_de_entrega']), $new_post_id);
+    update_field('estado_pedido', 'Pendiente de Asignación', $new_post_id);
+
+    // --- NUEVO: Generar el HTML de la fila de la tabla para devolverlo ---
+    ob_start();
+    
+    $vendedoras_users = get_users(['role__in' => ['vendedora', 'gerente_ventas'], 'orderby' => 'display_name']);
+    ?>
+    <tr id="order-row-<?php echo $new_post_id; ?>">
+        <td><a href="<?php echo get_permalink($new_post_id); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php echo esc_html($nuevo_codigo); ?></a></td>
+        <td><?php echo esc_html($nombre_cliente); ?></td>
+        <td><?php echo esc_html($nombre_producto); ?></td>
+        <td>
+            <select class="ghd-vendedora-selector" data-order-id="<?php echo $new_post_id; ?>">
+                <option value="0">Asignar Vendedora</option>
+                <?php foreach ($vendedoras_users as $vendedora) : ?>
+                    <option value="<?php echo esc_attr($vendedora->ID); ?>"><?php echo esc_html($vendedora->display_name); ?></option>
+                <?php endforeach; ?>
+            </select>
+        </td>
+        <td>
+            <select class="ghd-priority-selector" data-order-id="<?php echo $new_post_id; ?>">
+                <option value="Seleccionar Prioridad">Seleccionar Prioridad</option>
+                <option value="Alta">Alta</option>
+                <option value="Media">Media</option>
+                <option value="Baja">Baja</option>
+            </select>
+        </td>
+        <td>
+            <button class="ghd-btn ghd-btn-primary start-production-btn" data-order-id="<?php echo $new_post_id; ?>" disabled>
+                Iniciar Producción
+            </button>
+        </td>
+    </tr>
+    <?php
+    $new_row_html = ob_get_clean();
+
+    wp_send_json_success([
+        'message' => '¡Pedido ' . $nuevo_codigo . ' creado con éxito!',
+        'new_row_html' => $new_row_html
+    ]);
+    wp_die();
+}

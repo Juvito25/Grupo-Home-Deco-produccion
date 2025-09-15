@@ -14,6 +14,12 @@ add_filter('body_class', function($classes) {
     return $classes;
 });
 
+// --- NUEVO: Mostrar mensaje de éxito si se creó un pedido ---
+if (isset($_GET['pedido_creado']) && $_GET['pedido_creado'] == '1') {
+    echo '<div class="ghd-alert-success" style="margin: 0 2rem 1.5rem; padding: 1rem; background-color: #d1fae5; border-left: 5px solid #10b981; color: #065f46;">¡El nuevo pedido ha sido creado con éxito!</div>';
+}
+// --- FIN NUEVO ---
+
 get_header(); 
 ?>
 
@@ -32,7 +38,7 @@ get_header();
                     <h2>Pedidos Pendientes de Asignación</h2>
                 </div> 
                 <div class="header-actions">
-                    <button class="ghd-btn ghd-btn-primary"><i class="fa-solid fa-plus"></i> <span>Nuevo Pedido</span></button>
+                    <button id="abrir-nuevo-pedido-modal" class="ghd-btn ghd-btn-primary"><i class="fa-solid fa-plus"></i> <span>Nuevo Pedido</span></button>
                 </div>
             </header>
 
@@ -175,5 +181,41 @@ get_header();
             </table>
         </div>
     </main>
+</div>
+<!-- Popup para Nuevo Pedido -->
+<div id="nuevo-pedido-modal" class="ghd-modal" style="display:none;">
+    <div class="ghd-modal-content">
+        <span class="close-button">&times;</span>
+        <h3>Crear Nuevo Pedido</h3>
+        <form id="nuevo-pedido-form">
+            
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="np_nombre_cliente">Nombre del Cliente</label>
+                <input type="text" id="np_nombre_cliente" name="nombre_cliente" required>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="np_cliente_email">Email del Cliente</label>
+                <input type="email" id="np_cliente_email" name="cliente_email">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="np_nombre_producto">Nombre del Producto</label>
+                <input type="text" id="np_nombre_producto" name="nombre_producto" required>
+            </div>
+            
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="np_color_producto">Color</label>
+                <input type="color" id="np_color_producto" name="color_del_producto" value="#ffffff" style="height: 40px; padding: 5px;">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="np_direccion_entrega">Dirección de Entrega</label>
+                <textarea id="np_direccion_entrega" name="direccion_de_entrega" rows="3"></textarea>
+            </div>
+
+            <button type="submit" class="ghd-btn ghd-btn-primary"><i class="fa-solid fa-plus"></i> Crear Pedido</button>
+        </form>
+    </div>
 </div>
 <?php get_footer(); ?>

@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', function() {
+    
     // --- LÓGICA DEL MENÚ MÓVIL (Estable) ---
     const menuToggle = document.getElementById('mobile-menu-toggle');
     const sidebar = document.querySelector('.ghd-sidebar');
@@ -834,6 +835,74 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+        // --- LÓGICA PARA EL POPUP DE NUEVO PEDIDO ---
+    const abrirModalBtn = document.getElementById('abrir-nuevo-pedido-modal');
+    const nuevoPedidoModal = document.getElementById('nuevo-pedido-modal');
+    const nuevoPedidoForm = document.getElementById('nuevo-pedido-form');
+
+    if (abrirModalBtn && nuevoPedidoModal) {
+        // Abrir el modal
+        abrirModalBtn.addEventListener('click', function() {
+            nuevoPedidoModal.style.display = 'flex';
+        });
+
+        // Cerrar el modal con el botón de la 'X'
+        const closeModalBtn = nuevoPedidoModal.querySelector('.close-button');
+        if (closeModalBtn) {
+            closeModalBtn.addEventListener('click', function() {
+                nuevoPedidoModal.style.display = 'none';
+            });
+        }
+    }
+
+        // Reemplaza el listener 'submit' para nuevoPedidoForm con este
+    if (nuevoPedidoForm) {
+        nuevoPedidoForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const submitButton = this.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creando...';
+
+            const formData = new FormData(this);
+            formData.append('action', 'ghd_crear_nuevo_pedido');
+            formData.append('nonce', ghd_ajax.nonce);
+
+            fetch(ghd_ajax.ajax_url, {
+                method: 'POST',
+                body: new URLSearchParams(formData)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.data.message);
+                    nuevoPedidoModal.style.display = 'none';
+                    this.reset();
+
+                    // --- CORRECCIÓN: Lógica para insertar la nueva fila con AJAX ---
+                    const tableBody = document.getElementById('ghd-orders-table-body');
+                    if (tableBody) {
+                        // Buscar si la tabla tiene el mensaje de "No hay pedidos"
+                        const noOrdersRow = tableBody.querySelector('td[colspan="6"]');
+                        if (noOrdersRow) {
+                            // Si la tabla estaba vacía, reemplazar el mensaje con la nueva fila
+                            tableBody.innerHTML = data.data.new_row_html;
+                        } else {
+                            // Si ya hay pedidos, añadir el nuevo al principio
+                            tableBody.insertAdjacentHTML('afterbegin', data.data.new_row_html);
+                        }
+                    }
+                    
+                } else {
+                    alert('Error: ' + (data.data?.message || 'No se pudo crear el pedido.'));
+                }
+            })
+            .finally(() => {
+                submitButton.disabled = false;
+                submitButton.innerHTML = '<i class="fa-solid fa-plus"></i> Crear Pedido';
+            });
+        });
+    }
 }); // Cierre Correcto del DOMContentLoaded listener
 
 // LÓGICA PARA ACTIVAR EL FILTRO DESDE LA URL AL CARGAR LA PÁGINA (EXISTENTE)
@@ -874,19 +943,35 @@ if (refreshArchivedBtn) {
             action: 'ghd_refresh_archived_orders',
             nonce: ghd_ajax.nonce
         });
-
-        fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
-            .then(res => res.json())
+        // ...listener de "submit" para nuevoPedidoForm ...
+            fetch(ghd_ajax.ajax_url, {
+                method: 'POST',
+                body: new URLSearchParams(formData)
+            })
+            .then(res => {
+                if (!res.ok) {
+                    // Si el servidor responde con un error (ej. 500), lo capturamos aquí
+                    throw new Error('Error del servidor. Revisa el debug.log de WordPress.');
+                }
+                return res.json();
+            })
             .then(data => {
                 if (data.success) {
-                    tableBody.innerHTML = data.data.table_html;
+                    alert(data.data.message);
+                    window.location.reload();
                 } else {
-                    alert('Error: ' + (data.data?.message || 'No se pudo refrescar la lista.'));
+                    // Esto mostrará el error específico enviado desde PHP (ej. "Campo obligatorio")
+                    alert('Error: ' + (data.data?.message || 'No se pudo crear el pedido.'));
                 }
             })
+            .catch(error => {
+                // Esto captura errores de red o errores lanzados en el .then() anterior
+                console.error("Error al crear pedido:", error);
+                alert("Ocurrió un error inesperado. Revisa la consola para más detalles.");
+            })
             .finally(() => {
-                tableBody.style.opacity = '1';
-                refreshArchivedBtn.disabled = false;
+                submitButton.disabled = false;
+                submitButton.innerHTML = '<i class="fa-solid fa-plus"></i> Crear Pedido';
             });
     });
 }

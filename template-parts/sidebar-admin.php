@@ -22,7 +22,7 @@ $current_slug = get_post_field('post_name', get_queried_object_id());
 
             <?php if (current_user_can('manage_options')) : ?>
                 <li>
-                    <a href="#">
+                    <a href="<?php echo esc_url(home_url('/nuevo-pedido/')); ?>">
                         <i class="fa-solid fa-plus"></i>
                         <span>Nuevo Pedido</span>
                     </a>
