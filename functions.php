@@ -1128,6 +1128,55 @@ function ghd_update_vendedora_callback() {
     wp_die();
 }
 
+// --- NUEVO: LÓGICA AJAX PARA INICIAR PRODUCCIÓN ---
+add_action('wp_ajax_ghd_start_production', 'ghd_start_production_callback');
+function ghd_start_production_callback() {
+    // 1. Verificación de Nonce para seguridad
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+
+    // 2. Verificación de permisos: solo administradores pueden iniciar producción
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(['message' => 'No tienes permisos para iniciar la producción.']);
+        wp_die();
+    }
+
+    // 3. Obtener y sanitizar el ID del pedido
+    $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
+    if (!$order_id) {
+        wp_send_json_error(['message' => 'ID de pedido no válido.']);
+        wp_die();
+    }
+
+    // 4. Verificar el estado actual del pedido para asegurar que es "Pendiente de Asignación"
+    if (get_field('estado_pedido', $order_id) !== 'Pendiente de Asignación') {
+        wp_send_json_error(['message' => 'El pedido ya no está en estado "Pendiente de Asignación".']);
+        wp_die();
+    }
+
+    // 5. Actualizar los campos ACF para iniciar la producción
+    update_field('estado_pedido', 'En Producción', $order_id);
+    update_field('estado_carpinteria', 'Pendiente', $order_id);
+    
+    // Opcional: Guardar un timestamp de cuándo se inició la producción para métricas
+    update_post_meta($order_id, 'historial_produccion_iniciada_timestamp', current_time('timestamp', true));
+
+    // 6. Registrar la acción en el historial del pedido
+    wp_insert_post([
+        'post_title' => 'Producción Iniciada por ' . wp_get_current_user()->display_name,
+        'post_type' => 'ghd_historial',
+        'meta_input' => ['_orden_produccion_id' => $order_id, '_iniciada_por_user_id' => get_current_user_id()]
+    ]);
+    
+    // 7. Preparar la respuesta JSON: devolver el HTML y KPIs actualizados para la sección de "Pedidos en Producción"
+    $production_data = ghd_get_pedidos_en_produccion_data();
+    
+    wp_send_json_success([
+        'message' => 'Producción iniciada con éxito.',
+        'production_tasks_html' => $production_data['tasks_html'], // HTML actualizado para la tabla de producción
+        'production_kpi_data' => $production_data['kpi_data']     // KPIs actualizados
+    ]);
+    wp_die();
+} // fin ghd_start_production_callback()
 
 /**
  * AJAX Handler para asignar una tarea a un miembro del sector.
@@ -1568,46 +1617,80 @@ function ghd_refresh_archived_orders_callback() {
 
 /**
  * AJAX Handler para crear un nuevo pedido desde el popup.
- * V3 - Ahora devuelve el HTML de la nueva fila para la actualización por AJAX.
+ * V4 - Corregido para un guardado robusto del estado inicial y debugging.
  */
 add_action('wp_ajax_ghd_crear_nuevo_pedido', 'ghd_crear_nuevo_pedido_callback');
 function ghd_crear_nuevo_pedido_callback() {
+    error_log('ghd_crear_nuevo_pedido_callback: Inicio de la función.');
+
     check_ajax_referer('ghd-ajax-nonce', 'nonce');
     if (!current_user_can('manage_options')) {
+        error_log('ghd_crear_nuevo_pedido_callback: Permisos insuficientes.');
         wp_send_json_error(['message' => 'No tienes permisos para crear pedidos.']);
         wp_die();
     }
 
-    $nombre_cliente = sanitize_text_field($_POST['nombre_cliente']);
-    $nombre_producto = sanitize_text_field($_POST['nombre_producto']);
-    
+    $nombre_cliente = sanitize_text_field($_POST['nombre_cliente'] ?? '');
+    $nombre_producto = sanitize_text_field($_POST['nombre_producto'] ?? '');
+    $cliente_email = sanitize_email($_POST['cliente_email'] ?? '');
+    $color_producto = sanitize_text_field($_POST['color_del_producto'] ?? '');
+    $direccion_entrega = sanitize_textarea_field($_POST['direccion_de_entrega'] ?? '');
+
     if (empty($nombre_cliente) || empty($nombre_producto)) {
+        error_log('ghd_crear_nuevo_pedido_callback: Cliente o producto vacíos.');
         wp_send_json_error(['message' => 'El nombre del cliente y del producto son obligatorios.']);
         wp_die();
     }
 
-    $new_post_id = wp_insert_post([
+    $post_data = [
         'post_type'   => 'orden_produccion',
         'post_title'  => 'Pedido para ' . $nombre_cliente,
         'post_status' => 'publish',
-    ], true);
+    ];
+    $new_post_id = wp_insert_post($post_data, true);
 
     if (is_wp_error($new_post_id)) {
+        error_log('ghd_crear_nuevo_pedido_callback: Error al insertar el post: ' . $new_post_id->get_error_message());
         wp_send_json_error(['message' => $new_post_id->get_error_message()]);
         wp_die();
     }
+    error_log('ghd_crear_nuevo_pedido_callback: Post creado con ID ' . $new_post_id);
 
     $nuevo_codigo = 'PED-' . date('Y') . '-' . str_pad($new_post_id, 3, '0', STR_PAD_LEFT);
     wp_update_post(['ID' => $new_post_id, 'post_title' => $nuevo_codigo]);
+    error_log('ghd_crear_nuevo_pedido_callback: Título y código actualizados: ' . $nuevo_codigo);
 
-    update_field('nombre_cliente', $nombre_cliente, $new_post_id);
-    update_field('nombre_producto', $nombre_producto, $new_post_id);
-    update_field('cliente_email', sanitize_email($_POST['cliente_email']), $new_post_id);
-    update_field('color_del_producto', sanitize_text_field($_POST['color_del_producto']), $new_post_id);
-    update_field('direccion_de_entrega', sanitize_textarea_field($_POST['direccion_de_entrega']), $new_post_id);
-    update_field('estado_pedido', 'Pendiente de Asignación', $new_post_id);
+    // --- CORRECCIÓN CLAVE: Guardar TODOS los campos ACF de forma robusta ---
+    // Usamos add_row o update_field. Si no existen, update_field los crea.
+    $fields_to_update = [
+        'codigo_de_pedido'       => $nuevo_codigo,
+        'nombre_cliente'         => $nombre_cliente,
+        'cliente_email'          => $cliente_email,
+        'nombre_producto'        => $nombre_producto,
+        'color_del_producto'     => $color_producto,
+        'direccion_de_entrega'   => $direccion_entrega,
+        'estado_pedido'          => 'Pendiente de Asignación', // El estado crucial
+        'estado_carpinteria'     => 'No Asignado', // Inicializar los estados de producción
+        'estado_corte'           => 'No Asignado',
+        'estado_costura'         => 'No Asignado',
+        'estado_tapiceria'       => 'No Asignado',
+        'estado_embalaje'        => 'No Asignado',
+        'estado_logistica'       => 'No Asignado',
+        'estado_administrativo'  => 'No Asignado',
+        'prioridad_pedido'       => 'Baja', // Establecer una prioridad por defecto
+    ];
 
-    // --- NUEVO: Generar el HTML de la fila de la tabla para devolverlo ---
+    foreach ($fields_to_update as $field_name => $value) {
+        $update_success = update_field($field_name, $value, $new_post_id);
+        if (!$update_success) {
+            error_log("ghd_crear_nuevo_pedido_callback: FALLO al guardar ACF '{$field_name}' con valor '{$value}'.");
+        } else {
+            error_log("ghd_crear_nuevo_pedido_callback: ÉXITO al guardar ACF '{$field_name}' con valor '{$value}'.");
+        }
+    }
+    // --- FIN CORRECCIÓN CLAVE ---
+
+    // Generar el HTML de la fila de la tabla para devolverlo
     ob_start();
     
     $vendedoras_users = get_users(['role__in' => ['vendedora', 'gerente_ventas'], 'orderby' => 'display_name']);
@@ -1626,7 +1709,7 @@ function ghd_crear_nuevo_pedido_callback() {
         </td>
         <td>
             <select class="ghd-priority-selector" data-order-id="<?php echo $new_post_id; ?>">
-                <option value="Seleccionar Prioridad">Seleccionar Prioridad</option>
+                <option value="" selected>Seleccionar Prioridad</option> <!-- Corregido valor por defecto -->
                 <option value="Alta">Alta</option>
                 <option value="Media">Media</option>
                 <option value="Baja">Baja</option>
@@ -1641,9 +1724,10 @@ function ghd_crear_nuevo_pedido_callback() {
     <?php
     $new_row_html = ob_get_clean();
 
+    error_log('ghd_crear_nuevo_pedido_callback: Función finalizada con éxito. Devolviendo HTML.');
     wp_send_json_success([
         'message' => '¡Pedido ' . $nuevo_codigo . ' creado con éxito!',
         'new_row_html' => $new_row_html
     ]);
     wp_die();
-}
+}// fin ghd_crear_nuevo_pedido_callback()

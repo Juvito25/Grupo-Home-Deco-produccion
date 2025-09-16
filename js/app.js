@@ -220,7 +220,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const startProductionBtn = row.querySelector('.start-production-btn');
 
                 if (prioritySelector && vendedoraSelector && startProductionBtn) {
-                    const isPrioritySet = (prioritySelector.value !== 'Seleccionar Prioridad');
+                    // const isPrioritySet = (prioritySelector.value !== 'Seleccionar Prioridad');
+                    const isPrioritySet = (prioritySelector.value !== '');
                     const isVendedoraSet = (vendedoraSelector.value !== '0'); // '0' es el valor para "Asignar Vendedora"
 
                     startProductionBtn.disabled = !(isPrioritySet && isVendedoraSet);
@@ -370,6 +371,74 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             // --- FIN NUEVO ---
+                        // --- NUEVO BLOQUE: Manejar click en "Iniciar Producción" ---
+            ordersTableBody.addEventListener('click', function(e) {
+                const startProductionBtn = e.target.closest('.start-production-btn');
+                // Asegurarse que el botón fue clicado y que no esté deshabilitado
+                if (startProductionBtn && !startProductionBtn.disabled) {
+                    e.preventDefault(); // Prevenir el comportamiento por defecto del botón
+
+                    const orderId = startProductionBtn.dataset.orderId;
+                    const row = startProductionBtn.closest('tr'); // Obtener la fila para efectos visuales
+
+                    if (!confirm('¿Estás seguro de que quieres iniciar la producción de este pedido? Esta acción moverá el pedido a producción.')) {
+                        return; // Si el usuario cancela, no hacer nada
+                    }
+
+                    // 1. Indicador visual de carga
+                    row.style.opacity = '0.5';
+                    startProductionBtn.disabled = true;
+                    startProductionBtn.textContent = 'Iniciando...';
+
+                    // 2. Preparar los parámetros para la llamada AJAX
+                    const params = new URLSearchParams({
+                        action: 'ghd_start_production', // La nueva acción AJAX definida en functions.php
+                        nonce: ghd_ajax.nonce,
+                        order_id: orderId
+                    });
+
+                    // 3. Realizar la petición AJAX
+                    fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.success) {
+                                alert(data.data.message);
+                                row.remove(); // Eliminar la fila de la tabla de asignación (ya no está pendiente)
+
+                                // 4. Refrescar la sección de "Pedidos en Producción" y sus KPIs
+                                const productionTableBody = document.getElementById('ghd-production-table-body');
+                                const refreshProductionTasksBtn = document.getElementById('ghd-refresh-production-tasks');
+                                
+                                if (productionTableBody && data.data.production_tasks_html) {
+                                     // Reemplazar el contenido de la tabla de producción con el HTML actualizado
+                                    productionTableBody.innerHTML = data.data.production_tasks_html;
+                                    // Actualizar los KPIs de producción
+                                    if (data.data.production_kpi_data) {
+                                        updateAdminProductionKPIs(data.data.production_kpi_data);
+                                    }
+                                } else if (refreshProductionTasksBtn) {
+                                    // Si por alguna razón no se recibe el HTML directamente, forzar un click al botón de refresco
+                                    refreshProductionTasksBtn.click();
+                                }
+                            } else {
+                                // 5. Manejar errores
+                                alert('Error al iniciar producción: ' + (data.data?.message || 'Error desconocido.'));
+                                row.style.opacity = '1'; // Restaurar apariencia
+                                startProductionBtn.disabled = false; // Habilitar botón
+                                startProductionBtn.textContent = 'Iniciar Producción'; // Restaurar texto
+                            }
+                        })
+                        .catch(error => {
+                            // 6. Manejar errores de red
+                            console.error("Error de red al iniciar producción:", error);
+                            alert('Error de red al iniciar producción. Por favor, revisa tu conexión.');
+                            row.style.opacity = '1'; // Restaurar apariencia
+                            startProductionBtn.disabled = false; // Habilitar botón
+                            startProductionBtn.textContent = 'Iniciar Producción'; // Restaurar texto
+                        });
+                }
+            });
+            // --- FIN NUEVO BLOQUE ---
         }
     }
 
@@ -879,7 +948,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     nuevoPedidoModal.style.display = 'none';
                     this.reset();
 
-                    // --- CORRECCIÓN: Lógica para insertar la nueva fila con AJAX ---
+                   // --- Lógica para insertar la nueva fila con AJAX ---
                     const tableBody = document.getElementById('ghd-orders-table-body');
                     if (tableBody) {
                         // Buscar si la tabla tiene el mensaje de "No hay pedidos"
@@ -891,8 +960,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             // Si ya hay pedidos, añadir el nuevo al principio
                             tableBody.insertAdjacentHTML('afterbegin', data.data.new_row_html);
                         }
-                    }
-                    
+                    } 
                 } else {
                     alert('Error: ' + (data.data?.message || 'No se pudo crear el pedido.'));
                 }

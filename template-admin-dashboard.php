@@ -57,15 +57,71 @@ get_header();
                     <tbody id="ghd-orders-table-body">
                         <?php
                         // Carga inicial de pedidos pendientes de asignación
-                        $pedidos_asignacion_query = new WP_Query(['post_type' => 'orden_produccion', 'posts_per_page' => -1, 'meta_query' => [['key' => 'estado_pedido', 'value' => 'Pendiente de Asignación']]]);
+                        $args_asignacion = array(
+                            'post_type'      => 'orden_produccion',
+                            'posts_per_page' => -1,
+                            'meta_query'     => array(
+                                array(
+                                    'key'     => 'estado_pedido',
+                                    'value'   => 'Pendiente de Asignación',
+                                    'compare' => '=',
+                                ),
+                            ),
+                            // Ordenar para que los nuevos aparezcan primero por defecto
+                            'orderby' => 'date',
+                            'order'   => 'DESC',
+                        );
+                        $pedidos_asignacion_query = new WP_Query($args_asignacion);
+
+                        // Obtener la lista de vendedoras una sola vez para optimizar
+                        $vendedoras_users = get_users([
+                            'role__in' => ['vendedora', 'gerente_ventas'],
+                            'orderby'  => 'display_name',
+                            'order'    => 'ASC'
+                        ]);
+
                         if ($pedidos_asignacion_query->have_posts()) :
                             while ($pedidos_asignacion_query->have_posts()) : $pedidos_asignacion_query->the_post();
-                                // Lógica para mostrar cada fila...
+                                $order_id = get_the_ID();
+                                $current_vendedora_id = get_field('vendedora_asignada', $order_id);
+                                $current_priority = get_field('prioridad_pedido', $order_id);
+                        ?>
+                            <tr id="order-row-<?php echo $order_id; ?>">
+                                <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
+                                <td><?php echo esc_html(get_field('nombre_cliente', $order_id)); ?></td>
+                                <td><?php echo esc_html(get_field('nombre_producto', $order_id)); ?></td>
+                                <td>
+                                    <select class="ghd-vendedora-selector" data-order-id="<?php echo $order_id; ?>">
+                                        <option value="0" <?php selected($current_vendedora_id, 0); ?>>Asignar Vendedora</option>
+                                        <?php foreach ($vendedoras_users as $vendedora) : ?>
+                                            <option value="<?php echo esc_attr($vendedora->ID); ?>" <?php selected($current_vendedora_id, $vendedora->ID); ?>>
+                                                <?php echo esc_html($vendedora->display_name); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </td>
+                                <td>
+                                    <select class="ghd-priority-selector" data-order-id="<?php echo $order_id; ?>">
+                                        <option value="" <?php selected($current_priority, ''); ?>>Seleccionar Prioridad</option>
+                                        <option value="Alta" <?php selected($current_priority, 'Alta'); ?>>Alta</option>
+                                        <option value="Media" <?php selected($current_priority, 'Media'); ?>>Media</option>
+                                        <option value="Baja" <?php selected($current_priority, 'Baja'); ?>>Baja</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <button class="ghd-btn ghd-btn-primary start-production-btn" data-order-id="<?php echo $order_id; ?>" disabled>
+                                        Iniciar Producción
+                                    </button>
+                                </td>
+                            </tr>
+                        <?php
                             endwhile;
-                        else:
-                            echo '<tr><td colspan="6" style="text-align:center;">No hay pedidos pendientes de asignación.</td></tr>';
+                        else: 
+                        ?>
+                            <tr><td colspan="6" style="text-align:center;">No hay pedidos pendientes de asignación.</td></tr>
+                        <?php
                         endif;
-                        wp_reset_postdata();
+                        wp_reset_postdata(); 
                         ?>
                     </tbody>
                 </table>
