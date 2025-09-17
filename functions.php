@@ -29,6 +29,61 @@ function ghd_registrar_cpt_historial() {
     register_post_type('ghd_historial', ['labels' => ['name' => 'Historial de Producción'], 'public' => false, 'show_ui' => true, 'show_in_menu' => 'edit.php?post_type=orden_produccion', 'supports' => ['title']]);
 }
 
+// --- NUEVO: REGISTRO DE CUSTOM POST TYPE PARA MODELOS DE PUNTOS ---
+add_action('init', 'ghd_registrar_cpt_modelo_puntos');
+function ghd_registrar_cpt_modelo_puntos() {
+    $labels = [
+        'name'                  => _x('Modelos de Puntos', 'Post Type General Name', 'textdomain'),
+        'singular_name'         => _x('Modelo de Puntos', 'Post Type Singular Name', 'textdomain'),
+        'menu_name'             => __('Puntos por Modelo', 'textdomain'),
+        'name_admin_bar'        => __('Modelo de Puntos', 'textdomain'),
+        'archives'              => __('Archivo de Modelos', 'textdomain'),
+        'attributes'            => __('Atributos del Modelo', 'textdomain'),
+        'parent_item_colon'     => __('Modelo Padre:', 'textdomain'),
+        'all_items'             => __('Todos los Modelos', 'textdomain'),
+        'add_new_item'          => __('Añadir Nuevo Modelo', 'textdomain'),
+        'add_new'               => __('Añadir Nuevo', 'textdomain'),
+        'new_item'              => __('Nuevo Modelo', 'textdomain'),
+        'edit_item'             => __('Editar Modelo', 'textdomain'),
+        'update_item'           => __('Actualizar Modelo', 'textdomain'),
+        'view_item'             => __('Ver Modelo', 'textdomain'),
+        'view_items'            => __('Ver Modelos', 'textdomain'),
+        'search_items'          => __('Buscar Modelo', 'textdomain'),
+        'not_found'             => __('No encontrado', 'textdomain'),
+        'not_found_in_trash'    => __('No encontrado en la Papelera', 'textdomain'),
+        'featured_image'        => __('Imagen Destacada', 'textdomain'),
+        'set_featured_image'    => __('Establecer Imagen Destacada', 'textdomain'),
+        'remove_featured_image' => __('Remover Imagen Destacada', 'textdomain'),
+        'use_featured_image'    => __('Usar como Imagen Destacada', 'textdomain'),
+        'insert_into_item'      => __('Insertar en Modelo', 'textdomain'),
+        'uploaded_to_this_item' => __('Subido a este Modelo', 'textdomain'),
+        'items_list'            => __('Lista de Modelos', 'textdomain'),
+        'items_list_navigation' => __('Navegación de lista de Modelos', 'textdomain'),
+        'filter_items_list'     => __('Filtrar lista de Modelos', 'textdomain'),
+    ];
+    $args = [
+        'label'                 => __('Modelo de Puntos', 'textdomain'),
+        'description'           => __('Modelos de productos y sus puntos asociados para el sistema de embalaje.', 'textdomain'),
+        'labels'                => $labels,
+        'supports'              => ['title'], // Solo necesitamos el título para el nombre del modelo
+        'hierarchical'          => false,
+        'public'                => false, // No visible en el frontend públicamente
+        'show_ui'               => true, // Visible en el admin
+        'show_in_menu'          => 'edit.php?post_type=orden_produccion', // Aparecerá bajo "Órdenes de Producción"
+        'menu_position'         => 25,
+        'show_in_admin_bar'     => false,
+        'show_in_nav_menus'     => false,
+        'can_export'            => true,
+        'has_archive'           => false,
+        'exclude_from_search'   => true,
+        'publicly_queryable'    => false,
+        'capability_type'       => 'post',
+        'map_meta_cap'          => true, // Permite usar capacidades estándar como 'edit_posts'
+    ];
+    register_post_type('ghd_modelo_puntos', $args);
+}
+// --- FIN CPT MODELOS DE PUNTOS ---
+
 // --- NUEVO: REGISTRO DE ROLES DE USUARIO PERSONALIZADOS ---
 add_action('after_setup_theme', 'ghd_register_custom_roles');
 function ghd_register_custom_roles() {
@@ -1105,6 +1160,61 @@ function ghd_register_task_details_and_complete_callback() {
         'post_type' => 'ghd_historial',
         'meta_input' => ['_orden_produccion_id' => $order_id]
     ]);
+    // --- NUEVO: Lógica para guardar datos específicos del sector de Embalaje ---
+    if ($field_estado_sector === 'estado_embalaje') {
+        $operario_embalaje_id = isset($_POST['operario_embalaje_id']) ? intval($_POST['operario_embalaje_id']) : 0;
+        $modelo_embalado_id   = isset($_POST['modelo_embalado_id']) ? intval($_POST['modelo_embalado_id']) : 0;
+        $cantidad_embalada    = isset($_POST['cantidad_embalada']) ? intval($_POST['cantidad_embalada']) : 0;
+
+        if ($operario_embalaje_id === 0 || $modelo_embalado_id === 0 || $cantidad_embalada === 0) {
+            wp_send_json_error(['message' => 'Faltan datos obligatorios para el registro de puntos de embalaje.']);
+            wp_die();
+        }
+
+        // 1. Obtener los puntos del modelo seleccionado
+        $modelo_puntos_obj = null;
+        $embalaje_models = ghd_get_embalaje_models_for_select(); // Reutilizamos la función de ayuda
+        foreach ($embalaje_models as $model) {
+            if ($model->id === $modelo_embalado_id) {
+                $modelo_puntos_obj = $model;
+                break;
+            }
+        }
+
+        if (!$modelo_puntos_obj) {
+            wp_send_json_error(['message' => 'Modelo de embalaje no válido.']);
+            wp_die();
+        }
+
+        $puntos_por_modelo = $modelo_puntos_obj->points;
+        $puntos_totales_tarea = $puntos_por_modelo * $cantidad_embalada;
+
+        // 2. Guardar estos datos específicos en campos ACF de la orden_produccion
+        update_field('embalaje_operario_id', $operario_embalaje_id, $order_id);
+        update_field('embalaje_modelo_id', $modelo_embalado_id, $order_id);
+        update_field('embalaje_cantidad', $cantidad_embalada, $order_id);
+        update_field('embalaje_puntos_tarea', $puntos_totales_tarea, $order_id);
+        
+        // 3. Sumar los puntos al perfil del operario (User Meta)
+        $current_total_points = (int) get_user_meta($operario_embalaje_id, 'ghd_total_puntos_embalaje', true);
+        $new_total_points = $current_total_points + $puntos_totales_tarea;
+        update_user_meta($operario_embalaje_id, 'ghd_total_puntos_embalaje', $new_total_points);
+
+        // Opcional: Registrar los puntos en el historial del post también
+        wp_insert_post([
+            'post_title' => 'Puntos Embalaje: ' . $modelo_puntos_obj->title . ' x' . $cantidad_embalada . ' = ' . $puntos_totales_tarea . ' puntos para Operario ID ' . $operario_embalaje_id,
+            'post_type' => 'ghd_historial',
+            'meta_input' => [
+                '_orden_produccion_id' => $order_id,
+                '_tipo_registro' => 'puntos_embalaje',
+                '_operario_id' => $operario_embalaje_id,
+                '_modelo_id' => $modelo_embalado_id,
+                '_cantidad' => $cantidad_embalada,
+                '_puntos_sumados' => $puntos_totales_tarea,
+            ]
+        ]);
+    }
+// --- FIN Lógica Embalaje ---
 
     // --- LÓGICA DE TRANSICIONES DE FLUJO (ESTRICTAMENTE SECUENCIAL) ---
     
@@ -1374,6 +1484,38 @@ function ghd_get_user_role_and_sector_info( $user ) {
         'operarios_sector' => $operarios_sector
     ];
 }// fin ghd_get_user_role_and_sector_info()
+
+// --- NUEVO: Función de ayuda para obtener Modelos de Puntos para selectores ---
+/**
+ * Obtiene todos los CPT 'ghd_modelo_puntos' para usarlos en un selector.
+ * @return array Un array de objetos con 'id', 'title', 'points'.
+ */
+function ghd_get_embalaje_models_for_select() {
+    $models_query = new WP_Query([
+        'post_type'      => 'ghd_modelo_puntos',
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'orderby'        => 'title',
+        'order'          => 'ASC',
+        'fields'         => 'ids' // Solo obtener IDs para optimizar
+    ]);
+
+    $models_data = [];
+    if ($models_query->have_posts()) {
+        foreach ($models_query->posts as $model_id) {
+            $model_title = get_the_title($model_id);
+            $model_points = (int) get_field('puntos_del_modelo', $model_id); // Obtener los puntos ACF
+            $models_data[] = (object) [ // Devolver como objeto para fácil acceso
+                'id'    => $model_id,
+                'title' => $model_title,
+                'points'=> $model_points
+            ];
+        }
+    }
+    wp_reset_postdata();
+    return $models_data;
+}
+// --- FIN Función de Ayuda Modelos de Puntos ---
 
 /**
  * AJAX Handler para filtrar los pedidos en el panel del administrador.

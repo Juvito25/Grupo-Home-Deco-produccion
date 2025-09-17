@@ -127,6 +127,91 @@ if ($estado_actual === 'Pendiente') {
                 <label for="observaciones_tarea_<?php echo $post_id; ?>">Observaciones (Opcional):</label>
                 <textarea id="observaciones_tarea_<?php echo $post_id; ?>" name="observaciones_tarea_completa" rows="4"></textarea>
             </div>
+            <?php 
+            // --- CAMPOS ESPECÍFICOS PARA EL SECTOR DE EMBALAJE ---
+            if ($campo_estado === 'estado_embalaje') : 
+                // Obtener los modelos de puntos
+                $embalaje_models = ghd_get_embalaje_models_for_select();
+                // Obtener operarios de embalaje (ya están en $operarios_del_sector si es líder)
+
+                // --- NUEVO: Obtener la cantidad de unidades del producto principal del pedido ---
+                $cantidad_producto_en_pedido = (int) get_field('cantidad_unidades_producto', $post_id);
+                if ($cantidad_producto_en_pedido === 0) { // Asegurar que sea al menos 1 si no está definido
+                    $cantidad_producto_en_pedido = 1;
+                }
+            ?>
+                <hr style="margin: 20px 0; border-color: #eee;">
+                <h4>Detalles de Embalaje</h4>
+
+                <div class="form-group">
+                    <label for="operario_embalaje_<?php echo $post_id; ?>">Operario que Embaló:</label>
+                    <select id="operario_embalaje_<?php echo $post_id; ?>" name="operario_embalaje_id" required>
+                        <option value="">Selecciona un operario</option>
+                        <?php if (!empty($operarios_del_sector)) : ?>
+                            <?php foreach ($operarios_del_sector as $operario) : ?>
+                                <option value="<?php echo esc_attr($operario->ID); ?>">
+                                    <?php echo esc_html($operario->display_name); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="modelo_embalado_<?php echo $post_id; ?>">Modelo de Producto Embalado:</label>
+                    <select id="modelo_embalado_<?php echo $post_id; ?>" name="modelo_embalado_id" required>
+                        <option value="">Selecciona un modelo</option>
+                        <?php if (!empty($embalaje_models)) : ?>
+                            <?php foreach ($embalaje_models as $model) : ?>
+                                <option value="<?php echo esc_attr($model->id); ?>" data-points="<?php echo esc_attr($model->points); ?>">
+                                    <?php echo esc_html($model->title); ?> (<?php echo esc_html($model->points); ?> puntos)
+                                </option>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="cantidad_embalada_<?php echo $post_id; ?>">Cantidad Embalada:</label>
+                    <input type="number" id="cantidad_embalada_<?php echo $post_id; ?>" name="cantidad_embalada" min="1" value="<?php echo esc_attr($cantidad_producto_en_pedido); ?>" required>
+                </div>
+                
+                <p style="font-size: 0.9em; color: #555; margin-top: 10px;">Puntos estimados para esta tarea: <strong id="puntos_estimados_<?php echo $post_id; ?>">0</strong></p>
+
+                            <script>
+                // Lógica JS para actualizar los puntos estimados en el modal
+                document.addEventListener('DOMContentLoaded', function() {
+                    const modal = document.getElementById('complete-task-modal-<?php echo $post_id; ?>');
+                    if (modal) {
+                        const modeloSelector = modal.querySelector('#modelo_embalado_<?php echo $post_id; ?>');
+                        const cantidadInput = modal.querySelector('#cantidad_embalada_<?php echo $post_id; ?>');
+                        const puntosEstimadosSpan = modal.querySelector('#puntos_estimados_<?php echo $post_id; ?>');
+
+                        const updateEstimatedPoints = () => {
+                            const selectedOption = modeloSelector.options[modeloSelector.selectedIndex];
+                            const modelPoints = parseInt(selectedOption.dataset.points || '0');
+                            const quantity = parseInt(cantidadInput.value || '0');
+                            const totalPoints = modelPoints * quantity;
+                            puntosEstimadosSpan.textContent = totalPoints;
+                        };
+
+                        // Escuchar cambios en los selectores y el input de cantidad
+                        modeloSelector.addEventListener('change', updateEstimatedPoints);
+                        cantidadInput.addEventListener('input', updateEstimatedPoints);
+
+                        // --- NUEVO: Escuchar un evento personalizado cuando el modal se abre ---
+                        modal.addEventListener('ghdModalOpened', updateEstimatedPoints); // <-- CLAVE: Escuchar este evento
+                        // --- FIN NUEVO ---
+
+                        // Llamar una vez para inicializar al cargar el DOM, si el modal ya estuviera abierto por alguna razón
+                        // (menos probable, pero por seguridad)
+                        if (modal.style.display === 'flex') {
+                            updateEstimatedPoints();
+                        }
+                    }
+                });
+                </script>
+            <?php endif; // Fin de campos específicos para embalaje ?>
             <button type="submit" class="ghd-btn ghd-btn-success"><i class="fa-solid fa-check"></i> Completar Tarea</button>
         </form>
     </div>

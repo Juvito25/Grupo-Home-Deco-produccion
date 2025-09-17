@@ -125,7 +125,13 @@ document.addEventListener('DOMContentLoaded', function() {
             if (openModalButton) {
                 e.preventDefault();
                 const modal = document.getElementById(`complete-task-modal-${openModalButton.dataset.orderId}`);
-                if (modal) modal.style.display = 'flex';
+                if (modal) {
+                    modal.style.display = 'flex'; // Mostrar el modal
+                    // --- NUEVO: Disparar evento personalizado para inicializar el script del modal ---
+                    modal.dispatchEvent(new Event('ghdModalOpened')); // <-- AÑADIR ESTA LÍNEA
+                    // --- FIN NUEVO ---
+                    e.stopPropagation(); 
+                }
             }
 
             // Lógica para cerrar el modal
