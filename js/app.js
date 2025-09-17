@@ -335,43 +335,51 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
 
-            // --- NUEVO: Manejar cambios en el selector de Asignación de Operarios ---
-            ordersTableBody.addEventListener('change', function(e) {
-                const assigneeSelector = e.target.closest('.ghd-assignee-selector');
-                if (assigneeSelector) {
-                    const orderId = assigneeSelector.dataset.orderId;
-                    const fieldPrefix = assigneeSelector.dataset.fieldPrefix; // ej. 'asignado_a_carpinteria'
-                    const selectedAssigneeId = assigneeSelector.value;
-                    const row = assigneeSelector.closest('tr');
+        // --- NUEVO BLOQUE: Manejar cambios en el selector de Asignación de Operarios usando delegación de eventos ---
+        mainContent.addEventListener('change', function(e) { // Escuchar 'change' en el contenedor principal
+            const assigneeSelector = e.target.closest('.ghd-assignee-selector');
+            if (assigneeSelector) {
+                const orderId = assigneeSelector.dataset.orderId;
+                const fieldPrefix = assigneeSelector.dataset.fieldPrefix; // ej. 'asignado_a_carpinteria'
+                const selectedAssigneeId = assigneeSelector.value;
+                
+                // Opcional: Mostrar un indicador de carga en la tarjeta
+                const card = assigneeSelector.closest('.ghd-order-card');
+                if (card) card.style.opacity = '0.5';
 
-                    // Enviar la asignación al backend vía AJAX
-                    const params = new URLSearchParams({
-                        action: 'ghd_assign_task_to_member', // <-- AÑADIR ESTE ENDPOINT AJAX EN functions.php
-                        nonce: ghd_ajax.nonce,
-                        order_id: orderId,
-                        field_prefix: fieldPrefix,
-                        assignee_id: selectedAssigneeId
+                // Enviar la asignación al backend vía AJAX
+                const params = new URLSearchParams({
+                    action: 'ghd_assign_task_to_member',
+                    nonce: ghd_ajax.nonce,
+                    order_id: orderId,
+                    field_prefix: fieldPrefix,
+                    assignee_id: selectedAssigneeId
+                });
+
+                fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            console.log('Operario asignado:', data.message);
+                            // Después de asignar, refrescar las tareas para ver el cambio reflejado (nombre asignado)
+                            document.getElementById('ghd-refresh-tasks')?.click();
+                        } else {
+                            console.error('Error al asignar operario:', data.data?.message || 'Error desconocido.');
+                            alert('Error al asignar operario: ' + (data.data?.message || 'Error desconocido.'));
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Error de red al asignar operario:", error);
+                        alert('Error de red al asignar operario.');
+                    })
+                    .finally(() => {
+                        if (card) card.style.opacity = '1'; // Restaurar opacidad
                     });
+            }
+        }); // fin listener delegación de eventos
+        // --- FIN NUEVO BLOQUE ---
 
-                    fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
-                        .then(res => res.json())
-                        .then(data => {
-                            if (!data.success) {
-                                console.error('Error al asignar operario:', data.data?.message || 'Error desconocido.');
-                            } else {
-                                console.log('Operario asignado:', data.message);
-                                // Opcional: Refrescar la sección de producción del admin para ver el cambio
-                                const refreshProdBtn = document.getElementById('ghd-refresh-production-tasks');
-                                if (refreshProdBtn) { refreshProdBtn.click(); }
-                            }
-                        })
-                        .catch(error => {
-                            console.error("Error de red al asignar operario:", error);
-                        });
-                }
-            });
-            // --- FIN NUEVO ---
-                        // --- NUEVO BLOQUE: Manejar click en "Iniciar Producción" ---
+            // --- NUEVO BLOQUE: Manejar click en "Iniciar Producción" ---
             ordersTableBody.addEventListener('click', function(e) {
                 const startProductionBtn = e.target.closest('.start-production-btn');
                 // Asegurarse que el botón fue clicado y que no esté deshabilitado

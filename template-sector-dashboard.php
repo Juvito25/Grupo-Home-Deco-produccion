@@ -12,32 +12,80 @@ $user_roles = (array) $current_user->roles;
 
 // --- LÓGICA PARA DETERMINAR QUÉ SECTOR MOSTRAR (SIN REDIRECCIONES) ---
 
+// $allowed_leader_sectors = [];
+// foreach ($user_roles as $role) {
+//     if (strpos($role, 'lider_') !== false) {
+//         $allowed_leader_sectors[] = str_replace('lider_', '', $role);
+//     }
+// }
+
+// // $requested_sector = isset($_GET['sector']) ? sanitize_text_field($_GET['sector']) : '';
+// $requested_sector = isset($_GET['sector']) ? strtolower(sanitize_text_field($_GET['sector'])) : '';
+// $base_sector_key = '';
+
+// // Si se solicita un sector y el usuario tiene permiso, lo usamos.
+// if (!empty($requested_sector) && in_array($requested_sector, $allowed_leader_sectors)) {
+//     $base_sector_key = $requested_sector;
+// } 
+// // Si no se solicita, pero es líder, usamos el primero de su lista.
+// elseif (!empty($allowed_leader_sectors)) {
+//     $base_sector_key = $allowed_leader_sectors[0];
+// } 
+// // Si no es un líder de sector, no debería estar aquí.
+// elseif (!current_user_can('manage_options')) {
+//     // Si no es admin y no tiene roles de líder, lo mandamos al panel principal.
+//     // Usamos JS para la redirección para evitar errores de header, aunque en este punto ya no deberían ocurrir.
+//     echo '<script>window.location.href = "' . esc_url(home_url('/panel-de-control/')) . '";</script>';
+//     exit;
+// }
 $allowed_leader_sectors = [];
 foreach ($user_roles as $role) {
     if (strpos($role, 'lider_') !== false) {
-        $allowed_leader_sectors[] = str_replace('lider_', '', $role);
+        // Aseguramos que los sectores permitidos estén en minúsculas y sin tildes para comparación
+        $allowed_leader_sectors[] = str_replace('lider_', '', remove_accents($role));
     }
 }
 
-// $requested_sector = isset($_GET['sector']) ? sanitize_text_field($_GET['sector']) : '';
-$requested_sector = isset($_GET['sector']) ? strtolower(sanitize_text_field($_GET['sector'])) : '';
+// Limpiar el sector solicitado: minúsculas y sin tildes
+$requested_sector_raw = isset($_GET['sector']) ? sanitize_text_field($_GET['sector']) : '';
+$requested_sector = strtolower(remove_accents($requested_sector_raw)); // <-- CLAVE: normalizar aquí
+
 $base_sector_key = '';
 
-// Si se solicita un sector y el usuario tiene permiso, lo usamos.
-if (!empty($requested_sector) && in_array($requested_sector, $allowed_leader_sectors)) {
+// Si el usuario es administrador, siempre puede ver cualquier sector válido
+if (current_user_can('manage_options') && !empty($requested_sector) && array_key_exists($requested_sector, ghd_get_sectores())) {
     $base_sector_key = $requested_sector;
+    $is_leader = true; // El admin actúa como líder de ese sector para la vista
+}
+// Si se solicita un sector y el usuario tiene permiso (es líder de ese sector)
+elseif (!empty($requested_sector) && in_array($requested_sector, $allowed_leader_sectors)) {
+    $base_sector_key = $requested_sector;
+    $is_leader = true;
 } 
-// Si no se solicita, pero es líder, usamos el primero de su lista.
+// Si no se solicita un sector específico, pero el usuario es líder de al menos un sector,
+// redirigimos al primero de su lista para mantener la "redirección inteligente"
 elseif (!empty($allowed_leader_sectors)) {
-    $base_sector_key = $allowed_leader_sectors[0];
+    // Redirigir al primer sector permitido
+    wp_redirect( add_query_arg('sector', $allowed_leader_sectors[0], get_permalink() ) );
+    exit;
 } 
-// Si no es un líder de sector, no debería estar aquí.
+// Si no es admin y no tiene roles de líder, lo mandamos al panel principal.
 elseif (!current_user_can('manage_options')) {
-    // Si no es admin y no tiene roles de líder, lo mandamos al panel principal.
-    // Usamos JS para la redirección para evitar errores de header, aunque en este punto ya no deberían ocurrir.
-    echo '<script>window.location.href = "' . esc_url(home_url('/panel-de-control/')) . '";</script>';
+    wp_redirect( home_url('/panel-de-control/') ); // Redirección directa para mejor flujo
     exit;
 }
+
+// Si $base_sector_key sigue vacío después de todas las comprobaciones, es un caso de error o acceso no autorizado.
+if (empty($base_sector_key)) {
+    // Opcional: Redirigir a una página de error o al panel principal
+    wp_redirect( home_url('/panel-de-control/') );
+    exit;
+}
+
+// A partir del $base_sector_key, definimos el resto de variables
+$mapa_roles = ghd_get_mapa_roles_a_campos();
+$campo_estado = 'estado_' . $base_sector_key;
+// $is_leader ya se define arriba, si es admin o líder explícito.
 
 // Si $base_sector_key sigue vacío, es un caso de error.
 if (empty($base_sector_key)) {
@@ -70,11 +118,23 @@ add_filter('body_class', function($classes) {
 });
 
 $sector_kpi_data = ghd_calculate_sector_kpis($campo_estado);
-$pedidos_query = new WP_Query([
+$pedidos_query_args = [
     'post_type'      => 'orden_produccion', 
     'posts_per_page' => -1, 
     'meta_query'     => [['key' => $campo_estado, 'value' => ['Pendiente', 'En Progreso'], 'compare' => 'IN']]
-]);
+];
+
+// Si el usuario NO es un líder de sector específico, pero es un administrador,
+// o si es un líder y tiene la capacidad ghd_view_all_sector_tasks,
+// no filtramos por asignación.
+// PERO aquí estamos en template-sector-dashboard.php, donde $is_leader se establece para la vista.
+// La lógica aquí debe determinar si el usuario actual (que puede ser un Admin) DEBE ver todos los pedidos del sector.
+if (!current_user_can('ghd_view_all_sector_tasks') && !$is_leader) { // Solo si NO tiene permiso de ver todo Y NO es el líder del sector
+    $asignado_a_field = str_replace('estado_', 'asignado_a_', $campo_estado);
+    $pedidos_query_args['meta_query'][] = ['key' => $asignado_a_field, 'value' => $current_user->ID, 'compare' => '='];
+}
+
+$pedidos_query = new WP_Query($pedidos_query_args);
 ?>
 
 <div class="ghd-app-wrapper">
@@ -84,6 +144,14 @@ $pedidos_query = new WP_Query([
         <header class="ghd-main-header">
             <div class="header-title-wrapper">
                 <button id="mobile-menu-toggle" class="ghd-btn-icon"><i class="fa-solid fa-bars"></i></button>
+                <?php 
+                // Obtener la URL de la página de Sectores para el botón "Volver"
+                $sectores_page = get_page_by_path('sectores'); // Asume que el slug de tu página de Sectores es 'sectores'
+                $sectores_url = $sectores_page ? get_permalink($sectores_page->ID) : home_url('/sectores/');
+                ?>
+                <a href="<?php echo esc_url($sectores_url); ?>" class="ghd-btn ghd-btn-secondary ghd-btn-small" style="margin-right: 15px;">
+                    <i class="fa-solid fa-arrow-left"></i> Volver a Sectores
+                </a>
                 <h2>Tareas de <?php echo esc_html($sector_name); ?></h2>
             </div>
             <div class="header-actions">

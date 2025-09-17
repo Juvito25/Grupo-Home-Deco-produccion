@@ -28,7 +28,7 @@ if (
 <!-- INICIO DE LA CABECERA PROFESIONAL (SOLO PARA LA APP) -->
 <header class="ghd-pro-header">
     <div class="header-logo-title">
-        <a href="<?php echo home_url(); ?>" class="site-logo-link">
+        <a href="<?php echo home_url('/panel-de-control'); ?>" class="site-logo-link">
             <h1 class="main-title">GRUPO DECO HOME</h1> <!-- Texto grande -->
             <span class="sub-title">S.R.L</span> <!-- Texto pequeño debajo -->
             <!-- La imagen del logo.png ya NO va aquí si el texto la reemplaza visualmente -->

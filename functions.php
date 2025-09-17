@@ -138,14 +138,23 @@ function ghd_register_custom_roles() {
         $admin_role->add_cap('ghd_register_embalaje_points'); // Admin puede registrar puntos de embalaje si es necesario
         $admin_role->add_cap('ghd_register_own_embalaje'); // Admin puede registrar su propio embalaje
         $admin_role->add_cap('ghd_manage_own_delivery'); // Admin puede gestionar sus propias entregas
+        $admin_role->add_cap('ghd_view_all_sector_tasks'); // <- línea agregada para que Admin vea todas las tareas de todos los sectores
     }
 }
 /////// Fin registro roles personalizados /////////// Fin registro roles personalizados //////
 
 // --- 3. FUNCIONES DE AYUDA ---
 function ghd_get_sectores() { 
-    return ['Carpintería', 'Corte', 'Costura', 'Tapicería', 'Embalaje', 'Logística']; 
+    return [
+        'carpinteria' => 'Carpintería', 
+        'corte'       => 'Corte', 
+        'costura'     => 'Costura', 
+        'tapiceria'   => 'Tapicería', 
+        'embalaje'    => 'Embalaje', 
+        'logistica'   => 'Logística'
+    ]; 
 }
+
 function ghd_get_mapa_roles_a_campos() {
     return [
         // Mapeo de roles REALES a campos de estado ACF
@@ -796,24 +805,33 @@ function ghd_refresh_sector_tasks_callback() {
     $base_sector_key = str_replace('estado_', '', $campo_estado);
     // --- FIN CORRECCIÓN ---
 
-    $current_user = wp_get_current_user();
+        $current_user = wp_get_current_user();
     $user_roles = (array) $current_user->roles;
-    $is_leader = false;
+    $is_leader_actual_role = false; // Bandera para el rol de líder real del usuario
     foreach($user_roles as $role) {
         if (strpos($role, 'lider_') !== false) {
-            $is_leader = true;
+            $is_leader_actual_role = true;
             break;
         }
     }
-    
+
+    // Para el contexto de renderizado de la tarjeta, el administrador también debe verse como un "líder"
+    // para poder asignar tareas y ver el selector.
+    $is_leader_for_rendering = $is_leader_actual_role || current_user_can('ghd_view_all_sector_tasks'); // <-- CLAVE: Permitir al admin asignar
+
     $operarios_del_sector = [];
-    if ($is_leader && !empty($base_sector_key)) {
+    // Obtener operarios si es un líder real O un administrador con la capacidad
+    if ($is_leader_for_rendering && !empty($base_sector_key)) {
         $operarios_del_sector = get_users([
             'role__in' => ['lider_' . $base_sector_key, 'operario_' . $base_sector_key], 
             'orderby'  => 'display_name',
             'order'    => 'ASC'
         ]);
     }
+
+    // PASAR LA BANDERA CORRECTA PARA EL RENDERIZADO AL TEMPLATE PART
+    // Aseguramos que $is_leader que se pasa a task-card.php considere al administrador
+    $is_leader = $is_leader_for_rendering; // Usamos esta variable en $task_card_args
 
     $sector_kpi_data = ghd_calculate_sector_kpis($campo_estado);
 
@@ -823,7 +841,10 @@ function ghd_refresh_sector_tasks_callback() {
         'meta_query'     => [['key' => $campo_estado, 'value' => ['Pendiente', 'En Progreso'], 'compare' => 'IN']]
     ];
     
-    if (!$is_leader) {
+    // Si el usuario actual tiene la capacidad de ver todas las tareas del sector (ej. Administrador),
+    // o si es el líder del sector, no aplicamos el filtro de asignación personal.
+    // Solo si NO es líder Y NO es Admin con permiso de ver todo, filtramos por asignación.
+    if (!current_user_can('ghd_view_all_sector_tasks') && !$is_leader) {
         $asignado_a_field = str_replace('estado_', 'asignado_a_', $campo_estado);
         $pedidos_query_args['meta_query'][] = ['key' => $asignado_a_field, 'value' => $current_user->ID, 'compare' => '='];
     }
@@ -1731,3 +1752,109 @@ function ghd_crear_nuevo_pedido_callback() {
     ]);
     wp_die();
 }// fin ghd_crear_nuevo_pedido_callback()
+
+// --- Función de ayuda para eliminar tildes (acentos) ---
+if ( ! function_exists( 'remove_accents' ) ) {
+    function remove_accents( $string ) {
+        if ( ! preg_match( '/[\x80-\xff]/', $string ) ) {
+            return $string;
+        }
+        $chars = array(
+            // Decompositions for Latin-1 Supplement
+            chr(195).chr(128) => 'A', chr(195).chr(129) => 'A',
+            chr(195).chr(130) => 'A', chr(195).chr(131) => 'A',
+            chr(195).chr(132) => 'A', chr(195).chr(133) => 'A',
+            chr(195).chr(135) => 'C', chr(195).chr(136) => 'E',
+            chr(195).chr(137) => 'E', chr(195).chr(138) => 'E',
+            chr(195).chr(139) => 'E', chr(195).chr(140) => 'I',
+            chr(195).chr(141) => 'I', chr(195).chr(142) => 'I',
+            chr(195).chr(143) => 'I', chr(195).chr(145) => 'N',
+            chr(195).chr(146) => 'O', chr(195).chr(147) => 'O',
+            chr(195).chr(148) => 'O', chr(195).chr(149) => 'O',
+            chr(195).chr(150) => 'O', chr(195).chr(153) => 'U',
+            chr(195).chr(154) => 'U', chr(195).chr(155) => 'U',
+            chr(195).chr(156) => 'U', chr(195).chr(157) => 'Y',
+            chr(195).chr(159) => 's', chr(195).chr(160) => 'a',
+            chr(195).chr(161) => 'a', chr(195).chr(162) => 'a',
+            chr(195).chr(163) => 'a', chr(195).chr(164) => 'a',
+            chr(195).chr(165) => 'a', chr(195).chr(167) => 'c',
+            chr(195).chr(168) => 'e', chr(195).chr(169) => 'e',
+            chr(195).chr(170) => 'e', chr(195).chr(171) => 'e',
+            chr(195).chr(172) => 'i', chr(195).chr(173) => 'i',
+            chr(195).chr(174) => 'i', chr(195).chr(175) => 'i',
+            chr(195).chr(177) => 'n', chr(195).chr(178) => 'o',
+            chr(195).chr(179) => 'o', chr(195).chr(180) => 'o',
+            chr(195).chr(181) => 'o', chr(195).chr(182) => 'o',
+            chr(195).chr(182) => 'o', chr(195).chr(185) => 'u',
+            chr(195).chr(186) => 'u', chr(195).chr(187) => 'u',
+            chr(195).chr(188) => 'u', chr(195).chr(189) => 'y',
+            chr(195).chr(191) => 'y',
+            // Decompositions for Latin Extended-A
+            chr(196).chr(128) => 'A', chr(196).chr(129) => 'a',
+            chr(196).chr(130) => 'A', chr(196).chr(131) => 'a',
+            chr(196).chr(132) => 'A', chr(196).chr(133) => 'a',
+            chr(196).chr(134) => 'C', chr(196).chr(135) => 'c',
+            chr(196).chr(136) => 'C', chr(196).chr(137) => 'c',
+            chr(196).chr(138) => 'C', chr(196).chr(139) => 'c',
+            chr(196).chr(140) => 'C', chr(196).chr(141) => 'c',
+            chr(196).chr(142) => 'D', chr(196).chr(143) => 'd',
+            chr(196).chr(144) => 'D', chr(196).chr(145) => 'd',
+            chr(196).chr(146) => 'E', chr(196).chr(147) => 'e',
+            chr(196).chr(148) => 'E', chr(196).chr(149) => 'e',
+            chr(196).chr(150) => 'E', chr(196).chr(151) => 'e',
+            chr(196).chr(152) => 'E', chr(196).chr(153) => 'e',
+            chr(196).chr(154) => 'E', chr(196).chr(155) => 'e',
+            chr(196).chr(156) => 'G', chr(196).chr(157) => 'g',
+            chr(196).chr(158) => 'G', chr(196).chr(159) => 'g',
+            chr(196).chr(160) => 'G', chr(196).chr(161) => 'g',
+            chr(196).chr(162) => 'G', chr(196).chr(163) => 'g',
+            chr(196).chr(164) => 'H', chr(196).chr(165) => 'h',
+            chr(196).chr(166) => 'H', chr(196).chr(167) => 'h',
+            chr(196).chr(168) => 'I', chr(196).chr(169) => 'i',
+            chr(196).chr(170) => 'I', chr(196).chr(171) => 'i',
+            chr(196).chr(172) => 'I', chr(196).chr(173) => 'i',
+            chr(196).chr(174) => 'I', chr(196).chr(175) => 'i',
+            chr(196).chr(176) => 'I', chr(196).chr(177) => 'i',
+            chr(196).chr(178) => 'J', chr(196).chr(179) => 'j',
+            chr(196).chr(180) => 'J', chr(196).chr(181) => 'j',
+            chr(196).chr(182) => 'K', chr(196).chr(183) => 'k',
+            chr(196).chr(184) => 'k', chr(196).chr(185) => 'L',
+            chr(196).chr(186) => 'l', chr(196).chr(187) => 'L',
+            chr(196).chr(188) => 'l', chr(196).chr(189) => 'L',
+            chr(196).chr(190) => 'l', chr(196).chr(191) => 'L',
+            chr(197).chr(128) => 'l', chr(197).chr(129) => 'L',
+            chr(197).chr(130) => 'l', chr(197).chr(131) => 'N',
+            chr(197).chr(132) => 'n', chr(197).chr(133) => 'N',
+            chr(197).chr(134) => 'n', chr(197).chr(135) => 'N',
+            chr(197).chr(136) => 'n', chr(197).chr(137) => 'N',
+            chr(197).chr(138) => 'n', chr(197).chr(139) => 'O',
+            chr(197).chr(140) => 'o', chr(197).chr(141) => 'O',
+            chr(197).chr(142) => 'o', chr(197).chr(143) => 'O',
+            chr(197).chr(144) => 'o', chr(197).chr(145) => 'R',
+            chr(197).chr(146) => 'r', chr(197).chr(147) => 'R',
+            chr(197).chr(148) => 'r', chr(197).chr(149) => 'R',
+            chr(197).chr(150) => 'r', chr(197).chr(151) => 'S',
+            chr(197).chr(152) => 's', chr(197).chr(153) => 'S',
+            chr(197).chr(154) => 's', chr(197).chr(155) => 'S',
+            chr(197).chr(156) => 's', chr(197).chr(157) => 'S',
+            chr(197).chr(158) => 's', chr(197).chr(159) => 'T',
+            chr(197).chr(160) => 't', chr(197).chr(161) => 'T',
+            chr(197).chr(162) => 't', chr(197).chr(163) => 'T',
+            chr(197).chr(164) => 't', chr(197).chr(165) => 'U',
+            chr(197).chr(166) => 'u', chr(197).chr(167) => 'U',
+            chr(197).chr(168) => 'u', chr(197).chr(169) => 'U',
+            chr(197).chr(170) => 'u', chr(197).chr(171) => 'U',
+            chr(197).chr(172) => 'u', chr(197).chr(173) => 'U',
+            chr(197).chr(174) => 'u', chr(197).chr(175) => 'U',
+            chr(197).chr(176) => 'u', chr(197).chr(177) => 'W',
+            chr(197).chr(178) => 'w', chr(197).chr(179) => 'Y',
+            chr(197).chr(180) => 'y', chr(197).chr(181) => 'Y',
+            chr(197).chr(182) => 'Z', chr(197).chr(183) => 'z',
+            chr(197).chr(184) => 'Z', chr(197).chr(185) => 'z',
+            chr(197).chr(186) => 'Z', chr(197).chr(187) => 'z',
+            chr(197).chr(191) => 's'
+        );
+        $string = strtr($string, $chars);
+        return $string;
+    }
+} // fin remove_accents()
