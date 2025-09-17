@@ -177,6 +177,59 @@ function ghd_get_mapa_roles_a_campos() {
 }
 
 /**
+ * Asigna un color consistente a una vendedora basándose en su ID de usuario.
+ * Devuelve un array con el color de fondo (HEX sólido) y el color de texto (blanco o negro).
+ * @param int $user_id El ID del usuario de la vendedora.
+ * @return array Un array con 'bg_color' (HEX) y 'text_color'.
+ */
+function ghd_get_vendedora_color($user_id) {
+    $base_hex_colors = [
+        '#ef4444', // Rojo vibrante
+        '#f97316', // Naranja
+        '#eab308', // Amarillo mostaza
+        '#22c55e', // Verde esmeralda
+        '#16a34a', // Verde oscuro
+        '#06b6d4', // Azul cian
+        '#3b82f6', // Azul brillante
+        '#6366f1', // Azul índigo
+        '#a855f7', // Púrpura
+        '#d946ef', // Rosa fucsia
+        '#ec4899', // Rosa cálido
+        '#f43f5e', // Rosa rojizo
+        '#6b7280', // Gris medio
+        // Repite colores si es necesario o añade más para una mayor variedad
+    ];
+
+    $color_index = $user_id % count($base_hex_colors);
+    $hex_color = $base_hex_colors[$color_index]; // Este será ahora el color de fondo
+
+    // Convertir HEX a RGB para calcular luminancia
+    $hex_cleaned = str_replace('#', '', $hex_color);
+    if (strlen($hex_cleaned) == 3) {
+        $r = hexdec(substr($hex_cleaned, 0, 1).substr($hex_cleaned, 0, 1));
+        $g = hexdec(substr($hex_cleaned, 1, 1).substr($hex_cleaned, 1, 1));
+        $b = hexdec(substr($hex_cleaned, 2, 1).substr($hex_cleaned, 2, 1));
+    } else {
+        $r = hexdec(substr($hex_cleaned, 0, 2));
+        $g = hexdec(substr($hex_cleaned, 2, 2));
+        $b = hexdec(substr($hex_cleaned, 4, 2));
+    }
+
+    // Calcular la luminancia relativa (BT.709) para determinar el color de texto
+    $luminance = (0.2126 * $r + 0.7152 * $g + 0.0722 * $b) / 255; 
+
+    // Usar un umbral para decidir si el texto es blanco o negro
+    // Para colores sólidos, un umbral de 0.5 a 0.6 es un buen punto de partida.
+    $text_color = ($luminance > 0.55) ? '#000000' : '#ffffff'; 
+    // He ajustado el umbral a 0.55. Puedes experimentar entre 0.5 y 0.7 si es necesario.
+
+    return [
+        'bg_color'   => $hex_color, // Devolvemos el color HEX sólido
+        'text_color' => $text_color
+    ];
+}// fin ghd_get_vendedora_color ////
+
+/**
  * Función para calcular los KPIs de un sector dado un campo de estado.
  * Reutilizable para la carga inicial y las respuestas AJAX.
  * @param string $campo_estado El nombre del campo ACF (ej. 'estado_corte').
