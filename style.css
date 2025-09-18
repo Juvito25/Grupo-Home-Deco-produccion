@@ -1356,3 +1356,12 @@ body.page-template-template-login {
         justify-content: center;
     }
 }
+
+/* Ajustes para botones de fletero */
+.ghd-order-card .order-card-actions .ghd-btn.ghd-btn-small {
+    white-space: normal; /* Permite que el texto se envuelva */
+    height: auto;        /* Ajusta la altura automáticamente */
+    min-height: 38px;    /* Altura mínima para que no se vea demasiado estirado */
+    padding: 8px 12px;   /* Ajusta el padding para mejor apariencia */
+    line-height: 1.2;    /* Ajusta el espaciado entre líneas si el texto se envuelve */
+}

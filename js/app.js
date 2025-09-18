@@ -49,6 +49,54 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tiempoEl) tiempoEl.textContent = kpiData.tiempo_promedio_str_produccion;
     };
 
+    // --- Función para refrescar la lista de tareas del Fletero ---
+    const refreshFleteroTasksList = () => {
+        const fleteroTasksList = document.querySelector('.ghd-fletero-tasks-list');
+        const refreshFleteroTasksBtn = document.getElementById('ghd-refresh-fletero-tasks');
+
+        if (!fleteroTasksList || !refreshFleteroTasksBtn) {
+            console.warn('refreshFleteroTasksList: Elementos DOM (.ghd-fletero-tasks-list o #ghd-refresh-fletero-tasks) no encontrados. Posiblemente en otra página.');
+            return;
+        }
+
+        fleteroTasksList.style.opacity = '0.5';
+        refreshFleteroTasksBtn.disabled = true;
+
+        const params = new URLSearchParams({
+            action: 'ghd_refresh_fletero_tasks',
+            nonce: ghd_ajax.nonce
+        });
+
+        fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+            .then(res => res.json())
+            .then(response => { 
+                console.log('Respuesta completa de ghd_refresh_fletero_tasks:', response);
+
+                if (response.success) { 
+                    if (typeof response.data.tasks_html === 'string') {
+                        fleteroTasksList.innerHTML = response.data.tasks_html;
+                        console.log('Refresco de tareas de fletero exitoso. Contenido actualizado.');
+                    } else {
+                        const errorMessage = response.data.message || 'La respuesta de refresco del servidor es incompleta (falta HTML).';
+                        fleteroTasksList.innerHTML = '<p class="no-tasks-message" style="text-align: center; padding: 20px;">' + errorMessage + '</p>';
+                        console.error('Error de refresco (success=true, pero tasks_html inválido):', response);
+                    }
+                } else {
+                    const errorMessage = response.data?.message || 'Error desconocido del servidor al refrescar.';
+                    fleteroTasksList.innerHTML = '<p class="no-tasks-message" style="text-align: center; padding: 20px;">' + errorMessage + '</p>';
+                    console.error('Error de refresco (success=false):', response);
+                }
+            })
+            .catch(error => {
+                console.error("Error de red al refrescar tareas de fletero:", error);
+                fleteroTasksList.innerHTML = '<p class="no-tasks-message" style="text-align: center; padding: 20px;">Error de red. Inténtalo de nuevo.</p>';
+            })
+            .finally(() => {
+                fleteroTasksList.style.opacity = '1';
+                refreshFleteroTasksBtn.disabled = false;
+            });
+    }; // fin función refreshFleteroTasksList
+
     // --- LÓGICA UNIVERSAL DE EVENTOS EN EL CONTENIDO PRINCIPAL ---
     const mainContent = document.querySelector('.ghd-main-content');
     if (mainContent) {
@@ -57,13 +105,22 @@ document.addEventListener('DOMContentLoaded', function() {
         mainContent.addEventListener('click', function(e) {
             
             const target = e.target;
+            // Botones de paneles de Administrador/Sector
             const actionButton = target.closest('.action-button');
             const openModalButton = target.closest('.open-complete-task-modal');
             const closeModalButton = target.closest('.close-button');
-            const refreshTasksBtn = target.closest('#ghd-refresh-tasks');
-            const archiveBtn = target.closest('.archive-order-btn'); // Unificado aquí
+            const refreshTasksBtn = target.closest('#ghd-refresh-tasks'); // Refrescar panel de sector general
+            const archiveBtn = target.closest('.archive-order-btn'); // Archivar pedido (Admin/Macarena)
 
-            // Lógica para el botón "Refrescar" en el panel de sector
+            // Botones de panel de Fletero
+            const fleteroActionButton = target.closest('.fletero-action-btn'); // Marcar Recogido / Marcar Entregado
+            const openUploadDeliveryProofModalBtn = target.closest('.open-upload-delivery-proof-modal'); // Abre modal de comprobante de fletero
+            const refreshFleteroTasksBtn = target.closest('#ghd-refresh-fletero-tasks'); // Refrescar panel de fletero
+
+
+            // --- MANEJADORES DE CLICKS ---
+
+            // Lógica para el botón "Refrescar" en el panel de sector (NO fletero)
             if (refreshTasksBtn) {
                 e.preventDefault();
                 const sectorTasksList = document.querySelector('.ghd-sector-tasks-list');
@@ -77,11 +134,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                     .then(res => res.json())
-                    .then(data => {
-                        if (data.success && data.data) {
-                            sectorTasksList.innerHTML = data.data.tasks_html;
-                            if (data.data.kpi_data) updateSectorKPIs(data.data.kpi_data);
+                    .then(response => { // Renombrado a 'response' para consistencia
+                        if (response.success && response.data) { // Acceso correcto a response.data
+                            sectorTasksList.innerHTML = response.data.tasks_html;
+                            if (response.data.kpi_data) updateSectorKPIs(response.data.kpi_data);
+                        } else {
+                            // Mostrar mensaje de error en consola, no alerta
+                            console.error('Error al refrescar tareas de sector: ' + (response.data?.message || 'Error desconocido.'));
+                            sectorTasksList.innerHTML = '<p class="no-tasks-message">Error al cargar tareas.</p>';
                         }
+                    })
+                    .catch(error => {
+                        console.error("Error en la petición AJAX de refresco de sector:", error);
+                        sectorTasksList.innerHTML = '<p class="no-tasks-message">Error de red. Inténtalo de nuevo.</p>';
                     })
                     .finally(() => {
                         sectorTasksList.style.opacity = '1';
@@ -90,7 +155,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Lógica para el botón "Iniciar Tarea" en el Panel de Sector
-            if (actionButton && !openModalButton) {
+            if (actionButton && !openModalButton) { // Solo si es un botón de acción simple (no abre modal)
                 e.preventDefault();
                 const card = actionButton.closest('.ghd-order-card');
                 const assigneeSelector = card.querySelector('.ghd-assignee-selector');
@@ -110,38 +175,49 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                     .then(res => res.json())
-                    .then(data => {
-                        if (data.success) {
+                    .then(response => { // Renombrado a 'response'
+                        if (response.success) {
                             document.getElementById('ghd-refresh-tasks')?.click();
+                            // Mostrar mensaje de éxito en consola si no hay alerta
+                            console.log('Estado de tarea actualizado: ' + (response.data?.message || ''));
                         } else { 
-                            alert('Error: ' + (data.data?.message || 'Error desconocido')); 
+                            alert('Error: ' + (response.data?.message || 'Error desconocido')); 
                             card.style.opacity = '1';
                             actionButton.disabled = false;
                         }
+                    })
+                    .catch(error => {
+                        console.error("Error de red al iniciar tarea:", error);
+                        alert('Error de red. Inténtalo de nuevo.'); 
+                        card.style.opacity = '1';
+                        actionButton.disabled = false;
                     });
             }
 
-            // Lógica para abrir el modal de registro de detalles
+            // Lógica para abrir el modal de registro de detalles (general de sector)
             if (openModalButton) {
                 e.preventDefault();
                 const modal = document.getElementById(`complete-task-modal-${openModalButton.dataset.orderId}`);
                 if (modal) {
-                    modal.style.display = 'flex'; // Mostrar el modal
-                    // --- NUEVO: Disparar evento personalizado para inicializar el script del modal ---
-                    modal.dispatchEvent(new Event('ghdModalOpened')); // <-- AÑADIR ESTA LÍNEA
-                    // --- FIN NUEVO ---
+                    modal.style.display = 'flex';
+                    modal.dispatchEvent(new Event('ghdModalOpened'));
                     e.stopPropagation(); 
                 }
             }
 
-            // Lógica para cerrar el modal
+            // Lógica para cerrar CUALQUIER modal (botón X)
             if (closeModalButton) {
                 e.preventDefault();
                 const modal = closeModalButton.closest('.ghd-modal');
-                if (modal) modal.style.display = 'none';
+                if (modal) {
+                    modal.style.display = 'none';
+                    const form = modal.querySelector('form');
+                    if (form) form.reset();
+                }
+                e.stopPropagation(); 
             }
             
-            // --- CORRECCIÓN: Lógica unificada para el botón "Archivar Pedido" ---
+            // Lógica unificada para el botón "Archivar Pedido" (Admin/Macarena)
             if (archiveBtn) { 
                 e.preventDefault();
                 if (!confirm('¿Archivar este pedido? Esta acción es final.')) return;
@@ -158,25 +234,97 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                     .then(res => res.json())
-                    .then(data => {
-                        if (data.success) {
+                    .then(response => { // Renombrado a 'response'
+                        if (response.success) {
                             container.remove();
-                            if (data.data && data.data.kpi_data) {
-                                updateAdminClosureKPIs(data.data.kpi_data);
+                            if (response.data && response.data.kpi_data) {
+                                updateAdminClosureKPIs(response.data.kpi_data);
                             }
+                            console.log('Pedido archivado: ' + (response.data?.message || ''));
                         } else {
-                            alert('Error: ' + (data.data?.message || 'No se pudo archivar.'));
+                            alert('Error: ' + (response.data?.message || 'No se pudo archivar.'));
                             container.style.opacity = '1';
                             archiveBtn.disabled = false;
                             archiveBtn.textContent = 'Archivar Pedido';
                         }
+                    })
+                    .catch(error => {
+                        console.error("Error de red al archivar pedido:", error);
+                        alert('Error de red. Inténtalo de nuevo.');
+                        container.style.opacity = '1';
+                        archiveBtn.disabled = false;
+                        archiveBtn.textContent = 'Archivar Pedido';
                     });
             }
-        }); 
+
+            // --- Lógica para el botón "Refrescar" en el panel de fletero ---
+            if (refreshFleteroTasksBtn) {
+                e.preventDefault();
+                refreshFleteroTasksList(); // Llama a la función centralizada de refresco
+            }
+
+            // --- Lógica para el botón "Marcar como Recogido" del Fletero ---
+            if (fleteroActionButton && !openUploadDeliveryProofModalBtn) {
+                e.preventDefault();
+                const orderId = fleteroActionButton.dataset.orderId;
+                const newStatus = fleteroActionButton.dataset.newStatus; // 'Recogido' o 'Entregado'
+                const card = fleteroActionButton.closest('.ghd-order-card');
+
+                if (!confirm(`¿Estás seguro de que quieres marcar este pedido como "${newStatus}"?`)) {
+                    return;
+                }
+
+                card.style.opacity = '0.5';
+                fleteroActionButton.disabled = true;
+                fleteroActionButton.textContent = 'Actualizando...';
+
+                const params = new URLSearchParams({
+                    action: 'ghd_fletero_mark_recogido',
+                    nonce: ghd_ajax.nonce,
+                    order_id: orderId
+                });
+
+                fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+                .then(res => res.json())
+                .then(response => {
+                    if (response.success) {
+                        refreshFleteroTasksList();
+                        // Alerta solo si es un mensaje de éxito, pero generalmente el refresh es silencioso
+                        console.log('Pedido marcado como recogido: ' + (response.data?.message || '')); 
+                    } else {
+                        alert('Error: ' + (response.data?.message || 'Error desconocido al marcar como recogido.'));
+                    }
+                })
+                .catch(error => {
+                    console.error("Error de red al marcar como recogido:", error);
+                    alert('Error de red. Inténtalo de nuevo.');
+                })
+                .finally(() => {
+                    card.style.opacity = '1'; 
+                    fleteroActionButton.disabled = false;
+                    fleteroActionButton.textContent = 'Marcar como Recogido';
+                });
+            } // fin fleteroActionButton
+
+            // Lógica para abrir el modal de subida de comprobante del Fletero
+            if (openUploadDeliveryProofModalBtn) {
+                e.preventDefault();
+                const orderId = openUploadDeliveryProofModalBtn.dataset.orderId;
+                const modal = document.getElementById(`upload-delivery-proof-modal-${orderId}`);
+                if (modal) {
+                    modal.style.display = 'flex';
+                    modal.dispatchEvent(new Event('ghdModalOpened'));
+                    e.stopPropagation();
+                }
+            }
+
+        }); // fin listener clicks 
 
         // Listener para los SUBMITS (envío de formularios)
         mainContent.addEventListener('submit', function(e) {
-            const completeTaskForm = e.target.closest('.complete-task-form');
+            const completeTaskForm = e.target.closest('.complete-task-form'); // Formulario de tareas de sector (general)
+            const completeDeliveryForm = e.target.closest('.complete-delivery-form'); // Formulario de entrega del Fletero
+
             if (completeTaskForm) {
                 e.preventDefault();
                 const orderId = completeTaskForm.dataset.orderId;
@@ -192,15 +340,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: formData })
                 .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        alert(data.data.message || 'Tarea completada.');
+                .then(response => { // Renombrado a 'response'
+                    if (response.success) {
+                        alert(response.data.message || 'Tarea completada.');
                         const modal = document.getElementById(`complete-task-modal-${orderId}`);
                         if (modal) modal.style.display = 'none';
                         document.getElementById('ghd-refresh-tasks')?.click();
                     } else {
-                        alert('Error: ' + (data.data?.message || 'No se pudo completar la tarea.'));
+                        alert('Error: ' + (response.data?.message || 'No se pudo completar la tarea.'));
                     }
+                })
+                .catch(error => {
+                    console.error("Error de red al completar tarea:", error);
+                    alert('Error de red al completar tarea.');
                 })
                 .finally(() => {
                     if (submitButton) {
@@ -209,7 +361,54 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 });
             }
-        }); 
+
+            // --- Lógica para el SUBMIT del formulario de COMPROBANTE DE ENTREGA del Fletero ---
+            if (completeDeliveryForm) {
+                e.preventDefault();
+                const orderId = completeDeliveryForm.dataset.orderId;
+                const formData = new FormData(completeDeliveryForm);
+                formData.append('action', 'ghd_fletero_complete_delivery');
+                formData.append('nonce', ghd_ajax.nonce);
+                formData.append('order_id', orderId);
+
+                const submitButton = completeDeliveryForm.querySelector('button[type="submit"]');
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Entregando...';
+                }
+                completeDeliveryForm.style.opacity = '0.5';
+
+                fetch(ghd_ajax.ajax_url, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(res => res.json())
+                .then(response => { // Renombramos a 'response' para claridad
+                    if (response.success) {
+                        const modal = document.getElementById(`upload-delivery-proof-modal-${orderId}`);
+                        if (modal) {
+                            modal.style.display = 'none';
+                            completeDeliveryForm.reset();
+                        }
+                        console.log('Entrega completada: ' + (response.data?.message || ''));
+                        refreshFleteroTasksList();
+                    } else {
+                        alert('Error al completar entrega: ' + (response.data?.message || 'Error desconocido.'));
+                    }
+                })
+                .catch(error => {
+                    console.error("Error de red al completar entrega:", error);
+                    alert('Error de red al completar entrega.');
+                })
+                .finally(() => {
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = '<i class="fa-solid fa-check"></i> Marcar como Entregado';
+                    }
+                    completeDeliveryForm.style.opacity = '1';
+                });// fin fetch
+            } // fin if (completeDeliveryForm)
+        }); // fin listener submits
     } // fin if (mainContent)
 ///////////////////////////// ////////////////////////////////////////////////////
     // --- LÓGICA PARA ASIGNAR PRIORIDAD EN EL PANEL DE ASIGNACIÓN ---
@@ -302,11 +501,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                         .then(res => res.json())
-                        .then(data => {
-                            if (!data.success) {
-                                console.error('Error al guardar prioridad:', data.data?.message || 'Error desconocido.');
+                        .then(response => { // Renombrado a 'response'
+                            if (!response.success) {
+                                console.error('Error al guardar prioridad:', response.data?.message || 'Error desconocido.');
                             } else {
-                                console.log('Prioridad guardada:', data.message);
+                                console.log('Prioridad guardada:', response.data.message);
                             }
                         })
                         .catch(error => {
@@ -328,11 +527,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                         .then(res => res.json())
-                        .then(data => {
-                            if (!data.success) {
-                                console.error('Error al guardar vendedora:', data.data?.message || 'Error desconocido.');
+                        .then(response => { // Renombrado a 'response'
+                            if (!response.success) {
+                                console.error('Error al guardar vendedora:', response.data?.message || 'Error desconocido.');
                             } else {
-                                console.log('Vendedora guardada:', data.message);
+                                console.log('Vendedora guardada:', response.data.message);
                             }
                         })
                         .catch(error => {
@@ -364,14 +563,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                     .then(res => res.json())
-                    .then(data => {
-                        if (data.success) {
-                            console.log('Operario asignado:', data.message);
+                    .then(response => { // Renombrado a 'response'
+                        if (response.success) {
+                            console.log('Operario asignado:', response.data.message);
                             // Después de asignar, refrescar las tareas para ver el cambio reflejado (nombre asignado)
                             document.getElementById('ghd-refresh-tasks')?.click();
                         } else {
-                            console.error('Error al asignar operario:', data.data?.message || 'Error desconocido.');
-                            alert('Error al asignar operario: ' + (data.data?.message || 'Error desconocido.'));
+                            console.error('Error al asignar operario:', response.data?.message || 'Error desconocido.');
+                            alert('Error al asignar operario: ' + (response.data?.message || 'Error desconocido.'));
                         }
                     })
                     .catch(error => {
@@ -414,41 +613,38 @@ document.addEventListener('DOMContentLoaded', function() {
                     // 3. Realizar la petición AJAX
                     fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                         .then(res => res.json())
-                        .then(data => {
-                            if (data.success) {
-                                alert(data.data.message);
+                        .then(response => { // Renombrado a 'response'
+                            if (response.success) {
+                                alert(response.data.message);
                                 row.remove(); // Eliminar la fila de la tabla de asignación (ya no está pendiente)
 
                                 // 4. Refrescar la sección de "Pedidos en Producción" y sus KPIs
                                 const productionTableBody = document.getElementById('ghd-production-table-body');
                                 const refreshProductionTasksBtn = document.getElementById('ghd-refresh-production-tasks');
                                 
-                                if (productionTableBody && data.data.production_tasks_html) {
+                                if (productionTableBody && response.data.production_tasks_html) {
                                      // Reemplazar el contenido de la tabla de producción con el HTML actualizado
-                                    productionTableBody.innerHTML = data.data.production_tasks_html;
+                                    productionTableBody.innerHTML = response.data.production_tasks_html;
                                     // Actualizar los KPIs de producción
-                                    if (data.data.production_kpi_data) {
-                                        updateAdminProductionKPIs(data.data.production_kpi_data);
+                                    if (response.data.kpi_data) {
+                                        updateAdminProductionKPIs(response.data.kpi_data);
                                     }
                                 } else if (refreshProductionTasksBtn) {
-                                    // Si por alguna razón no se recibe el HTML directamente, forzar un click al botón de refresco
                                     refreshProductionTasksBtn.click();
                                 }
                             } else {
-                                // 5. Manejar errores
-                                alert('Error al iniciar producción: ' + (data.data?.message || 'Error desconocido.'));
-                                row.style.opacity = '1'; // Restaurar apariencia
-                                startProductionBtn.disabled = false; // Habilitar botón
-                                startProductionBtn.textContent = 'Iniciar Producción'; // Restaurar texto
+                                alert('Error al iniciar producción: ' + (response.data?.message || 'Error desconocido.'));
+                                row.style.opacity = '1'; 
+                                startProductionBtn.disabled = false;
+                                startProductionBtn.textContent = 'Iniciar Producción';
                             }
                         })
                         .catch(error => {
-                            // 6. Manejar errores de red
                             console.error("Error de red al iniciar producción:", error);
                             alert('Error de red al iniciar producción. Por favor, revisa tu conexión.');
-                            row.style.opacity = '1'; // Restaurar apariencia
-                            startProductionBtn.disabled = false; // Habilitar botón
-                            startProductionBtn.textContent = 'Iniciar Producción'; // Restaurar texto
+                            row.style.opacity = '1';
+                            startProductionBtn.disabled = false;
+                            startProductionBtn.textContent = 'Iniciar Producción';
                         });
                 }
             });
@@ -466,13 +662,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 e.preventDefault();
                 
                 const sectorTasksList = document.querySelector('.ghd-sector-tasks-list');
-                const mainContentEl = document.querySelector('.ghd-main-content');
-                const campoEstado = mainContentEl ? mainContentEl.dataset.campoEstado : '';
-
-                if (!sectorTasksList || !campoEstado) {
-                    console.error("Error: No se encontró la lista de tareas o el campo de estado para refrescar.");
-                    return;
-                }
+                const campoEstado = mainContent.dataset.campoEstado || '';
+                if (!sectorTasksList || !campoEstado) return;
 
                 sectorTasksList.style.opacity = '0.5';
                 refreshTasksBtn.disabled = true;
@@ -485,21 +676,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                     .then(res => res.json())
-                    .then(data => {
-                        if (data.success) {
-                            // --- CORRECCIÓN: Acceder directamente a los datos de la respuesta ---
-                            sectorTasksList.innerHTML = data.tasks_html;
-                            if (data.kpi_data) {
-                                updateSectorKPIs(data.kpi_data);
+                    .then(response => { // Renombrado a 'response'
+                        if (response.success) { // Aquí no hay response.data.data, es response.data.tasks_html
+                            sectorTasksList.innerHTML = response.data.tasks_html; // <-- Usar response.data.tasks_html
+                            if (response.data.kpi_data) {
+                                updateSectorKPIs(response.data.kpi_data);
                             }
+                            console.log('Refresco de tareas de sector exitoso: ' + (response.data?.message || ''));
                         } else {
-                            alert('Error al refrescar tareas: ' + (data.data?.message || 'Error desconocido.'));
+                            // Mostrar mensaje de error en consola, no alerta
+                            console.error('Error al refrescar tareas de sector: ' + (response.data?.message || 'Error desconocido.'));
                             sectorTasksList.innerHTML = '<p class="no-tasks-message">Error al cargar tareas.</p>';
                         }
                     })
                     .catch(error => {
-                        console.error("Error en la petición AJAX de refresco:", error);
-                        alert('Error de red al refrescar tareas.');
+                        console.error("Error en la petición AJAX de refresco de sector:", error);
                         sectorTasksList.innerHTML = '<p class="no-tasks-message">Error de red. Inténtalo de nuevo.</p>';
                     })
                     .finally(() => {
@@ -533,20 +724,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
             fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                 .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        closureTableBody.innerHTML = data.data.table_html;
-                        if (data.data.kpi_data) {
-                            updateAdminClosureKPIs(data.data.kpi_data);
+                .then(response => { // Renombrado a 'response'
+                    if (response.success) {
+                        closureTableBody.innerHTML = response.data.table_html;
+                        if (response.data.kpi_data) {
+                            updateAdminClosureKPIs(response.data.kpi_data);
                         }
+                        console.log('Refresco de cierre exitoso: ' + (response.data?.message || ''));
                     } else {
-                        alert('Error al refrescar pedidos de cierre: ' + (data.data?.message || ''));
+                        console.error('Error al refrescar pedidos de cierre: ' + (response.data?.message || ''));
                         closureTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Error al cargar pedidos de cierre.</td></tr>';
                     }
                 })
                 .catch(error => {
                     console.error("Error en la petición AJAX de refresco de cierre:", error);
-                    alert('Error de red al refrescar pedidos de cierre.');
                     closureTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Error de red. Inténtalo de nuevo.</td></tr>';
                 })
                 .finally(() => {
@@ -579,26 +770,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
             fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                 .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        productionTableBody.innerHTML = data.data.tasks_html;
-                        if (data.data.kpi_data) {
-                            updateAdminProductionKPIs(data.data.kpi_data);
+                .then(response => { // Renombrado a 'response'
+                    if (response.success) {
+                        productionTableBody.innerHTML = response.data.tasks_html;
+                        if (response.data.kpi_data) {
+                            updateAdminProductionKPIs(response.data.kpi_data);
                         }
+                        console.log('Refresco de producción exitoso: ' + (response.data?.message || ''));
                     } else {
-                        alert('Error al refrescar pedidos en producción: ' + (data.data?.message || ''));
-                        productionTableBody.innerHTML = '<tr><td colspan="9" style="text-align:center;">Error al cargar pedidos en producción.</td></tr>'; // Colspan ajustado
+                        console.error('Error al refrescar pedidos en producción: ' + (response.data?.message || ''));
+                        productionTableBody.innerHTML = '<tr><td colspan="9" style="text-align:center;">Error al cargar pedidos en producción.</td></tr>';
                     }
                 })
                 .catch(error => {
                     console.error("Error en la petición AJAX de refresco de producción:", error);
-                    alert('Error de red al refrescar pedidos en producción.');
-                    productionTableBody.innerHTML = '<tr><td colspan="9">Error de red. Inténtalo de nuevo.</td></tr>'; // Colspan ajustado
+                    productionTableBody.innerHTML = '<tr><td colspan="9">Error de red. Inténtalo de nuevo.</td></tr>';
                 })
                 .finally(() => {
                     productionTasksContainer.style.opacity = '1';
                     refreshProductionTasksBtn.disabled = false;
-                    // Si el panel de producción se refresca, también refrescar el de cierre.
                     const refreshClosureBtn = document.getElementById('ghd-refresh-closure-tasks');
                     if (refreshClosureBtn) { refreshClosureBtn.click(); }
                 });
@@ -625,270 +815,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 nonce: ghd_ajax.nonce
             });
 
-            fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-                        archivedOrdersTableBody.innerHTML = data.data.table_html;
-                    } else {
-                        alert('Error al refrescar pedidos archivados: ' + (data.data?.message || ''));
-                        archivedOrdersTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Error al cargar pedidos archivados.</td></tr>';
-                    }
-                })
-                .catch(error => {
-                    console.error("Error en la petición AJAX de refresco de archivados:", error);
-                    alert('Error de red al refrescar pedidos archivados.');
-                    archivedOrdersTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Error de red. Inténtalo de nuevo.</td></tr>';
-                })
-                .finally(() => {
-                    archivedOrdersTableBody.style.opacity = '1';
-                    refreshArchivedOrdersBtn.disabled = false;
-                });
-        });
-    }
-
-    // --- LÓGICA PARA LOS MODALES DE COMPLETAR TAREA ---
-    // Event delegation para los botones que abren modales
-    mainContent.addEventListener('click', function(e) { // Asegurarse que mainContent está definido
-        const openModalButton = e.target.closest('.open-complete-task-modal');
-        if (openModalButton) {
-            e.preventDefault();
-            const orderId = openModalButton.dataset.orderId;
-            const modal = document.getElementById(`complete-task-modal-${orderId}`);
-            if (modal) {
-                modal.style.display = 'flex'; // Mostrar el modal
-                // Detener la propagación del evento para que no active otros listeners
-                e.stopPropagation(); 
-            }
-        }
-
-        // Event delegation para los botones que cierran modales
-        const closeModalButton = e.target.closest('.close-button');
-        if (closeModalButton && closeModalButton.dataset.modalId) {
-            e.preventDefault();
-            const modal = document.getElementById(closeModalButton.dataset.modalId);
-            if (modal) {
-                modal.style.display = 'none'; // Ocultar el modal
-                // Opcional: Resetear el formulario del modal al cerrarlo
-                const form = modal.querySelector('.complete-task-form');
-                if (form) {
-                    form.reset(); // Limpia campos y estado del botón
-                    const submitButton = form.querySelector('button[type="submit"]');
-                    if (submitButton) {
-                        submitButton.disabled = false;
-                        submitButton.innerHTML = '<i class="fa-solid fa-check"></i> Completar y Guardar';
-                    }
-                    form.style.opacity = '1'; // Restaurar opacidad
-                }
-            }
-            // Detener la propagación del evento para que no active otros listeners
-            e.stopPropagation(); 
-        }
-
-        // Lógica para enviar el formulario de registro de detalles de tarea
-        const completeTaskForm = e.target.closest('.complete-task-form');
-        // Asegurarse que el evento es un click en el botón submit y que el formulario existe
-        if (completeTaskForm && e.target.type === 'submit') { 
-            e.preventDefault(); // Prevenir el envío por defecto del formulario
-            const orderId = completeTaskForm.dataset.orderId;
-            const fieldEstadoSector = completeTaskForm.dataset.field; // ej. 'estado_carpinteria'
-            const formData = new FormData(completeTaskForm); // Capturar todos los datos del formulario (incluyendo archivos)
-
-            // Añadir datos adicionales que no están en el formulario
-            formData.append('action', 'ghd_register_task_details_and_complete');
-            formData.append('nonce', ghd_ajax.nonce);
-            formData.append('order_id', orderId);
-            formData.append('field', fieldEstadoSector);
-            // Obtener el ID del usuario logueado si no está ya en formData (aunque en este caso, el backend lo obtiene)
-            // formData.append('logged_in_user_id', ghd_ajax.user_id); // Si estuviera disponible en ghd_ajax
-
-            // Deshabilitar formulario y mostrar indicador de carga
-            const submitButton = completeTaskForm.querySelector('button[type="submit"]');
-            if (submitButton) {
-                submitButton.disabled = true;
-                submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
-            }
-            completeTaskForm.style.opacity = '0.5';
-
-            fetch(ghd_ajax.ajax_url, {
-                method: 'POST',
-                body: formData // FormData se envía directamente, manejando archivos correctamente
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.data.message); // Mostrar mensaje de éxito
-                    const modal = document.getElementById(`complete-task-modal-${orderId}`);
-                    if (modal) {
-                        modal.style.display = 'none'; // Cerrar modal
-                    }
-                    
-                    // Refrescar el panel del sector para ver que la tarea ha desaparecido o cambiado
-                    const refreshTasksBtn = document.getElementById('ghd-refresh-tasks');
-                    if (refreshTasksBtn) { refreshTasksBtn.click(); }
-                    
-                    // Si el Admin está viendo un panel de sector, refrescar también sus paneles generales
-                    if (document.body.classList.contains('is-admin-dashboard-panel')) {
-                        const refreshProdBtn = document.getElementById('ghd-refresh-production-tasks');
-                        if (refreshProdBtn) { refreshProdBtn.click(); }
-                        const refreshClosureBtn = document.getElementById('ghd-refresh-closure-tasks');
-                        if (refreshClosureBtn) { refreshClosureBtn.click(); }
-                    }
-
-                } else {
-                    alert('Error al completar tarea: ' + (data.data?.message || 'Error desconocido.'));
-                }
-            })
-            .catch(error => {
-                console.error("Error de red al completar tarea:", error);
-                alert('Error de red al completar tarea.');
-            })
-            .finally(() => {
-                // Restaurar el estado del botón y del formulario
-                if (submitButton) {
-                    submitButton.disabled = false;
-                    submitButton.innerHTML = '<i class="fa-solid fa-check"></i> Completar y Guardar';
-                }
-                completeTaskForm.style.opacity = '1';
-            });
-        }
-    }); // Fin de la delegación de eventos en mainContent
-
-
-    // --- LÓGICA PARA EL FILTRO DESDE LA URL AL CARGAR LA PÁGINA (EN ADMIN DASHBOARD) ---
-    const adminDashboard = document.querySelector('.page-template-template-admin-dashboard');
-    if (adminDashboard) {
-        const searchFilter = document.getElementById('ghd-search-filter');
-        const statusFilter = document.getElementById('ghd-status-filter');
-        const priorityFilter = document.getElementById('ghd-priority-filter');
-        const resetFiltersBtn = document.getElementById('ghd-reset-filters');
-        const tableBody = document.getElementById('ghd-orders-table-body');
-
-        // Función para aplicar los filtros
-        const applyFilters = () => {
-            if (!tableBody) return;
-            
-            tableBody.style.opacity = '0.5';
-            
-            const params = new URLSearchParams({ 
-                action: 'ghd_filter_orders', // <-- NECESITA ESTE ENDPOINT AJAX EN functions.php
-                nonce: ghd_ajax.nonce, 
-                search: searchFilter.value, 
-                status: statusFilter.value, 
-                priority: priorityFilter.value 
-            });
-            
-            fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
-                .then(res => res.json())
-                .then(data => { 
-                    if (data.success) {
-                        tableBody.innerHTML = data.data.html;
-                    } else {
-                        alert('Error al filtrar tareas: ' + (data.data?.message || ''));
-                        tableBody.innerHTML = '<tr><td colspan="9">Ocurrió un error al cargar los datos.</td></tr>';
-                    }
-                })
-                .catch(error => {
-                    console.error("Error en la petición AJAX de filtros:", error);
-                    tableBody.innerHTML = '<tr><td colspan="9">Error de red. Inténtalo de nuevo.</td></tr>';
-                })
-                .finally(() => {
-                    tableBody.style.opacity = '1';
-                });
-        };
-
-        let searchTimeout;
-        if (searchFilter) { 
-            searchFilter.addEventListener('keyup', () => { 
-                clearTimeout(searchTimeout); 
-                searchTimeout = setTimeout(applyFilters, 500); // Esperar 500ms después de dejar de teclear
-            });
-        }
-        
-        if (statusFilter) { 
-            statusFilter.addEventListener('change', applyFilters);
-        }
-        if (priorityFilter) { 
-            priorityFilter.addEventListener('change', applyFilters);
-        }
-        
-        if (resetFiltersBtn) { 
-            resetFiltersBtn.addEventListener('click', () => { 
-                searchFilter.value = ''; 
-                statusFilter.value = ''; 
-                priorityFilter.value = ''; 
-                applyFilters(); 
-            });
-        }
-
-        // Lógica para cargar filtros desde la URL si existen (ej. después de una búsqueda)
-        if (window.location.hash && window.location.hash.startsWith('#buscar=')) {
-            let searchTerm = decodeURIComponent(window.location.hash.substring(8)).replace(/\+/g, ' ');
-            if (searchFilter) searchFilter.value = searchTerm;
-            applyFilters(); // Aplicar el filtro de búsqueda
-            // Limpiar el hash de la URL después de usarlo
-            history.pushState("", document.title, window.location.pathname + window.location.search);
-        }
-    }
-
-    // --- LÓGICA PARA LOS GRÁFICOS DE LA PÁGINA DE REPORTES ---
-    // (Asegurarse de que el objeto ghd_reports_data esté disponible globalmente)
-    if (typeof ghd_reports_data !== 'undefined' && document.querySelector('.ghd-reports-grid')) {
-        // Código para inicializar Chart.js...
-        const pedidosCtx = document.getElementById('pedidosPorEstadoChart');
-        if (pedidosCtx) {
-            new Chart(pedidosCtx, {
-                type: 'bar',
-                data: {
-                    labels: ghd_reports_data.pedidos_por_estado.labels,
-                    datasets: [{
-                        label: 'Pedidos por Estado',
-                        data: ghd_reports_data.pedidos_por_estado.data,
-                        backgroundColor: ghd_reports_data.pedidos_por_estado.labels.map(label => 
-                            ghd_reports_data.pedidos_por_estado.backgroundColors[label] || 'rgba(74, 124, 89, 0.7)'
-                        ),
-                        borderColor: 'rgba(255, 255, 255, 0.8)',
-                        borderWidth: 1
-                    }]
-                },
-                options: { 
-                    responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
-                    plugins: { legend: { display: false }, title: { display: false } }
-                }
-            });
-        }
-        // ... (código para otros gráficos: cargaPorSectorChart, pedidosPorPrioridadChart) ...
-    }
-
-    // --- LÓGICA PARA EL BOTÓN "EXPORTAR" PEDIDOS (EN TABLAS DEL ADMIN) ---
-    const exportAssignationOrdersBtn = document.getElementById('ghd-export-assignation-orders');
-    if (exportAssignationOrdersBtn) {
-        exportAssignationOrdersBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            const exportType = exportAssignationOrdersBtn.dataset.exportType || 'assignation';
-
-            exportAssignationOrdersBtn.disabled = true;
-            exportAssignationOrdersBtn.textContent = 'Exportando...';
-
-            const params = new URLSearchParams({
-                action: 'ghd_export_orders_csv', // <-- NECESITA ESTE ENDPOINT AJAX EN functions.php
-                nonce: ghd_ajax.nonce,
-                export_type: exportType
-            });
-
             fetch(ghd_ajax.ajax_url, {
                 method: 'POST',
                 body: params
             })
             .then(response => {
-                // Manejar el caso de que la respuesta sea un JSON de error
                 const contentType = response.headers.get('Content-Type');
                 if (contentType && contentType.includes('application/json')) {
                     return response.json().then(errorData => {
                         throw new Error(errorData.data?.message || 'Error desconocido al exportar.');
                     });
                 }
-                // Si no es JSON, asumimos que es un archivo y procedemos
                 return response.blob();
             })
             .then(blob => {
@@ -897,15 +834,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 a.style.display = 'none';
                 a.href = url;
                 
-                // Intentar obtener el nombre del archivo del header Content-Disposition
-                const contentDisposition = response.headers.get('Content-Disposition'); // Acceder a la respuesta original
+                const contentDisposition = response.headers.get('Content-Disposition');
                 const filenameMatch = contentDisposition && contentDisposition.match(/filename="(.+)"/);
                 a.download = filenameMatch ? filenameMatch[1] : `export_${Date.now()}.csv`;
                 
                 document.body.appendChild(a);
                 a.click();
-                window.URL.revokeObjectURL(url); // Liberar el objeto URL
-                alert('Exportación completada con éxito.');
+                window.URL.revokeObjectURL(url);
+                console.log('Exportación completada con éxito.');
             })
             .catch(error => {
                 console.error("Error al exportar pedidos:", error);
@@ -918,18 +854,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-        // --- LÓGICA PARA EL POPUP DE NUEVO PEDIDO ---
+    // --- LÓGICA PARA EL POPUP DE NUEVO PEDIDO ---
     const abrirModalBtn = document.getElementById('abrir-nuevo-pedido-modal');
     const nuevoPedidoModal = document.getElementById('nuevo-pedido-modal');
     const nuevoPedidoForm = document.getElementById('nuevo-pedido-form');
 
     if (abrirModalBtn && nuevoPedidoModal) {
-        // Abrir el modal
         abrirModalBtn.addEventListener('click', function() {
             nuevoPedidoModal.style.display = 'flex';
         });
 
-        // Cerrar el modal con el botón de la 'X'
         const closeModalBtn = nuevoPedidoModal.querySelector('.close-button');
         if (closeModalBtn) {
             closeModalBtn.addEventListener('click', function() {
@@ -938,7 +872,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-        // Reemplaza el listener 'submit' para nuevoPedidoForm con este
     if (nuevoPedidoForm) {
         nuevoPedidoForm.addEventListener('submit', function(e) {
             e.preventDefault();
@@ -956,27 +889,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: new URLSearchParams(formData)
             })
             .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.data.message);
+            .then(response => { // Renombrado a 'response'
+                if (response.success) {
+                    alert(response.data.message);
                     nuevoPedidoModal.style.display = 'none';
                     this.reset();
 
-                   // --- Lógica para insertar la nueva fila con AJAX ---
                     const tableBody = document.getElementById('ghd-orders-table-body');
                     if (tableBody) {
-                        // Buscar si la tabla tiene el mensaje de "No hay pedidos"
                         const noOrdersRow = tableBody.querySelector('td[colspan="6"]');
                         if (noOrdersRow) {
-                            // Si la tabla estaba vacía, reemplazar el mensaje con la nueva fila
-                            tableBody.innerHTML = data.data.new_row_html;
+                            tableBody.innerHTML = response.data.new_row_html;
                         } else {
-                            // Si ya hay pedidos, añadir el nuevo al principio
-                            tableBody.insertAdjacentHTML('afterbegin', data.data.new_row_html);
+                            tableBody.insertAdjacentHTML('afterbegin', response.data.new_row_html);
                         }
                     } 
                 } else {
-                    alert('Error: ' + (data.data?.message || 'No se pudo crear el pedido.'));
+                    alert('Error: ' + (response.data?.message || 'No se pudo crear el pedido.'));
                 }
             })
             .finally(() => {
@@ -987,11 +916,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 }); // Cierre Correcto del DOMContentLoaded listener
 
-// LÓGICA PARA ACTIVAR EL FILTRO DESDE LA URL AL CARGAR LA PÁGINA (EXISTENTE)
-// Se mantiene aquí por si acaso, pero la lógica principal de filtros está en DOMContentLoaded.
-// La llamada a applyFilters desde aquí podría no funcionar si el DOM no está listo.
 window.addEventListener('load', function() {
-    // Asegurarse de que getElementById existe antes de usarlo
     const searchFilterInput = document.getElementById('ghd-search-filter');
     if (!searchFilterInput) return;
 
@@ -1000,16 +925,13 @@ window.addEventListener('load', function() {
 
     if (searchTerm) {
         searchFilterInput.value = searchTerm;
-        // Simular el evento keyup para activar la lógica applyFilters
         const event = new Event('keyup');
         searchFilterInput.dispatchEvent(event);
-        // Limpiar el parámetro de búsqueda de la URL después de aplicarlo
         history.pushState("", document.title, window.location.pathname + window.location.search);
     }
 });
 
 
-// --- LÓGICA PARA EL BOTÓN "REFRESCAR" EN LA PÁGINA DE PEDIDOS ARCHIVADOS ---
 const refreshArchivedBtn = document.getElementById('ghd-refresh-archived-orders');
 if (refreshArchivedBtn) {
     refreshArchivedBtn.addEventListener('click', function(e) {
@@ -1025,14 +947,13 @@ if (refreshArchivedBtn) {
             action: 'ghd_refresh_archived_orders',
             nonce: ghd_ajax.nonce
         });
-        // ...listener de "submit" para nuevoPedidoForm ...
+        
             fetch(ghd_ajax.ajax_url, {
                 method: 'POST',
                 body: new URLSearchParams(formData)
             })
             .then(res => {
                 if (!res.ok) {
-                    // Si el servidor responde con un error (ej. 500), lo capturamos aquí
                     throw new Error('Error del servidor. Revisa el debug.log de WordPress.');
                 }
                 return res.json();
@@ -1042,12 +963,10 @@ if (refreshArchivedBtn) {
                     alert(data.data.message);
                     window.location.reload();
                 } else {
-                    // Esto mostrará el error específico enviado desde PHP (ej. "Campo obligatorio")
                     alert('Error: ' + (data.data?.message || 'No se pudo crear el pedido.'));
                 }
             })
             .catch(error => {
-                // Esto captura errores de red o errores lanzados en el .then() anterior
                 console.error("Error al crear pedido:", error);
                 alert("Ocurrió un error inesperado. Revisa la consola para más detalles.");
             })

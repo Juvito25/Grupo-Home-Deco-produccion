@@ -4,29 +4,14 @@
  * Descripción: Página de inicio de sesión personalizada.
  */
 
-// Si el usuario ya está logueado, redirigirlo a su dashboard
+// Si el usuario ya está logueado, redirigirlo usando el filtro login_redirect
+// Esto asegura que la lógica de ghd_custom_login_redirect se aplique.
 if (is_user_logged_in()) {
     $user = wp_get_current_user();
-    if (in_array('administrator', (array) $user->roles)) {
-        $admin_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-admin-dashboard.php']);
-        $redirect_url = !empty($admin_pages) ? get_permalink($admin_pages[0]) : admin_url();
-    } else {
-        $sector_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-sector-dashboard.php']);
-        $sector_dashboard_url = !empty($sector_pages) ? get_permalink($sector_pages[0]) : home_url();
-        
-        $user_roles = $user->roles;
-        $user_role = !empty($user_roles) ? $user_roles[0] : '';
-        $mapa_roles = ghd_get_mapa_roles_a_campos(); // Esta función debe estar definida en functions.php
-        if (array_key_exists($user_role, $mapa_roles)) {
-            $sector_name = ucfirst(str_replace(['rol_', '_'], ' ', $user_role));
-            $clean_sector_name = strtolower(str_replace(['á', 'é', 'í', 'ó', 'ú'], ['a', 'e', 'i', 'o', 'u'], $sector_name));
-            // Ya no añadimos el parámetro ?sector aquí, el template-sector-dashboard lo determinará.
-            $redirect_url = $sector_dashboard_url; 
-        } else {
-            $redirect_url = $sector_dashboard_url;
-        }
-    }
-    wp_redirect( $redirect_url );
+    // Obtener la URL a la que se redirigiría con el filtro login_redirect
+    // Pasamos null como requested_redirect_to para que el filtro decida
+    $redirect_to_url = apply_filters( 'login_redirect', admin_url(), '', $user ); 
+    wp_redirect( $redirect_to_url );
     exit;
 }
 
@@ -48,25 +33,10 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] ) {
         $login_error_message = $user->get_error_message();
     } else {
         // Autenticación exitosa
-        // Redirigir al usuario a su dashboard según su rol
-        if ( in_array('administrator', (array) $user->roles) ) {
-            $admin_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-admin-dashboard.php']);
-            $redirect_url = !empty($admin_pages) ? get_permalink($admin_pages[0]) : admin_url();
-        } else {
-            $sector_pages = get_posts(['post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-sector-dashboard.php']);
-            $sector_dashboard_url = !empty($sector_pages) ? get_permalink($sector_pages[0]) : home_url();
-            
-            $user_roles = $user->roles;
-            $user_role = !empty($user_roles) ? $user_roles[0] : '';
-            $mapa_roles = ghd_get_mapa_roles_a_campos();
-            if (array_key_exists($user_role, $mapa_roles)) {
-                // Ya no añadimos el parámetro ?sector aquí, el template-sector-dashboard lo determinará.
-                $redirect_url = $sector_dashboard_url; 
-            } else {
-                $redirect_url = $sector_dashboard_url;
-            }
-        }
-        wp_redirect( $redirect_url );
+        // No hacer wp_redirect aquí. Dejar que WordPress use el filtro 'login_redirect'.
+        // Simplemente redirigir a donde wp_signon enviaría por defecto, que luego será filtrado.
+        // La URL oculta del formulario ya apunta a home_url('/'), que será filtrado.
+        wp_redirect( apply_filters( 'login_redirect', home_url(), home_url(), $user ) );
         exit;
     }
 }

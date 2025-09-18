@@ -1409,6 +1409,237 @@ function ghd_assign_task_to_member_callback() {
     wp_die();
 }/// fin ghd_assign_task_to_member_callback()
 
+////// /////////////////////////////////////////////////////
+// --- NUEVO: AJAX Handler para Fletero: Marcar Entrega como "Recogido" ---
+add_action('wp_ajax_ghd_fletero_mark_recogido', 'ghd_fletero_mark_recogido_callback');
+function ghd_fletero_mark_recogido_callback() {
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+
+    // Solo fleteros, líderes de logística o administradores pueden usar esto
+    if (!current_user_can('ghd_manage_own_delivery') && !current_user_can('lider_logistica') && !current_user_can('manage_options')) {
+        wp_send_json_error(['message' => 'No tienes permisos para marcar entregas como recogidas.']);
+        wp_die();
+    }
+
+    $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
+    if (!$order_id) {
+        wp_send_json_error(['message' => 'ID de pedido no válido.']);
+        wp_die();
+    }
+
+    // Opcional: Verificar que el pedido esté asignado al fletero actual si no es admin/líder
+    if (!current_user_can('lider_logistica') && !current_user_can('manage_options')) {
+        $assigned_fletero_id = (int) get_field('logistica_fletero_id', $order_id);
+        if ($assigned_fletero_id !== get_current_user_id()) {
+            wp_send_json_error(['message' => 'Este pedido no está asignado a ti.']);
+            wp_die();
+        }
+    }
+
+    // Actualizar el estado de logística del pedido
+    update_field('estado_logistica', 'Recogido', $order_id);
+    update_field('fecha_recogido', current_time('mysql'), $order_id); // Guardar fecha de recogido
+    
+    // Registrar en el historial
+    wp_insert_post([
+        'post_title' => 'Pedido Recogido por Fletero ID ' . get_current_user_id(),
+        'post_type' => 'ghd_historial',
+        'meta_input' => ['_orden_produccion_id' => $order_id, '_logistica_estado' => 'Recogido']
+    ]);
+
+    wp_send_json_success(['message' => 'Pedido marcado como recogido.']);
+    wp_die();
+}
+
+// --- NUEVO: AJAX Handler para Fletero: Marcar Entrega como "Entregado" y Subir Comprobante ---
+add_action('wp_ajax_ghd_fletero_complete_delivery', 'ghd_fletero_complete_delivery_callback');
+function ghd_fletero_complete_delivery_callback() {
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+
+    // Solo fleteros, líderes de logística o administradores pueden usar esto
+    if (!current_user_can('ghd_manage_own_delivery') && !current_user_can('lider_logistica') && !current_user_can('manage_options')) {
+        wp_send_json_error(['message' => 'No tienes permisos para completar entregas.']);
+        wp_die();
+    }
+
+    $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
+    $firma_cliente = isset($_POST['firma_cliente']) ? sanitize_textarea_field($_POST['firma_cliente']) : '';
+
+    if (!$order_id) {
+        wp_send_json_error(['message' => 'ID de pedido no válido.']);
+        wp_die();
+    }
+
+    // Opcional: Verificar que el pedido esté asignado al fletero actual
+    if (!current_user_can('lider_logistica') && !current_user_can('manage_options')) {
+        $assigned_fletero_id = (int) get_field('logistica_fletero_id', $order_id);
+        if ($assigned_fletero_id !== get_current_user_id()) {
+            wp_send_json_error(['message' => 'Este pedido no está asignado a ti.']);
+            wp_die();
+        }
+    }
+
+    // Actualizar el estado de logística del pedido a 'Completado'
+    update_field('estado_logistica', 'Completado', $order_id);
+    update_field('fecha_entregado', current_time('mysql'), $order_id); // Guardar fecha de entrega
+    
+    // Guardar la firma del cliente (si se proporcionó)
+    if (!empty($firma_cliente)) {
+        update_field('logistica_firma_cliente', $firma_cliente, $order_id); // <-- Este campo ACF ya debió crearse
+    }
+
+    // Manejar la subida de la foto de comprobante
+    $attachment_id = 0;
+    if (isset($_FILES['foto_comprobante']) && !empty($_FILES['foto_comprobante']['name'])) {
+        require_once(ABSPATH . 'wp-admin/includes/image.php');
+        require_once(ABSPATH . 'wp-admin/includes/file.php');
+        require_once(ABSPATH . 'wp-admin/includes/media.php');
+        
+        $attachment_id = media_handle_upload('foto_comprobante', $order_id);
+        if (!is_wp_error($attachment_id)) {
+            update_field('logistica_foto_comprobante', $attachment_id, $order_id); // <-- Este campo ACF ya debió crearse
+        } else {
+            error_log('Error al subir foto de comprobante para pedido ' . $order_id . ': ' . $attachment_id->get_error_message());
+            // No hacemos wp_send_json_error aquí, para que la entrega se marque como completada aunque falle la foto
+        }
+    }
+    
+    // Registrar en el historial
+    $historial_title = 'Entrega Completada por Fletero ID ' . get_current_user_id();
+    if ($attachment_id > 0) $historial_title .= ' (con foto)';
+    if (!empty($firma_cliente)) $historial_title .= ' (con firma)';
+
+    wp_insert_post([
+        'post_title' => $historial_title,
+        'post_type' => 'ghd_historial',
+        'meta_input' => ['_orden_produccion_id' => $order_id, '_logistica_estado' => 'Completado']
+    ]);
+
+    // Finalmente, cambiar el estado general del pedido para que Macarena lo vea
+    update_field('estado_pedido', 'Pendiente de Cierre Admin', $order_id);
+    update_field('estado_administrativo', 'Listo para Archivar', $order_id);
+
+    wp_send_json_success(['message' => 'Entrega marcada como completada.']);
+    wp_die();
+}// fin ghd_fletero_complete_delivery_callback()
+
+////// /////////////////////////////////////////////////////
+// --- NUEVO: AJAX Handler para refrescar las entregas asignadas al fletero ---
+add_action('wp_ajax_ghd_refresh_fletero_tasks', 'ghd_refresh_fletero_tasks_callback');
+function ghd_refresh_fletero_tasks_callback() {
+    error_log('ghd_refresh_fletero_tasks_callback: Inicio de la función.'); // DEBUG
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+
+    if (!current_user_can('operario_logistica') && !current_user_can('lider_logistica') && !current_user_can('manage_options')) {
+        error_log('ghd_refresh_fletero_tasks_callback: Permisos insuficientes para el usuario ' . get_current_user_id()); // DEBUG
+        wp_send_json_error(['message' => 'No tienes permisos para ver entregas.']);
+        wp_die();
+    }
+
+    error_log('ghd_refresh_fletero_tasks_callback: Permisos OK. Generando HTML.'); // DEBUG
+
+    ob_start();
+    $current_user_id = get_current_user_id();
+    
+    // Consulta para obtener las órdenes de producción asignadas al fletero actual (duplicar lógica de template-fletero.php)
+    $args_entregas_fletero = array(
+        'post_type'      => 'orden_produccion',
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'meta_query'     => array(
+            'relation' => 'AND',
+            array(
+                'key'     => 'estado_logistica',
+                'value'   => ['Pendiente', 'En Progreso', 'Recogido'], 
+                'compare' => 'IN',
+            ),
+            array(
+                'key'     => 'logistica_fletero_id',
+                'value'   => $current_user_id,
+                'compare' => '=',
+            ),
+        ),
+        'orderby' => 'date',
+        'order'   => 'ASC',
+    );
+
+    $entregas_fletero_query = new WP_Query($args_entregas_fletero);
+
+    if ($entregas_fletero_query->have_posts()) :
+        while ($entregas_fletero_query->have_posts()) : $entregas_fletero_query->the_post();
+            $order_id = get_the_ID();
+            $codigo_pedido = get_the_title();
+            $nombre_cliente = get_field('nombre_cliente', $order_id);
+            $direccion_entrega = get_field('direccion_de_entrega', $order_id);
+            $estado_logistica = get_field('estado_logistica', $order_id);
+            $nombre_producto = get_field('nombre_producto', $order_id);
+            $cliente_telefono = get_field('cliente_telefono', $order_id);
+
+            $action_button_html = '';
+            if ($estado_logistica === 'Pendiente' || $estado_logistica === 'En Progreso') {
+                $action_button_html = '<button class="ghd-btn ghd-btn-primary ghd-btn-small fletero-action-btn" data-order-id="' . esc_attr($order_id) . '" data-new-status="Recogido">Marcar como Recogido</button>';
+            } elseif ($estado_logistica === 'Recogido') {
+                $action_button_html = '<button class="ghd-btn ghd-btn-success ghd-btn-small fletero-action-btn open-upload-delivery-proof-modal" data-order-id="' . esc_attr($order_id) . '">Marcar Entregado y Subir Comprobante</button>';
+            }
+    ?>
+        <div class="ghd-order-card fletero-card" id="fletero-order-<?php echo $order_id; ?>">
+            <div class="order-card-main">
+                <div class="order-card-header">
+                    <h3><?php echo esc_html($codigo_pedido); ?></h3>
+                    <span class="ghd-tag status-<?php echo strtolower(str_replace(' ', '-', $estado_logistica)); ?>"><?php echo esc_html($estado_logistica); ?></span>
+                </div>
+                <div class="order-card-body">
+                    <p><strong>Cliente:</strong> <?php echo esc_html($nombre_cliente); ?></p>
+                    <?php if ($nombre_producto) : ?><p><strong>Producto:</strong> <?php echo esc_html($nombre_producto); ?></p><?php endif; ?>
+                    <p><strong>Dirección:</strong> <?php echo nl2br(esc_html($direccion_entrega)); ?></p>
+                    <?php if ($cliente_telefono) : ?><p><strong>Teléfono:</strong> <a href="tel:<?php echo esc_attr($cliente_telefono); ?>"><?php echo esc_html($cliente_telefono); ?></a></p><?php endif; ?>
+                </div>
+            </div>
+            <div class="order-card-actions">
+                <?php echo $action_button_html; ?>
+                <a href="<?php the_permalink(); ?>" class="ghd-btn ghd-btn-secondary ghd-btn-small">Ver Detalles</a>
+            </div>
+        </div>
+
+        <!-- Modal para subir comprobante de entrega (DUPLICADO PARA AJAX) -->
+        <div id="upload-delivery-proof-modal-<?php echo $order_id; ?>" class="ghd-modal">
+            <div class="ghd-modal-content">
+                <span class="close-button" data-modal-id="upload-delivery-proof-modal-<?php echo $order_id; ?>">&times;</span>
+                <h3>Completar Entrega: <?php echo esc_html($codigo_pedido); ?></h3>
+                <form class="complete-delivery-form" data-order-id="<?php echo $order_id; ?>" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="foto_comprobante_<?php echo $order_id; ?>">Foto de Comprobante (Opcional):</label>
+                        <input type="file" id="foto_comprobante_<?php echo $order_id; ?>" name="foto_comprobante" accept="image/*">
+                    </div>
+                    <div class="form-group">
+                        <label for="firma_cliente_<?php echo $order_id; ?>">Firma del Cliente (Opcional):</label>
+                        <textarea id="firma_cliente_<?php echo $order_id; ?>" name="firma_cliente" rows="3" placeholder="Ingresar el nombre del cliente que firma o descripción de la firma..."></textarea>
+                    </div>
+                    <button type="submit" class="ghd-btn ghd-btn-success" style="margin-top: 20px;"><i class="fa-solid fa-check"></i> Marcar como Entregado</button>
+                </form>
+            </div>
+        </div>
+
+    <?php
+        endwhile;
+    else : 
+        error_log('ghd_refresh_fletero_tasks_callback: No hay entregas para el usuario ' . $current_user_id); // DEBUG
+    ?>
+        <p class="no-tasks-message" style="text-align: center; padding: 20px;">No tienes entregas asignadas actualmente.</p>
+    <?php endif; wp_reset_postdata(); 
+    
+    $fletero_tasks_html = ob_get_clean();
+    error_log('ghd_refresh_fletero_tasks_callback: HTML generado. Enviando éxito.'); // DEBUG
+    // --- NUEVO: Enviar la respuesta JSON con el formato esperado por el frontend ---
+    wp_send_json_success([
+        'tasks_html' => $fletero_tasks_html,
+        'message' => 'Entregas actualizadas.' // Mensaje de éxito si lo quieres mantener
+    ]);
+    // --- FIN NUEVO ---
+    wp_die();
+}// fin ghd_refresh_fletero_tasks_callback()
+///////////////////////////////////////////////////////////// 
+
 
 /**
  * Ayuda a determinar el rol del usuario, el sector asociado, si es líder, y los operarios del sector.
@@ -1693,12 +1924,34 @@ function ghd_custom_login_redirect($redirect_to, $requested_redirect_to, $user) 
 
     $user_roles = (array) $user->roles;
     
+    // PRIORIDAD DE REDIRECCIÓN (de más específico a general, si un usuario tiene múltiples roles)
+
     // 1. Administradores van al backend de WordPress
     if (in_array('administrator', $user_roles)) {
         return admin_url();
     }
 
-    // 2. Revisar si el usuario es un líder de producción
+    // 2. Fleteros van a su panel de entregas
+    if (in_array('operario_logistica', $user_roles)) {
+        $fletero_page = get_page_by_path('panel-de-fletero'); // <-- ¡ASEGÚRATE DE QUE ESTE SLUG SEA EL REAL!
+        if ($fletero_page) {
+            return get_permalink($fletero_page->ID);
+        }
+        // Fallback si la página del fletero no existe
+        return home_url(); 
+    }
+
+    // 3. Vendedoras y Gerentes de Ventas van a su panel de ventas
+    if (in_array('vendedora', $user_roles) || in_array('gerente_ventas', $user_roles)) {
+        $sales_page = get_page_by_path('panel-de-ventas'); // <-- ¡ASEGÚRATE DE QUE ESTE SLUG SEA EL REAL!
+        if ($sales_page) {
+            return get_permalink($sales_page->ID);
+        }
+        // Fallback si la página de ventas no existe
+        return home_url();
+    }
+
+    // 4. Líderes de Producción van a su panel general de tareas
     $is_production_leader = false;
     foreach ($user_roles as $role) {
         if (strpos($role, 'lider_') !== false) {
@@ -1706,24 +1959,28 @@ function ghd_custom_login_redirect($redirect_to, $requested_redirect_to, $user) 
             break;
         }
     }
-
-    // 3. Redirigir a los líderes de producción a su panel de tareas
     if ($is_production_leader) {
-        $sector_page = get_page_by_path('mis-tareas');
+        $sector_page = get_page_by_path('mis-tareas'); // <-- ¡ASEGÚRATE DE QUE ESTE SLUG SEA EL REAL!
         if ($sector_page) {
             return get_permalink($sector_page->ID);
         }
+        // Fallback si la página de tareas de sector no existe
+        return home_url();
     }
 
-    // 4. Para TODOS los demás roles (Macarena, Vendedoras, Operarios), redirigir al panel de control principal
-    $control_page = get_page_by_path('panel-de-control');
-    if ($control_page) {
-        return get_permalink($control_page->ID);
+    // 5. Control Final (Macarena) va a su panel de control
+    if (in_array('control_final_macarena', $user_roles)) {
+        $control_page = get_page_by_path('panel-de-control'); // <-- ¡ASEGÚRATE DE QUE ESTE SLUG SEA EL REAL!
+        if ($control_page) {
+            return get_permalink($control_page->ID);
+        }
+        // Fallback si la página de control no existe
+        return home_url();
     }
 
-    // 5. Fallback final si ninguna de las páginas existe
+    // 6. Fallback final para cualquier otro rol no cubierto (ej. suscriptor)
     return home_url();
-}
+} // fin ghd_custom_login_redirect()
 
 /**
  * Redirige al usuario a la página de login personalizada DESPUÉS de cerrar sesión.
