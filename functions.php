@@ -2310,3 +2310,95 @@ if ( ! function_exists( 'remove_accents' ) ) {
         return $string;
     }
 } // fin remove_accents()
+
+// --- NUEVO: Deshabilitar campos ACF específicos en el backend (solo lectura visual) ---
+add_action('acf/input/admin_enqueue_scripts', 'ghd_disable_acf_fields_for_readonly');
+function ghd_disable_acf_fields_for_readonly() {
+    // Lista de nombres de campos ACF que deseas deshabilitar para edición
+    // Asegúrate de usar los 'field_name' (slug) de tus campos.
+    $readonly_fields = [
+        'fecha_recogido',
+        'fecha_entregado',
+        'logistica_firma_cliente',
+        'logistica_foto_comprobante',
+        'embalaje_operario_id',
+        'embalaje_modelo_id',
+        'embalaje_cantidad',
+        'embalaje_puntos_tarea',
+        // Añade aquí cualquier otro campo que quieras que sea de solo lectura
+    ];
+
+    if (empty($readonly_fields)) {
+        return;
+    }
+
+    // Script JavaScript para deshabilitar los campos
+    $script = '
+    jQuery(document).ready(function($) {
+        var readonly_fields = ' . json_encode($readonly_fields) . ';
+        
+        readonly_fields.forEach(function(field_name) {
+            // Encuentra el campo por su nombre y deshabilita el input/select/textarea
+            // Esto apunta a los elementos input/select/textarea dentro de los wraps de ACF
+            var $field_input = $(\'.acf-field[data-name="\' + field_name + \'"] input, .acf-field[data-name="\' + field_name + \'"] select, .acf-field[data-name="\' + field_name + \'"] textarea\');
+            if ($field_input.length) {
+                $field_input.prop("disabled", true);
+                // Opcional: añadir una clase para estilos visuales de "solo lectura"
+                $field_input.closest(".acf-input").addClass("ghd-readonly-acf-field");
+            }
+        });
+    });
+    ';
+
+    wp_add_inline_script('acf-input', $script);
+}// fin ghd_disable_acf_fields_for_readonly()
+// --- FIN Deshabilitar campos ACF ---
+
+// --- NUEVO: Mostrar puntos de embalaje en el perfil de usuario (Backend) ---
+
+// Añadir campos extra a la página de perfil de usuario
+add_action( 'show_user_profile', 'ghd_show_embalaje_points_on_profile' );
+add_action( 'edit_user_profile', 'ghd_show_embalaje_points_on_profile' );
+function ghd_show_embalaje_points_on_profile( $user ) {
+    // Solo mostrar para operarios de embalaje, líderes de embalaje, o administradores
+    if ( ! current_user_can('lider_embalaje') && ! in_array('operario_embalaje', (array)$user->roles) && ! current_user_can('manage_options') ) {
+        return;
+    }
+    ?>
+    <h3><?php _e('Puntos de Embalaje (GHD)', 'textdomain'); ?></h3>
+    <table class="form-table">
+        <tr>
+            <th><label for="ghd_total_puntos_embalaje"><?php _e('Total de Puntos de Embalaje', 'textdomain'); ?></label></th>
+            <td>
+                <input type="text" name="ghd_total_puntos_embalaje_display" id="ghd_total_puntos_embalaje_display" value="<?php echo esc_attr( get_user_meta( $user->ID, 'ghd_total_puntos_embalaje', true ) ?: '0' ); ?>" class="regular-text" readonly="readonly" />
+                <p class="description"><?php _e('Puntos acumulados por tareas de embalaje. Solo lectura.', 'textdomain'); ?></p>
+            </td>
+        </tr>
+        <!-- Aquí podrías añadir la meta diaria de 25 puntos como referencia -->
+        <tr>
+            <th><label><?php _e('Meta Diaria', 'textdomain'); ?></label></th>
+            <td>
+                <p>25 puntos</p>
+                <p class="description"><?php _e('Meta diaria establecida para operarios de embalaje.', 'textdomain'); ?></p>
+            </td>
+        </tr>
+    </table>
+    <?php
+}
+
+// Para asegurar que el campo deshabilitado no se guarde si alguien lo manipula (solo se actualiza vía AJAX)
+add_action( 'personal_options_update', 'ghd_save_embalaje_points_on_profile' );
+add_action( 'edit_user_profile_update', 'ghd_save_embalaje_points_on_profile' );
+function ghd_save_embalaje_points_on_profile( $user_id ) {
+    // No hacer nada aquí, ya que los puntos se actualizan exclusivamente vía AJAX del sistema.
+    // Solo se aseguran los permisos si es que se manipula algo desde aquí.
+    if ( ! current_user_can( 'edit_user', $user_id ) ) {
+        return false;
+    }
+    // Si quisieras permitir que un admin lo edite manualmente, descomentar:
+    // if ( current_user_can( 'manage_options' ) && isset( $_POST['ghd_total_puntos_embalaje_display'] ) ) {
+    //     update_user_meta( $user_id, 'ghd_total_puntos_embalaje', sanitize_text_field( $_POST['ghd_total_puntos_embalaje_display'] ) );
+    // }
+}
+
+// --- FIN Puntos de Embalaje en Perfil ---

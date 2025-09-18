@@ -1,8 +1,9 @@
 document.addEventListener('DOMContentLoaded', function() {
     
+    // --- LÓGICA DEL MENÚ MÓVIL (Estable) ---
     const menuToggle = document.getElementById('mobile-menu-toggle');
     const sidebar = document.querySelector('.ghd-sidebar');
-    const closeSidebarBtn = document.getElementById('mobile-menu-close'); // <-- NUEVO: Botón de cierre dentro del sidebar
+    const closeSidebarBtn = document.getElementById('mobile-menu-close');
 
     if (menuToggle && sidebar) {
         const overlay = document.createElement('div');
@@ -12,23 +13,23 @@ document.addEventListener('DOMContentLoaded', function() {
         const closeMenu = () => { 
             sidebar.classList.remove('sidebar-visible'); 
             overlay.style.display = 'none'; 
-            document.body.classList.remove('no-scroll'); // Opcional: remover clase para deshabilitar scroll del body
+            document.body.classList.remove('no-scroll');
         };
         const openMenu = (e) => { 
             e.stopPropagation(); 
             sidebar.classList.add('sidebar-visible'); 
             overlay.style.display = 'block'; 
-            document.body.classList.add('no-scroll'); // Opcional: añadir clase para deshabilitar scroll del body
+            document.body.classList.add('no-scroll');
         };
 
         menuToggle.addEventListener('click', openMenu);
         overlay.addEventListener('click', closeMenu);
         
-        if (closeSidebarBtn) { // <-- Si el botón de cierre existe, añadir listener
+        if (closeSidebarBtn) {
             closeSidebarBtn.addEventListener('click', closeMenu);
         }
-    } // fin if menuToggle
-////////////////////////////// ////////////////////////////////////////////////////
+    }
+
     // --- Funciones para actualizar los KPIs ---
     const updateSectorKPIs = (kpiData) => {
         const activasEl = document.getElementById('kpi-activas');
@@ -134,6 +135,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const openUploadDeliveryProofModalBtn = target.closest('.open-upload-delivery-proof-modal'); // Abre modal de comprobante de fletero
             const refreshFleteroTasksBtn = target.closest('#ghd-refresh-fletero-tasks'); // Refrescar panel de fletero
 
+            // Otros botones
+            const exportAssignationOrdersBtn = target.closest('#ghd-export-assignation-orders'); // Botón de exportar
+
 
             // --- MANEJADORES DE CLICKS ---
 
@@ -151,12 +155,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                     .then(res => res.json())
-                    .then(response => { // Renombrado a 'response' para consistencia
-                        if (response.success && response.data) { // Acceso correcto a response.data
+                    .then(response => { // Renombrado a 'response'
+                        if (response.success && response.data) {
                             sectorTasksList.innerHTML = response.data.tasks_html;
                             if (response.data.kpi_data) updateSectorKPIs(response.data.kpi_data);
+                            console.log('Refresco de tareas de sector exitoso: ' + (response.data?.message || ''));
                         } else {
-                            // Mostrar mensaje de error en consola, no alerta
                             console.error('Error al refrescar tareas de sector: ' + (response.data?.message || 'Error desconocido.'));
                             sectorTasksList.innerHTML = '<p class="no-tasks-message">Error al cargar tareas.</p>';
                         }
@@ -195,7 +199,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     .then(response => { // Renombrado a 'response'
                         if (response.success) {
                             document.getElementById('ghd-refresh-tasks')?.click();
-                            // Mostrar mensaje de éxito en consola si no hay alerta
                             console.log('Estado de tarea actualizado: ' + (response.data?.message || ''));
                         } else { 
                             alert('Error: ' + (response.data?.message || 'Error desconocido')); 
@@ -284,7 +287,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (fleteroActionButton && !openUploadDeliveryProofModalBtn) {
                 e.preventDefault();
                 const orderId = fleteroActionButton.dataset.orderId;
-                const newStatus = fleteroActionButton.dataset.newStatus; // 'Recogido' o 'Entregado'
+                const newStatus = fleteroActionButton.dataset.newStatus;
                 const card = fleteroActionButton.closest('.ghd-order-card');
 
                 if (!confirm(`¿Estás seguro de que quieres marcar este pedido como "${newStatus}"?`)) {
@@ -306,7 +309,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(response => {
                     if (response.success) {
                         refreshFleteroTasksList();
-                        // Alerta solo si es un mensaje de éxito, pero generalmente el refresh es silencioso
                         console.log('Pedido marcado como recogido: ' + (response.data?.message || '')); 
                     } else {
                         alert('Error: ' + (response.data?.message || 'Error desconocido al marcar como recogido.'));
@@ -334,6 +336,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     e.stopPropagation();
                 }
             }
+            
+            // --- Lógica para el botón "Refrescar" en la sección de pedidos en asignación del admin ---
+            // Este bloque existía anteriormente, se ha movido para evitar duplicados y errores
+            const refreshAssignationTasksBtn = document.getElementById('ghd-refresh-assignation-tasks'); // Si tienes un botón con este ID
+            if (refreshAssignationTasksBtn) {
+                e.preventDefault();
+                // Llama a la función applyFilters o a una función de refresco específica para asignación
+                // Asumiendo que applyFilters se encarga de esto en template-admin-dashboard.php
+                // applyFilters(); // Si applyFilters existe globalmente o se puede llamar
+            }
 
         }); // fin listener clicks 
 
@@ -341,6 +353,8 @@ document.addEventListener('DOMContentLoaded', function() {
         mainContent.addEventListener('submit', function(e) {
             const completeTaskForm = e.target.closest('.complete-task-form'); // Formulario de tareas de sector (general)
             const completeDeliveryForm = e.target.closest('.complete-delivery-form'); // Formulario de entrega del Fletero
+            const nuevoPedidoForm = e.target.closest('#nuevo-pedido-form'); // Formulario de nuevo pedido (Admin)
+
 
             if (completeTaskForm) {
                 e.preventDefault();
@@ -423,9 +437,53 @@ document.addEventListener('DOMContentLoaded', function() {
                         submitButton.innerHTML = '<i class="fa-solid fa-check"></i> Marcar como Entregado';
                     }
                     completeDeliveryForm.style.opacity = '1';
-                });// fin fetch
+                });
             } // fin if (completeDeliveryForm)
+
+            // --- Lógica para el SUBMIT del formulario de NUEVO PEDIDO (Admin) ---
+            if (nuevoPedidoForm) {
+                e.preventDefault();
+
+                const submitButton = nuevoPedidoForm.querySelector('button[type="submit"]');
+                submitButton.disabled = true;
+                submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creando...';
+
+                const formData = new FormData(nuevoPedidoForm);
+                formData.append('action', 'ghd_crear_nuevo_pedido');
+                formData.append('nonce', ghd_ajax.nonce);
+
+                fetch(ghd_ajax.ajax_url, {
+                    method: 'POST',
+                    body: new URLSearchParams(formData)
+                })
+                .then(res => res.json())
+                .then(response => { // Renombrado a 'response'
+                    if (response.success) {
+                        alert(response.data.message);
+                        nuevoPedidoModal.style.display = 'none'; // Asegurarse que nuevoPedidoModal esté en scope
+                        nuevoPedidoForm.reset();
+
+                        const tableBody = document.getElementById('ghd-orders-table-body');
+                        if (tableBody) {
+                            const noOrdersRow = tableBody.querySelector('td[colspan="6"]');
+                            if (noOrdersRow) {
+                                tableBody.innerHTML = response.data.new_row_html;
+                            } else {
+                                tableBody.insertAdjacentHTML('afterbegin', response.data.new_row_html);
+                            }
+                        } 
+                    } else {
+                        alert('Error: ' + (response.data?.message || 'No se pudo crear el pedido.'));
+                    }
+                })
+                .finally(() => {
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = '<i class="fa-solid fa-plus"></i> Crear Pedido';
+                });
+            } // fin if (nuevoPedidoForm)
+
         }); // fin listener submits
+
     } // fin if (mainContent)
 ///////////////////////////// ////////////////////////////////////////////////////
     // --- LÓGICA PARA ASIGNAR PRIORIDAD EN EL PANEL DE ASIGNACIÓN ---
@@ -442,7 +500,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 const startProductionBtn = row.querySelector('.start-production-btn');
 
                 if (prioritySelector && vendedoraSelector && startProductionBtn) {
-                    // const isPrioritySet = (prioritySelector.value !== 'Seleccionar Prioridad');
                     const isPrioritySet = (prioritySelector.value !== '');
                     const isVendedoraSet = (vendedoraSelector.value !== '0'); // '0' es el valor para "Asignar Vendedora"
 
@@ -469,7 +526,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // --- Aplicar clases de color al selector de PRIORIDAD si ya tiene un valor ---
                 const prioritySelector = row.querySelector('.ghd-priority-selector');
                 if (prioritySelector && prioritySelector.value !== 'Seleccionar Prioridad') {
-                    prioritySelector.classList.remove('prioridad-no-seleccionada'); // Asegurarse de quitarla
+                    prioritySelector.classList.remove('prioridad-no-seleccionada');
                     if (prioritySelector.value === 'Alta') {
                         prioritySelector.classList.add('prioridad-alta');
                     } else if (prioritySelector.value === 'Media') {
@@ -482,7 +539,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // --- NUEVO BLOQUE: Aplicar clases de color al selector de VENDEDORA si ya tiene un valor ---
                 const vendedoraSelector = row.querySelector('.ghd-vendedora-selector');
                 if (vendedoraSelector && vendedoraSelector.value !== '0') { // '0' es el valor para "Asignar Vendedora"
-                    vendedoraSelector.classList.remove('vendedora-no-seleccionada'); // Asegurarse de quitarla si ya tiene valor
+                    vendedoraSelector.classList.remove('vendedora-no-seleccionada');
                 }
                 // --- FIN NUEVO BLOQUE ---
             });
@@ -490,13 +547,13 @@ document.addEventListener('DOMContentLoaded', function() {
             // Manejar cambios en los selectores (Prioridad y Vendedora)
             ordersTableBody.addEventListener('change', function(e) {
                 const target = e.target;
-                const row = target.closest('tr'); // Obtener la fila para actualizar el botón
+                const row = target.closest('tr');
 
                 if (target.classList.contains('ghd-priority-selector')) {
                     const orderId = target.dataset.orderId;
                     const selectedPriority = target.value;
                     
-                    updateStartProductionButtonState(row); // Actualiza el estado del botón y clases visuales
+                    updateStartProductionButtonState(row);
                     
                     // Limpiar clases de prioridad existentes y añadir la nueva
                     target.classList.remove('prioridad-alta', 'prioridad-media', 'prioridad-baja');
@@ -532,7 +589,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const orderId = target.dataset.orderId;
                     const selectedVendedoraId = target.value;
                     
-                    updateStartProductionButtonState(row); // Actualiza el estado del botón y clases visuales
+                    updateStartProductionButtonState(row);
 
                     // Enviar la vendedora al backend vía AJAX
                     const params = new URLSearchParams({
@@ -562,14 +619,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const assigneeSelector = e.target.closest('.ghd-assignee-selector');
             if (assigneeSelector) {
                 const orderId = assigneeSelector.dataset.orderId;
-                const fieldPrefix = assigneeSelector.dataset.fieldPrefix; // ej. 'asignado_a_carpinteria'
+                const fieldPrefix = assigneeSelector.dataset.fieldPrefix;
                 const selectedAssigneeId = assigneeSelector.value;
                 
-                // Opcional: Mostrar un indicador de carga en la tarjeta
                 const card = assigneeSelector.closest('.ghd-order-card');
                 if (card) card.style.opacity = '0.5';
 
-                // Enviar la asignación al backend vía AJAX
                 const params = new URLSearchParams({
                     action: 'ghd_assign_task_to_member',
                     nonce: ghd_ajax.nonce,
@@ -583,7 +638,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     .then(response => { // Renombrado a 'response'
                         if (response.success) {
                             console.log('Operario asignado:', response.data.message);
-                            // Después de asignar, refrescar las tareas para ver el cambio reflejado (nombre asignado)
                             document.getElementById('ghd-refresh-tasks')?.click();
                         } else {
                             console.error('Error al asignar operario:', response.data?.message || 'Error desconocido.');
@@ -595,7 +649,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         alert('Error de red al asignar operario.');
                     })
                     .finally(() => {
-                        if (card) card.style.opacity = '1'; // Restaurar opacidad
+                        if (card) card.style.opacity = '1';
                     });
             }
         }); // fin listener delegación de eventos
@@ -604,45 +658,38 @@ document.addEventListener('DOMContentLoaded', function() {
             // --- NUEVO BLOQUE: Manejar click en "Iniciar Producción" ---
             ordersTableBody.addEventListener('click', function(e) {
                 const startProductionBtn = e.target.closest('.start-production-btn');
-                // Asegurarse que el botón fue clicado y que no esté deshabilitado
                 if (startProductionBtn && !startProductionBtn.disabled) {
-                    e.preventDefault(); // Prevenir el comportamiento por defecto del botón
+                    e.preventDefault();
 
                     const orderId = startProductionBtn.dataset.orderId;
-                    const row = startProductionBtn.closest('tr'); // Obtener la fila para efectos visuales
+                    const row = startProductionBtn.closest('tr');
 
                     if (!confirm('¿Estás seguro de que quieres iniciar la producción de este pedido? Esta acción moverá el pedido a producción.')) {
-                        return; // Si el usuario cancela, no hacer nada
+                        return;
                     }
 
-                    // 1. Indicador visual de carga
                     row.style.opacity = '0.5';
                     startProductionBtn.disabled = true;
                     startProductionBtn.textContent = 'Iniciando...';
 
-                    // 2. Preparar los parámetros para la llamada AJAX
                     const params = new URLSearchParams({
-                        action: 'ghd_start_production', // La nueva acción AJAX definida en functions.php
+                        action: 'ghd_start_production',
                         nonce: ghd_ajax.nonce,
                         order_id: orderId
                     });
 
-                    // 3. Realizar la petición AJAX
                     fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                         .then(res => res.json())
                         .then(response => { // Renombrado a 'response'
                             if (response.success) {
                                 alert(response.data.message);
-                                row.remove(); // Eliminar la fila de la tabla de asignación (ya no está pendiente)
+                                row.remove();
 
-                                // 4. Refrescar la sección de "Pedidos en Producción" y sus KPIs
                                 const productionTableBody = document.getElementById('ghd-production-table-body');
                                 const refreshProductionTasksBtn = document.getElementById('ghd-refresh-production-tasks');
                                 
                                 if (productionTableBody && response.data.production_tasks_html) {
-                                     // Reemplazar el contenido de la tabla de producción con el HTML actualizado
-                                    productionTableBody.innerHTML = response.data.production_tasks_html;
-                                    // Actualizar los KPIs de producción
+                                     productionTableBody.innerHTML = response.data.production_tasks_html;
                                     if (response.data.kpi_data) {
                                         updateAdminProductionKPIs(response.data.kpi_data);
                                     }
@@ -651,7 +698,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 }
                             } else {
                                 alert('Error al iniciar producción: ' + (response.data?.message || 'Error desconocido.'));
-                                row.style.opacity = '1'; 
+                                row.style.opacity = '1';
                                 startProductionBtn.disabled = false;
                                 startProductionBtn.textContent = 'Iniciar Producción';
                             }
@@ -695,13 +742,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     .then(res => res.json())
                     .then(response => { // Renombrado a 'response'
                         if (response.success) { // Aquí no hay response.data.data, es response.data.tasks_html
-                            sectorTasksList.innerHTML = response.data.tasks_html; // <-- Usar response.data.tasks_html
+                            sectorTasksList.innerHTML = response.data.tasks_html;
                             if (response.data.kpi_data) {
                                 updateSectorKPIs(response.data.kpi_data);
                             }
                             console.log('Refresco de tareas de sector exitoso: ' + (response.data?.message || ''));
                         } else {
-                            // Mostrar mensaje de error en consola, no alerta
                             console.error('Error al refrescar tareas de sector: ' + (response.data?.message || 'Error desconocido.'));
                             sectorTasksList.innerHTML = '<p class="no-tasks-message">Error al cargar tareas.</p>';
                         }
@@ -836,6 +882,47 @@ document.addEventListener('DOMContentLoaded', function() {
                 method: 'POST',
                 body: params
             })
+            .then(res => res.json()) // Asumimos que la respuesta es JSON, como en otros refrescos
+            .then(response => { // Renombrado a 'response'
+                if (response.success) {
+                    archivedOrdersTableBody.innerHTML = response.data.table_html;
+                    console.log('Refresco de pedidos archivados exitoso: ' + (response.data?.message || ''));
+                } else {
+                    console.error('Error al refrescar pedidos archivados: ' + (response.data?.message || ''));
+                    archivedOrdersTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Error al cargar pedidos archivados.</td></tr>';
+                }
+            })
+            .catch(error => {
+                console.error("Error de red al refrescar pedidos archivados:", error);
+                archivedOrdersTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Error de red. Inténtalo de nuevo.</td></tr>';
+            })
+            .finally(() => {
+                archivedOrdersTableBody.style.opacity = '1';
+                refreshArchivedOrdersBtn.disabled = false;
+            });
+        });
+    }
+
+    // --- LÓGICA PARA EL BOTÓN "EXPORTAR" PEDIDOS (EN TABLAS DEL ADMIN) ---
+    const exportAssignationOrdersBtn = document.getElementById('ghd-export-assignation-orders');
+    if (exportAssignationOrdersBtn) {
+        exportAssignationOrdersBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const exportType = exportAssignationOrdersBtn.dataset.exportType || 'assignation';
+
+            exportAssignationOrdersBtn.disabled = true;
+            exportAssignationOrdersBtn.textContent = 'Exportando...';
+
+            const params = new URLSearchParams({
+                action: 'ghd_export_orders_csv',
+                nonce: ghd_ajax.nonce,
+                export_type: exportType
+            });
+
+            fetch(ghd_ajax.ajax_url, {
+                method: 'POST',
+                body: params
+            })
             .then(response => {
                 const contentType = response.headers.get('Content-Type');
                 if (contentType && contentType.includes('application/json')) {
@@ -858,11 +945,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.body.appendChild(a);
                 a.click();
                 window.URL.revokeObjectURL(url);
-                console.log('Exportación completada con éxito.');
+                alert('Exportación completada con éxito.'); // Mantener alerta de éxito para exportación
             })
             .catch(error => {
                 console.error("Error al exportar pedidos:", error);
-                alert('Error al exportar pedidos: ' + error.message);
+                alert('Error al exportar pedidos: ' + error.message); // Mantener alerta de error para exportación
             })
             .finally(() => {
                 exportAssignationOrdersBtn.disabled = false;
@@ -949,47 +1036,49 @@ window.addEventListener('load', function() {
 });
 
 
-const refreshArchivedBtn = document.getElementById('ghd-refresh-archived-orders');
-if (refreshArchivedBtn) {
-    refreshArchivedBtn.addEventListener('click', function(e) {
-        e.preventDefault();
+// Este listener era problemático, no se usaba con formData aquí. Se ha refactorizado arriba.
+// Se mantiene comentado si se necesita alguna otra lógica aquí, pero no para refresh_archived_orders
+// const refreshArchivedBtn = document.getElementById('ghd-refresh-archived-orders');
+// if (refreshArchivedBtn) {
+//     refreshArchivedBtn.addEventListener('click', function(e) {
+//         e.preventDefault();
         
-        const tableBody = document.getElementById('ghd-archived-orders-table-body');
-        if (!tableBody) return;
+//         const tableBody = document.getElementById('ghd-archived-orders-table-body');
+//         if (!tableBody) return;
 
-        tableBody.style.opacity = '0.5';
-        refreshArchivedBtn.disabled = true;
+//         tableBody.style.opacity = '0.5';
+//         refreshArchivedBtn.disabled = true;
 
-        const params = new URLSearchParams({
-            action: 'ghd_refresh_archived_orders',
-            nonce: ghd_ajax.nonce
-        });
+//         const params = new URLSearchParams({
+//             action: 'ghd_refresh_archived_orders',
+//             nonce: ghd_ajax.nonce
+//         });
         
-            fetch(ghd_ajax.ajax_url, {
-                method: 'POST',
-                body: new URLSearchParams(formData)
-            })
-            .then(res => {
-                if (!res.ok) {
-                    throw new Error('Error del servidor. Revisa el debug.log de WordPress.');
-                }
-                return res.json();
-            })
-            .then(data => {
-                if (data.success) {
-                    alert(data.data.message);
-                    window.location.reload();
-                } else {
-                    alert('Error: ' + (data.data?.message || 'No se pudo crear el pedido.'));
-                }
-            })
-            .catch(error => {
-                console.error("Error al crear pedido:", error);
-                alert("Ocurrió un error inesperado. Revisa la consola para más detalles.");
-            })
-            .finally(() => {
-                submitButton.disabled = false;
-                submitButton.innerHTML = '<i class="fa-solid fa-plus"></i> Crear Pedido';
-            });
-    });
-}
+//             fetch(ghd_ajax.ajax_url, {
+//                 method: 'POST',
+//                 body: new URLSearchParams(formData)
+//             })
+//             .then(res => {
+//                 if (!res.ok) {
+//                     throw new Error('Error del servidor. Revisa el debug.log de WordPress.');
+//                 }
+//                 return res.json();
+//             })
+//             .then(data => {
+//                 if (data.success) {
+//                     alert(data.data.message);
+//                     window.location.reload();
+//                 } else {
+//                     alert('Error: ' + (data.data?.message || 'No se pudo crear el pedido.'));
+//                 }
+//             })
+//             .catch(error => {
+//                 console.error("Error al crear pedido:", error);
+//                 alert("Ocurrió un error inesperado. Revisa la consola para más detalles.");
+//             })
+//             .finally(() => {
+//                 submitButton.disabled = false;
+//                 submitButton.innerHTML = '<i class="fa-solid fa-plus"></i> Crear Pedido';
+//             });
+//     });
+// }

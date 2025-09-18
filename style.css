@@ -68,7 +68,7 @@ a:hover {
      /* --- ESTILOS STICKY --- */
     position: sticky; /* Hace que el header sea sticky */
     top: 0; /* Lo fija en la parte superior */
-    z-index: 100; /* Asegura que se superponga sobre otros elementos al hacer scroll */
+    z-index: 1002; /* Asegura que se superponga sobre otros elementos al hacer scroll */
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); /* Sombra suave para darle profundidad */
     /* --- FIN ESTILOS STICKY --- */
 }
@@ -286,6 +286,38 @@ a:hover {
     margin-right: 8px;
     font-size: 1em;
 }
+.ghd-order-card .order-card-actions{
+    padding: 15px;
+}
+/* Estilos para los botones (ghd-btn) dentro de las acciones */
+.ghd-order-card .order-card-actions .ghd-btn {
+    flex: 1 1 auto;
+    min-width: 120px;
+    max-width: 100%; /* Asegura que no desborde en móviles */
+    justify-content: center;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    /* Los estilos de white-space, height, etc., para .ghd-btn.ghd-btn-small ya los tienes más abajo y son correctos */
+}
+/* Estilos para los selectores (dropdowns) dentro de las acciones */
+.ghd-order-card .order-card-actions select {
+    flex: 1 1 auto; /* Permite que el selector crezca */
+    min-width: 120px;
+    max-width: 100%; /* Asegura que no desborde en móviles */
+    height: 38px; /* Altura estándar para selectores */
+    padding: 8px 12px;
+    border: 1px solid var(--color-gris-claro);
+    border-radius: var(--border-radius-base);
+    background-color: var(--color-blanco);
+    color: var(--color-texto);
+    font-size: 0.9rem;
+}
+/* Asegura que los selectores también tengan una altura definida si están en la misma línea que los botones */
+.ghd-order-card .order-card-actions .ghd-assignee-selector {
+    height: 38px; /* O el mismo height que los botones para alinearlos */
+    /* Otros estilos si necesitas diferenciarlo visualmente, ej. border: 1px solid var(--color-secondary); */
+}
 
 /* Primary buttons (e.g., Nuevo Pedido, Archivar Pedido) */
 .ghd-btn-primary {
@@ -490,6 +522,7 @@ a:hover {
 .order-card-actions { 
     display: flex;
     flex-wrap: wrap; /* <-- Permite que los elementos se envuelvan */
+     align-items: center;
     gap: 10px;
     margin-top: 15px;
     padding-top: 15px;
@@ -1355,6 +1388,14 @@ body.page-template-template-login {
         min-width: 44px; /* Un ancho mínimo para que sea fácil de tocar */
     }
 
+    .ghd-order-card .order-card-actions {
+        flex-direction: column; /* Apilados en pantallas muy pequeñas */
+    }
+    .ghd-order-card .order-card-actions .ghd-btn,
+    .ghd-order-card .order-card-actions select { /* Aplicar también a selectores */
+        width: 100%; /* Ocupar todo el ancho en móvil */
+        flex: none; /* Eliminar el flex-grow en esta resolución */
+    }
     .ghd-order-card.fletero-card .order-card-actions {
         flex-direction: column; /* Apilados en pantallas muy pequeñas */
     }
@@ -1472,7 +1513,7 @@ body.page-template-template-login {
     gap: 10px;
     width: 100%;
     margin-top: 15px;
-    padding-top: 15px;
+    padding: 15px;
     border-top: 1px solid var(--color-gris-claro);
 }
 
