@@ -175,15 +175,28 @@ a:hover {
 
 .ghd-app-wrapper { display: flex; flex-grow: 1; }
 .ghd-sidebar { 
-    width: 260px; 
-    background-color: var(--texto-principal); 
-    color: var(--texto-claro); 
-    padding: 1.5rem; 
-    display: flex; 
-    flex-direction: column; 
+     width: var(--sidebar-width);
+    background-color: var(--color-sidebar-bg);
+    color: var(--color-blanco);
+    padding: 20px 0; /* <-- Cambia esto */
+    box-shadow: var(--shadow-md);
     flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    z-index: 1000;
 }
-.ghd-sidebar .sidebar-header { margin-bottom: 2rem; }
+.ghd-sidebar .sidebar-header { 
+    padding: 20px; /* <-- Añadir padding aquí */
+    margin-bottom: 20px; /* <-- Ajustar margin-bottom */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+ }
 .ghd-sidebar .sidebar-header .logo { 
     font-size: 1.5rem; 
     font-weight: 700; 
@@ -475,14 +488,21 @@ a:hover {
 
 
 .order-card-actions { 
-    display: flex; 
-    flex-direction: column; 
-    gap: 0.75rem; 
-    padding: 1.5rem; 
-    border-top: 1px solid var(--color-borde); /* Por defecto top para móvil */
-    width: 100%; /* Por defecto ancho completo para móvil */
-    flex-shrink: 0; 
-    justify-content: center; 
+    display: flex;
+    flex-wrap: wrap; /* <-- Permite que los elementos se envuelvan */
+    gap: 10px;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--color-gris-claro);
+}
+/* Hacer que cada botón ocupe el ancho disponible si hay espacio, o la mitad si son dos */
+.ghd-order-card.fletero-card .order-card-actions .ghd-btn {
+    flex: 1 1 auto; /* <-- Permite que los botones crezcan y se encojan, distribuyendo el espacio */
+    min-width: 120px; /* Asegura un ancho mínimo para cada botón */
+    justify-content: center;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 /* Para pantallas más grandes, las acciones vuelven a la derecha */
 @media (min-width: 769px) {
@@ -1334,6 +1354,13 @@ body.page-template-template-login {
     .open-complete-task-modal {
         min-width: 44px; /* Un ancho mínimo para que sea fácil de tocar */
     }
+
+    .ghd-order-card.fletero-card .order-card-actions {
+        flex-direction: column; /* Apilados en pantallas muy pequeñas */
+    }
+    .ghd-order-card.fletero-card .order-card-actions .ghd-btn {
+        width: 100%; /* Ocupar todo el ancho en móvil */
+    }
 }
 
 /* --- MEJORA DE ESTILO PARA BOTONES LARGOS EN TARJETAS --- */
@@ -1365,3 +1392,357 @@ body.page-template-template-login {
     padding: 8px 12px;   /* Ajusta el padding para mejor apariencia */
     line-height: 1.2;    /* Ajusta el espaciado entre líneas si el texto se envuelve */
 }
+
+/* --- Estilos para el Panel de Fleteros (template-fletero.php) --- */
+
+.ghd-app-wrapper.is-mobile-optimized {
+    padding: 0; /* Eliminar padding general si se quiere más ancho en móvil */
+}
+
+/* Estilos para la cuadrícula de tarjetas de fletero */
+.ghd-fletero-tasks-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* Ajuste responsive */
+    gap: 20px;
+    padding: 20px; /* Añadir padding para que las tarjetas no toquen los bordes */
+}
+
+/* Estilos base para las tarjetas de pedido del fletero */
+.ghd-order-card.fletero-card {
+    background-color: var(--color-blanco);
+    border-radius: var(--border-radius-base);
+    box-shadow: var(--shadow-sm);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 200px; /* Altura mínima para tarjetas uniformes */
+}
+
+.ghd-order-card.fletero-card .order-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    border-bottom: 1px solid var(--color-gris-claro);
+    padding-bottom: 10px;
+}
+
+.ghd-order-card.fletero-card .order-card-header h3 {
+    margin: 0;
+    font-size: 1.25rem; /* Tamaño de fuente para el código */
+    color: var(--color-rojo);
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Espacio entre icono y texto */
+}
+
+.ghd-order-card.fletero-card .order-card-body p {
+    margin: 0 0 8px 0;
+    font-size: 0.95rem;
+    color: var(--color-texto-oscuro);
+    display: flex;
+    align-items: flex-start; /* Alinea los iconos con la parte superior del texto */
+    gap: 8px; /* Espacio entre icono y texto */
+}
+
+.ghd-order-card.fletero-card .order-card-body p strong {
+    color: var(--color-texto);
+}
+
+.ghd-order-card.fletero-card .order-card-body p i {
+    color: var(--color-gris-oscuro); /* Color para los iconos de información */
+    font-size: 1.1em;
+    flex-shrink: 0; /* Evita que el icono se encoja */
+    margin-top: 2px; /* Pequeño ajuste vertical para los iconos */
+}
+
+.ghd-order-card.fletero-card .order-card-body .phone-link {
+    color: var(--color-azul); /* Color azul para enlaces de teléfono */
+    text-decoration: none;
+    font-weight: 500;
+}
+.ghd-order-card.fletero-card .order-card-body .phone-link:hover {
+    text-decoration: underline;
+}
+
+.ghd-order-card.fletero-card .order-card-actions {
+    display: flex;
+    flex-direction: column; /* Botones apilados en columnas */
+    gap: 10px;
+    width: 100%;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--color-gris-claro);
+}
+
+/* Ajustes para los botones de acción específicos del fletero */
+.ghd-order-card.fletero-card .order-card-actions .ghd-btn {
+    width: 100%; /* Ocupar todo el ancho */
+    justify-content: center; /* Centrar texto e icono */
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Espacio entre icono y texto */
+}
+
+/* Ajustes específicos para el botón truncado (resolviendo el problema anterior) */
+.ghd-order-card .order-card-actions .ghd-btn.ghd-btn-small {
+    white-space: normal; /* Permite que el texto se envuelva */
+    height: auto;        /* Ajusta la altura automáticamente */
+    min-height: 38px;    /* Altura mínima para que no se vea demasiado estirado */
+    padding: 8px 12px;   /* Ajusta el padding para mejor apariencia */
+    line-height: 1.2;    /* Ajusta el espaciado entre líneas si el texto se envuelve */
+}
+
+/* Estilos para el modal de comprobante de entrega */
+.ghd-modal .complete-delivery-form .form-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+}
+.ghd-modal .complete-delivery-form .form-group label i {
+    color: var(--color-gris-oscuro);
+}
+
+
+/* Media Queries para Responsive Design (opcional, si Elementor no lo maneja completamente) */
+@media (max-width: 768px) {
+    .ghd-fletero-tasks-list {
+        grid-template-columns: 1fr; /* Una columna en pantallas pequeñas */
+        padding: 15px;
+        gap: 15px;
+    }
+    .ghd-order-card.fletero-card {
+        padding: 15px;
+    }
+    .ghd-order-card.fletero-card .order-card-header h3 {
+        font-size: 1.15rem;
+    }
+    .ghd-main-header .header-title-wrapper h2 {
+        font-size: 1.5rem; /* Ajustar tamaño del título principal */
+    }
+}
+
+/* --- Estilos para el Layout General y Sidebar Móvil --- */
+/* Estilos generales para el wrapper de la aplicación */
+.ghd-app-wrapper {
+    display: flex;
+    min-height: 100vh;
+    background-color: var(--color-fondo-app); /* Color de fondo general de la aplicación */
+    width: 100%;
+}
+
+/* Sidebar General */
+.ghd-sidebar {
+    width: var(--sidebar-width); /* Define una variable CSS para el ancho del sidebar */
+    background-color: var(--color-sidebar-bg); /* Fondo oscuro */
+    color: var(--color-blanco);
+    padding: 20px 0;
+    box-shadow: var(--shadow-md);
+    flex-shrink: 0; /* Evita que el sidebar se encoja */
+    position: sticky;
+    top: 0;
+    height: 100vh; /* Ocupa toda la altura de la ventana */
+    overflow-y: auto; /* Para scroll si el contenido es largo */
+    display: flex;
+    flex-direction: column;
+    justify-content: start; /* Para empujar el footer hacia abajo */
+    z-index: 1000; /* Para que esté por encima de otros elementos */
+}
+
+.ghd-sidebar-header {
+    padding: 0 20px;
+    margin-bottom: 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.ghd-sidebar-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: var(--color-blanco);
+}
+.ghd-sidebar-header .ghd-btn-icon {
+    display: none; /* Ocultar en desktop, mostrar en móvil */
+    color: var(--color-blanco);
+}
+
+.ghd-sidebar-nav ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.ghd-sidebar-nav .nav-item {
+    margin-bottom: 5px;
+}
+.ghd-sidebar-nav .nav-link,
+.ghd-sidebar-footer .logout-link {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start; /* <-- NUEVO: Alinea el contenido a la izquierda */
+    gap: 12px;
+    padding: 12px 20px;
+    color: var(--color-sidebar-text);
+    text-decoration: none;
+    font-weight: 500;
+    transition: background-color 0.2s ease, color 0.2s ease;
+    border-left: 3px solid transparent;
+}
+.ghd-sidebar-nav .nav-link i,
+.ghd-sidebar-footer .logout-link i {
+    font-size: 1.1rem;
+    color: var(--color-sidebar-icon); /* Gris más oscuro */
+}
+.ghd-sidebar-nav .nav-link:hover,
+.ghd-sidebar-nav .nav-link.is-active,
+.ghd-sidebar-footer .logout-link:hover {
+    background-color: var(--color-sidebar-hover); /* Fondo más claro al pasar el ratón o activo */
+    color: var(--color-sidebar-active-text); /* Texto más claro */
+    border-left-color: var(--color-primary); /* Borde de color para activo */
+}
+.ghd-sidebar-nav .nav-link.is-active i {
+    color: var(--color-primary); /* Icono del mismo color que el borde activo */
+}
+
+/* Footer del Sidebar (Cerrar Sesión) */
+.ghd-sidebar-footer {
+    padding: 20px 0;
+    border-top: 1px solid var(--color-gris-oscuro); /* Separador */
+}
+.ghd-sidebar-footer .logout-link {
+    color: var(--color-rojo); /* Color de logout */
+}
+.ghd-sidebar-footer .logout-link i {
+    color: var(--color-rojo);
+}
+.ghd-sidebar-footer .logout-link:hover {
+    background-color: rgba(255, 0, 0, 0.1); /* Fondo rojo claro al pasar el ratón */
+    border-left-color: var(--color-rojo);
+}
+
+
+/* Main Content General */
+.ghd-main-content {
+    flex-grow: 1; /* Ocupa el espacio restante */
+    padding: 20px; /* Padding general para el contenido principal */
+    background-color: var(--color-fondo-app);
+}
+
+/* Header de la App (dentro de main-content) */
+.ghd-main-header {
+    background-color: var(--color-blanco);
+    padding: 15px 20px;
+    border-radius: var(--border-radius-base);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.ghd-main-header .header-title-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+.ghd-main-header h2 {
+    margin: 0;
+    font-size: 1.75rem;
+    color: var(--color-titulo);
+}
+.ghd-main-header .ghd-btn-icon {
+    background: none;
+    border: none;
+    color: var(--color-texto);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 5px;
+    display: none; /* Ocultar en desktop */
+}
+
+
+/* --- Media Queries (para Responsividad) --- */
+@media (max-width: 1024px) {
+    .ghd-sidebar {
+        position: fixed; /* Fijo para que no se mueva al scrollear */
+        left: -var(--sidebar-width); /* Ocultar por defecto */
+        transition: left 0.3s ease;
+    }
+    .ghd-sidebar.sidebar-visible {
+        left: 0; /* Mostrar en móvil */
+    }
+    .ghd-sidebar .ghd-sidebar-header .ghd-btn-icon {
+        display: block; /* Mostrar botón de cerrar en sidebar móvil */
+    }
+    .ghd-main-header .ghd-btn-icon {
+        display: block; /* Mostrar botón de abrir menú en header móvil */
+    }
+}
+@media (max-width: 768px) {
+    .ghd-main-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .ghd-main-header .header-actions {
+        width: 100%;
+        display: flex;
+        justify-content: flex-end; /* Alinear acciones a la derecha */
+    }
+}
+
+/* Establecer variables CSS globales (ajusta a tus colores base) */
+:root {
+    --color-primary: #4A7C59; /* Verde oscuro */
+    --color-secondary: #6B7280; /* Gris medio */
+    --color-success: #10B981; /* Verde brillante */
+    --color-danger: #EF4444; /* Rojo */
+    --color-warning: #F59E0B; /* Naranja/Amarillo */
+    --color-info: #3B82F6; /* Azul */
+
+    --color-blanco: #FFFFFF;
+    --color-negro: #1F2937; /* Gris muy oscuro */
+    --color-texto: #374151; /* Texto principal */
+    --color-texto-oscuro: #1F2937; 
+    --color-gris-claro: #E5E7EB; /* Bordes, separadores */
+    --color-gris-claro-2: #F3F4F6; /* Fondo de elementos */
+    --color-gris-oscuro: #6B7280;
+
+    --color-fondo-app: #F9FAFB; /* Fondo general de la aplicación */
+    --color-sidebar-bg: #374151; /* Fondo del sidebar */
+    --color-sidebar-text: #D1D5DB; /* Texto del sidebar */
+    --color-sidebar-icon: #9CA3AF; /* Iconos del sidebar */
+    --color-sidebar-hover: #4B5563; /* Hover del sidebar */
+    --color-sidebar-active-text: #FFFFFF; /* Texto activo del sidebar */
+
+    --color-rojo: #EF4444; /* Usado para códigos de pedido */
+    
+    --border-radius-base: 8px;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+
+    --sidebar-width: 250px; /* Ancho del sidebar */
+}
+
+/* Estilos de las insignias (badges) */
+.ghd-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.3em 0.7em;
+    border-radius: 9999px; /* Pill shape */
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+    color: #FFFFFF; /* Texto blanco por defecto */
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+/* Estados específicos */
+.ghd-badge.status-pendiente { background-color: var(--color-info); }
+.ghd-badge.status-en-progreso { background-color: var(--color-warning); }
+.ghd-badge.status-recogido { background-color: var(--color-info); } /* Mismo que pendiente, o un azul distinto */
+.ghd-badge.status-completado { background-color: var(--color-success); }
+.ghd-badge.status-no-asignado { background-color: var(--color-secondary); }
+.ghd-badge.status-pendientedecierreadmin { background-color: var(--color-danger); }
+/* Para otros estados, define más si es necesario */

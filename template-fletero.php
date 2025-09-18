@@ -10,10 +10,43 @@ if ( ! is_user_logged_in() || ( ! current_user_can('operario_logistica') && ! cu
 }
 
 get_header(); 
+
+// Obtener el ID del usuario logueado
+$current_user = wp_get_current_user();
 ?>
 
 <div class="ghd-app-wrapper is-mobile-optimized"> 
     
+    <?php 
+    // --- NUEVO: Incluir el Sidebar específico para fleteros (o un genérico si no hay uno) ---
+    // Si tienes un sidebar específico para fleteros, lo incluyes aquí.
+    // De lo contrario, usaremos un sidebar genérico con el botón de cerrar sesión.
+    // Por ahora, vamos a crear un "sidebar-fletero.php" simple o incluir la lógica aquí.
+
+    // Vamos a simular un sidebar directamente aquí para el fletero:
+    ?>
+    <aside class="ghd-sidebar">
+        <div class="ghd-sidebar-header">
+            <h3>Mi Puesto</h3>
+            <button id="mobile-menu-close" class="ghd-btn-icon"><i class="fa-solid fa-times"></i></button>
+        </div>
+        <nav class="ghd-sidebar-nav"> <!-- Este bloque queda justo después del header -->
+            <ul>
+                <li class="nav-item">
+                    <a href="<?php echo esc_url(home_url('/panel-de-fletero/')); ?>" class="nav-link is-active">
+                        <i class="fa-solid fa-truck"></i> Mis Entregas
+                    </a>
+                </li>
+            </ul>
+        </nav>
+        <div class="ghd-sidebar-footer"> <!-- Este bloque queda al final de la columna flexible -->
+            <a href="<?php echo wp_logout_url(home_url('/iniciar-sesion/')); ?>" class="nav-link logout-link">
+                <i class="fa-solid fa-arrow-right-from-bracket"></i> Cerrar Sesión
+            </a>
+        </div>
+    </aside>
+    <!-- FIN NUEVO Sidebar para Fletero -->
+
     <main class="ghd-main-content">
         
         <header class="ghd-main-header">
@@ -28,9 +61,9 @@ get_header();
 
         <div class="ghd-fletero-tasks-list" id="ghd-fletero-tasks-list">
             <?php
+            // La lógica de la WP_Query y el loop de las tarjetas va aquí, tal como la tenemos
             $current_user_id = get_current_user_id();
             
-            // Consulta para obtener las órdenes de producción asignadas al fletero actual
             $args_entregas_fletero = array(
                 'post_type'      => 'orden_produccion',
                 'posts_per_page' => -1,
@@ -39,11 +72,11 @@ get_header();
                     'relation' => 'AND',
                     array( // Debe estar en estado de logística o entregado por fletero
                         'key'     => 'estado_logistica',
-                        'value'   => ['Pendiente', 'En Progreso', 'Recogido'], // No incluir 'Entregado' para mostrar solo tareas activas
+                        'value'   => ['Pendiente', 'En Progreso', 'Recogido'], // No incluir 'Completado'
                         'compare' => 'IN',
                     ),
                     array( // Asignado a este fletero
-                        'key'     => 'logistica_fletero_id', // Campo ACF que ya creaste
+                        'key'     => 'logistica_fletero_id', 
                         'value'   => $current_user_id,
                         'compare' => '=',
                     ),
@@ -61,38 +94,33 @@ get_header();
                     $nombre_cliente = get_field('nombre_cliente', $order_id);
                     $direccion_entrega = get_field('direccion_de_entrega', $order_id);
                     $estado_logistica = get_field('estado_logistica', $order_id);
-                    // Puedes añadir más campos aquí que el fletero necesite ver (ej. nombre_producto, cliente_telefono)
                     $nombre_producto = get_field('nombre_producto', $order_id);
                     $cliente_telefono = get_field('cliente_telefono', $order_id);
-
-
-                    // Determinar el botón de acción actual y su estado
-                    $action_button_html = '';
-                    if ($estado_logistica === 'Pendiente' || $estado_logistica === 'En Progreso') {
-                        $action_button_html = '<button class="ghd-btn ghd-btn-primary ghd-btn-small fletero-action-btn" data-order-id="' . esc_attr($order_id) . '" data-new-status="Recogido">Marcar como Recogido</button>';
-                    } elseif ($estado_logistica === 'Recogido') {
-                        $action_button_html = '<button class="ghd-btn ghd-btn-success ghd-btn-small fletero-action-btn open-upload-delivery-proof-modal" data-order-id="' . esc_attr($order_id) . '">Entregado + Comprobante</button>';
-                        // O "Marcar como Entregado"
-                    }
-                    // Si el estado es 'Completado', no se muestra botón de acción activo, pero la tarjeta desaparecería de esta lista.
             ?>
                 <div class="ghd-order-card fletero-card" id="fletero-order-<?php echo $order_id; ?>">
                     <div class="order-card-main">
                         <div class="order-card-header">
-                            <h3><?php echo esc_html($codigo_pedido); ?></h3>
+                            <h3><i class="fa-solid fa-truck-fast"></i> <?php echo esc_html($codigo_pedido); ?></h3>
                             <span class="ghd-tag status-<?php echo strtolower(str_replace(' ', '-', $estado_logistica)); ?>"><?php echo esc_html($estado_logistica); ?></span>
                         </div>
                         <div class="order-card-body">
-                            <p><strong>Cliente:</strong> <?php echo esc_html($nombre_cliente); ?></p>
-                            <?php if ($nombre_producto) : ?><p><strong>Producto:</strong> <?php echo esc_html($nombre_producto); ?></p><?php endif; ?>
-                            <p><strong>Dirección:</strong> <?php echo nl2br(esc_html($direccion_entrega)); ?></p>
-                            <?php if ($cliente_telefono) : ?><p><strong>Teléfono:</strong> <a href="tel:<?php echo esc_attr($cliente_telefono); ?>"><?php echo esc_html($cliente_telefono); ?></a></p><?php endif; ?>
-                            <!-- Aquí puedes añadir más detalles del pedido que el fletero necesite -->
+                            <p><i class="fa-solid fa-user"></i> <strong>Cliente:</strong> <?php echo esc_html($nombre_cliente); ?></p>
+                            <?php if ($nombre_producto) : ?><p><i class="fa-solid fa-chair"></i> <strong>Producto:</strong> <?php echo esc_html($nombre_producto); ?></p><?php endif; ?>
+                            <p><i class="fa-solid fa-location-dot"></i> <strong>Dirección:</strong> <?php echo nl2br(esc_html($direccion_entrega)); ?></p>
+                            <?php if ($cliente_telefono) : ?><p><i class="fa-solid fa-phone"></i> <strong>Teléfono:</strong> <a href="tel:<?php echo esc_attr($cliente_telefono); ?>" class="phone-link"><?php echo esc_html($cliente_telefono); ?></a></p><?php endif; ?>
                         </div>
                     </div>
                     <div class="order-card-actions">
-                        <?php echo $action_button_html; ?>
-                        <a href="<?php the_permalink(); ?>" class="ghd-btn ghd-btn-secondary ghd-btn-small">Ver Detalles</a>
+                        <?php 
+                        $action_button_html = '';
+                        if ($estado_logistica === 'Pendiente' || $estado_logistica === 'En Progreso') {
+                            $action_button_html = '<button class="ghd-btn ghd-btn-primary ghd-btn-small fletero-action-btn" data-order-id="' . esc_attr($order_id) . '" data-new-status="Recogido"><i class="fa-solid fa-hand-holding-box"></i> Marcar como Recogido</button>';
+                        } elseif ($estado_logistica === 'Recogido') {
+                            $action_button_html = '<button class="ghd-btn ghd-btn-success ghd-btn-small fletero-action-btn open-upload-delivery-proof-modal" data-order-id="' . esc_attr($order_id) . '"><i class="fa-solid fa-camera"></i> Entregado + Comprobante</button>';
+                        }
+                        echo $action_button_html; 
+                        ?>
+                        <a href="<?php the_permalink(); ?>" class="ghd-btn ghd-btn-secondary ghd-btn-small"><i class="fa-solid fa-info-circle"></i> Ver Detalles</a>
                     </div>
                 </div>
 
@@ -103,14 +131,14 @@ get_header();
                         <h3>Completar Entrega: <?php echo esc_html($codigo_pedido); ?></h3>
                         <form class="complete-delivery-form" data-order-id="<?php echo $order_id; ?>" enctype="multipart/form-data">
                             <div class="form-group">
-                                <label for="foto_comprobante_<?php echo $order_id; ?>">Foto de Comprobante (Opcional):</label>
+                                <label for="foto_comprobante_<?php echo $order_id; ?>"><i class="fa-solid fa-image"></i> Foto de Comprobante (Opcional):</label>
                                 <input type="file" id="foto_comprobante_<?php echo $order_id; ?>" name="foto_comprobante" accept="image/*">
                             </div>
                             <div class="form-group">
-                                <label for="firma_cliente_<?php echo $order_id; ?>">Firma del Cliente (Opcional):</label>
+                                <label for="firma_cliente_<?php echo $order_id; ?>"><i class="fa-solid fa-signature"></i> Firma del Cliente (Opcional):</label>
                                 <textarea id="firma_cliente_<?php echo $order_id; ?>" name="firma_cliente" rows="3" placeholder="Ingresar el nombre del cliente que firma o descripción de la firma..."></textarea>
                             </div>
-                            <button type="submit" class="ghd-btn ghd-btn-success" style="margin-top: 20px;"><i class="fa-solid fa-check"></i> Marcar como Entregado</button>
+                            <button type="submit" class="ghd-btn ghd-btn-success" style="margin-top: 20px;"><i class="fa-solid fa-check-circle"></i> Marcar como Entregado</button>
                         </form>
                     </div>
                 </div>

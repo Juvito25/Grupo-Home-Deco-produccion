@@ -1,17 +1,34 @@
 document.addEventListener('DOMContentLoaded', function() {
     
-    // --- LÓGICA DEL MENÚ MÓVIL (Estable) ---
     const menuToggle = document.getElementById('mobile-menu-toggle');
     const sidebar = document.querySelector('.ghd-sidebar');
+    const closeSidebarBtn = document.getElementById('mobile-menu-close'); // <-- NUEVO: Botón de cierre dentro del sidebar
+
     if (menuToggle && sidebar) {
         const overlay = document.createElement('div');
         overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:999;display:none;";
         document.body.appendChild(overlay);
-        const closeMenu = () => { sidebar.classList.remove('sidebar-visible'); overlay.style.display = 'none'; };
-        menuToggle.addEventListener('click', (e) => { e.stopPropagation(); sidebar.classList.add('sidebar-visible'); overlay.style.display = 'block'; });
-        overlay.addEventListener('click', closeMenu);
-    }
 
+        const closeMenu = () => { 
+            sidebar.classList.remove('sidebar-visible'); 
+            overlay.style.display = 'none'; 
+            document.body.classList.remove('no-scroll'); // Opcional: remover clase para deshabilitar scroll del body
+        };
+        const openMenu = (e) => { 
+            e.stopPropagation(); 
+            sidebar.classList.add('sidebar-visible'); 
+            overlay.style.display = 'block'; 
+            document.body.classList.add('no-scroll'); // Opcional: añadir clase para deshabilitar scroll del body
+        };
+
+        menuToggle.addEventListener('click', openMenu);
+        overlay.addEventListener('click', closeMenu);
+        
+        if (closeSidebarBtn) { // <-- Si el botón de cierre existe, añadir listener
+            closeSidebarBtn.addEventListener('click', closeMenu);
+        }
+    } // fin if menuToggle
+////////////////////////////// ////////////////////////////////////////////////////
     // --- Funciones para actualizar los KPIs ---
     const updateSectorKPIs = (kpiData) => {
         const activasEl = document.getElementById('kpi-activas');
