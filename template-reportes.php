@@ -1,10 +1,8 @@
 <?php
 /**
- * Template Name: GHD - Reportes de Producción
- * Descripción: Muestra gráficos con estadísticas de la producción.
+ * Template Name: GHD - Reportes
  */
-
-if (!is_user_logged_in() || !current_user_can('manage_options')) {
+if ( ! is_user_logged_in() || ( ! current_user_can('gerente_ventas') && ! current_user_can('manage_options') ) ) {
     auth_redirect();
 }
 get_header(); 
@@ -12,7 +10,7 @@ get_header();
 
 <div class="ghd-app-wrapper">
     
-    <?php get_template_part('template-parts/sidebar-admin'); ?>
+    <?php get_template_part('template-parts/sidebar-sales'); ?>
 
     <main class="ghd-main-content">
         

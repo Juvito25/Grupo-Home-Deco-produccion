@@ -823,6 +823,19 @@ function ghd_archive_order_callback() {
     update_field('estado_administrativo', 'Archivado', $order_id);
     update_field('estado_pedido', 'Completado y Archivado', $order_id);
     update_field('fecha_de_archivo_pedido', current_time('mysql'), $order_id); // <-- NUEVO: Guardar fecha y hora exactas
+    // --- NUEVO: Calcular y guardar la comisión cuando el pedido se archiva ---
+    $comision_calculada = ghd_calculate_commission_for_order($order_id);
+    update_field('comision_calculada', $comision_calculada, $order_id);
+    
+    // Opcional: Acumular la comisión al perfil de la vendedora
+    $vendedora_id = (int) get_field('vendedora_asignada', $order_id);
+    if ($vendedora_id > 0 && $comision_calculada > 0) {
+        $current_total_comisiones = (float) get_user_meta($vendedora_id, 'ghd_total_comisiones', true);
+        $new_total_comisiones = $current_total_comisiones + $comision_calculada;
+        update_user_meta($vendedora_id, 'ghd_total_comisiones', $new_total_comisiones);
+        error_log("GHD Comisión: {$comision_calculada} sumada a vendedora ID: {$vendedora_id} para Pedido ID: {$order_id}");
+    }
+    // --- FIN NUEVO ---
     wp_insert_post([ 
         'post_title' => 'Pedido Cerrado y Archivado', 
         'post_type' => 'ghd_historial', 
@@ -1748,6 +1761,42 @@ function ghd_get_embalaje_models_for_select() {
 }
 // --- FIN Función de Ayuda Modelos de Puntos ---
 
+// --- NUEVO: Función para calcular la comisión de un pedido ---
+/**
+ * Calcula la comisión para un pedido dado su ID.
+ * Aplica la fórmula: (Valor Final Comisionable - Valor Flete Comisionable) * 0.015.
+ * @param int $order_id El ID del post de orden_produccion.
+ * @return float La comisión calculada, o 0 si faltan datos o hay error.
+ */
+function ghd_calculate_commission_for_order($order_id) {
+    $valor_final_comisionable = (float) get_field('valor_final_comisionable', $order_id);
+    $valor_flete_comisionable = (float) get_field('valor_flete_comisionable', $order_id);
+    $porcentaje_comision = 0.015; // 1.5%
+
+    // Validar que los valores sean números positivos
+    if ($valor_final_comisionable <= 0) {
+        error_log("GHD Comisión: Valor Final Comisionable no válido para Pedido ID: {$order_id}");
+        return 0.0;
+    }
+    // Asegurarse de que el flete no sea negativo, pero puede ser 0
+    if ($valor_flete_comisionable < 0) {
+        $valor_flete_comisionable = 0.0;
+    }
+
+    $base_comision = $valor_final_comisionable - $valor_flete_comisionable;
+
+    // Asegurar que la base no sea negativa después de restar el flete
+    if ($base_comision < 0) {
+        $base_comision = 0.0;
+    }
+
+    $comision = $base_comision * $porcentaje_comision;
+
+    // Redondear a dos decimales si es necesario (para valores monetarios)
+    return round($comision, 2);
+}
+// --- FIN Función de Cálculo de Comisión ---
+////////////////////////////////////////////////////////////////////////////////////////
 /**
  * AJAX Handler para filtrar los pedidos en el panel del administrador.
  * Maneja la búsqueda por texto, el estado del pedido y la prioridad.
@@ -2325,6 +2374,7 @@ function ghd_disable_acf_fields_for_readonly() {
         'embalaje_modelo_id',
         'embalaje_cantidad',
         'embalaje_puntos_tarea',
+        'comision_calculada',
         // Añade aquí cualquier otro campo que quieras que sea de solo lectura
     ];
 

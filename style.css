@@ -1787,3 +1787,36 @@ body.page-template-template-login {
 .ghd-badge.status-no-asignado { background-color: var(--color-secondary); }
 .ghd-badge.status-pendientedecierreadmin { background-color: var(--color-danger); }
 /* Para otros estados, define más si es necesario */
+
+
+/* Estados específicos del sistema GHD (ya existentes) */
+.ghd-badge.status-pendiente { background-color: var(--color-info); }
+.ghd-badge.status-en-progreso { background-color: var(--color-warning); }
+.ghd-badge.status-recogido { background-color: var(--color-info); }
+.ghd-badge.status-completado { background-color: var(--color-success); }
+.ghd-badge.status-no-asignado { background-color: var(--color-secondary); }
+.ghd-badge.status-pendientedecierreadmin { background-color: var(--color-danger); }
+
+/* --- NUEVOS ESTILOS PARA ESTADOS GENERALES --- */
+/* (Pueden reutilizar colores existentes o definir nuevos) */
+.ghd-badge.status-pendiente-de-asignacion { /* Coincide con el slug de "Pendiente de Asignación" */
+    background-color: var(--color-secondary); /* Gris */
+}
+.ghd-badge.status-en-produccion, /* Coincide con "En Producción" */
+.ghd-badge.status-en-costura, /* Coincide con "En Costura", etc. */
+.ghd-badge.status-en-tapiceriaembalaje { 
+    background-color: var(--color-info); /* Azul para estados intermedios de producción */
+}
+.ghd-badge.status-listo-para-entrega { /* Coincide con "Listo para Entrega" */
+    background-color: var(--color-success); /* Verde para listo para entrega */
+}
+.ghd-badge.status-despachado { /* Si tienes un estado "Despachado" */
+    background-color: var(--color-primary); /* Verde más oscuro */
+}
+.ghd-badge.status-completado-y-archivado { /* Coincide con "Completado y Archivado" */
+    background-color: var(--color-negro); /* Negro o un gris muy oscuro para archivado */
+    color: var(--color-blanco);
+}
+.ghd-badge.status-cancelado { /* Si tienes un estado "Cancelado" */
+    background-color: var(--color-rojo); /* Rojo para cancelado */
+}
