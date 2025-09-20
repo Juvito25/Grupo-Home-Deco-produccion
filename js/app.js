@@ -359,15 +359,19 @@ document.addEventListener('DOMContentLoaded', function() {
             if (completeTaskForm) {
                 e.preventDefault();
                 const orderId = completeTaskForm.dataset.orderId;
+                const fieldEstadoSector = completeTaskForm.dataset.field; // <-- ¡NUEVO: Obtener el campo de estado!
+
                 const formData = new FormData(completeTaskForm);
                 formData.append('action', 'ghd_register_task_details_and_complete');
                 formData.append('nonce', ghd_ajax.nonce);
+                formData.append('order_id', orderId); // <-- Asegurar que orderId se envía explícitamente
+                formData.append('field', fieldEstadoSector); // <-- ¡NUEVO: Adjuntar el campo de estado!
 
                 const submitButton = completeTaskForm.querySelector('button[type="submit"]');
                 if (submitButton) {
                     submitButton.disabled = true;
                     submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
-                }
+                } 
 
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: formData })
                 .then(res => res.json())

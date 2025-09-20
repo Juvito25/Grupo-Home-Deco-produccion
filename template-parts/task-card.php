@@ -79,36 +79,56 @@ if ($estado_actual === 'Pendiente') {
         <?php endif; ?>
 
         <!-- Botón de acción principal: Iniciar Tarea / Marcar Completa -->
-        <?php
-        $can_action_task = false;
-        // Lógica para determinar si el usuario actual puede realizar la acción en esta tarea.
-        if ($is_leader) {
-            $can_action_task = true; // Los líderes pueden actuar en cualquier tarea de su sector
-        } elseif ($asignado_a_id === $logged_in_user_id) { // Si es operario y la tarea está asignada a él
-            $can_action_task = true;
-        }
+                 <!-- Botón de acción principal: Iniciar Tarea / Marcar Completa -->
+        <?php 
+            // Lógica para determinar si el usuario actual puede realizar la acción en esta tarea.
+            $can_action_task = false;
+            if ($is_leader) { // Los líderes pueden actuar en cualquier tarea de su sector
+                $can_action_task = true;
+            } elseif ($asignado_a_id === $logged_in_user_id && $asignado_a_id !== 0) { // Operario, si la tarea está asignada a él
+                $can_action_task = true;
+            }
 
-        if ($button_text && $can_action_task) :
-            if ($estado_actual === 'En Progreso') : // Si la tarea está En Progreso, se muestra el botón para Completar y Registrar Detalles
-            ?>
-                <button class="ghd-btn ghd-btn-success action-button open-complete-task-modal" 
-                        data-order-id="<?php echo $post_id; ?>" 
-                        data-field="<?php echo $campo_estado; ?>" 
-                        data-assignee-id="<?php echo esc_attr($asignado_a_id); ?>">
-                    <i class="fa-solid fa-check"></i>
-                    <span>Completar Tarea</span>
-                </button>
-            <?php else : // Si la tarea está Pendiente, se muestra el botón para Iniciar Tarea
-            ?>
-                <button class="ghd-btn <?php echo $button_class; ?> action-button"
-                        data-order-id="<?php echo $post_id; ?>"
-                        data-field="<?php echo $campo_estado; ?>"
-                        data-value="<?php echo $button_value; ?>">
-                    <i class="fa-solid fa-play"></i> <?php echo $button_text; ?>
-                </button>
-            <?php endif; ?>
-        <?php endif; ?>
+            if ($can_action_task) :
+                // PRIORIDAD DE LOS BOTONES:
+                // 1. Iniciar Tarea (si está Pendiente)
+                // 2. Completar Tarea (si está En Progreso y es Embalaje, que tiene modal)
+                // 3. Completar Tarea (si está En Progreso y NO es Embalaje, como Logística Líder)
 
+                // --- 1. Botón "Iniciar Tarea" (Pendiente -> En Progreso) ---
+                if ($estado_actual === 'Pendiente') : ?>
+                    <button class="ghd-btn ghd-btn-primary action-button"
+                            data-order-id="<?php echo $post_id; ?>"
+                            data-field="<?php echo $campo_estado; ?>"
+                            data-value="En Progreso"> <!-- Envía el valor 'En Progreso' -->
+                        <i class="fa-solid fa-play"></i> Iniciar Tarea
+                    </button>
+                <?php 
+                // --- 2. Botón "Completar Tarea" para Embalaje (SIEMPRE con modal) ---
+                // Se muestra si el campo_estado es 'estado_embalaje' y la tarea está 'En Progreso'.
+                elseif ($campo_estado === 'estado_embalaje' && $estado_actual === 'En Progreso') : 
+                ?>
+                    <button class="ghd-btn ghd-btn-success action-button open-complete-task-modal" 
+                            data-order-id="<?php echo $post_id; ?>" 
+                            data-field="<?php echo $campo_estado; ?>" 
+                            data-assignee-id="<?php echo esc_attr($asignado_a_id); ?>">
+                        <i class="fa-solid fa-check"></i>
+                        <span>Completar Tarea</span>
+                    </button>
+                <?php 
+                // --- 3. Botón "Completar Tarea" para CUALQUIER otro sector (SIN modal) ---
+                // Se muestra si la tarea está 'En Progreso' (y no fue capturada por la condición de Embalaje).
+                // Esto incluye a Carpintería, Corte, Costura, Tapicería y Logística Líder.
+                elseif ($estado_actual === 'En Progreso') : ?>
+                    <button class="ghd-btn ghd-btn-success action-button" 
+                            data-order-id="<?php echo $post_id; ?>" 
+                            data-field="<?php echo $campo_estado; ?>" 
+                            data-value="Completado"> <!-- Envía el valor 'Completado' -->
+                        <i class="fa-solid fa-check"></i>
+                        <span>Completar Tarea</span>
+                    </button>
+                <?php endif; // Fin de las condiciones de botones ?>
+            <?php endif; // Fin de if ($can_action_task) ?>
         <a href="<?php echo $permalink; ?>" class="ghd-btn ghd-btn-secondary ghd-btn-small">Ver Detalles</a>
     </div>
 </div>

@@ -212,24 +212,22 @@ function ghd_get_sectores() {
 
 function ghd_get_mapa_roles_a_campos() {
     return [
-        // Mapeo de roles REALES a campos de estado ACF
-        'lider_carpinteria' => 'estado_carpinteria', 
+        'lider_carpinteria'    => 'estado_carpinteria', 
         'operario_carpinteria' => 'estado_carpinteria',
-        'lider_corte' => 'estado_corte', 
-        'operario_corte' => 'estado_corte',
-        'lider_costura' => 'estado_costura', 
-        'operario_costura' => 'estado_costura',
-        'lider_tapiceria' => 'estado_tapiceria', 
-        'operario_tapiceria' => 'estado_tapiceria',
-        'lider_embalaje' => 'estado_embalaje', 
-        'operario_embalaje' => 'estado_embalaje',
-        'lider_logistica' => 'estado_logistica', 
-        'operario_logistica' => 'estado_logistica',
-        'control_final_macarena' => 'estado_administrativo', // Macarena usa este campo
-        // 'vendedora' y 'gerente_ventas' no tienen un 'estado_X' asociado para tareas,
-        // ya que su panel es de ventas/comisiones.
+        'lider_corte'          => 'estado_corte', 
+        'operario_corte'       => 'estado_corte',
+        'lider_costura'        => 'estado_costura', 
+        'operario_costura'     => 'estado_costura',
+        'lider_tapiceria'      => 'estado_tapiceria', 
+        'operario_tapiceria'   => 'estado_tapiceria',
+        'lider_embalaje'       => 'estado_embalaje', 
+        'operario_embalaje'    => 'estado_embalaje',
+        'lider_logistica'      => 'estado_logistica_lider',   // <--- ESTO ES CRÍTICO
+        'operario_logistica'   => 'estado_logistica_fletero', // <--- ESTO ES CRÍTICO
+        'control_final_macarena' => 'estado_administrativo',
     ];
 }
+
 
 /**
  * Asigna un color consistente a una vendedora basándose en su ID de usuario.
@@ -754,54 +752,127 @@ function ghd_update_priority_callback() {
 /////////////////////////////////////////////////////fin de ghd_update_priority() //////////////////////////////////////////////////
 
 add_action('wp_ajax_ghd_update_task_status', function() {
+    error_log('ghd_update_task_status: Inicio de la función.');
+    error_log('ghd_update_task_status: _POST: ' . print_r($_POST, true));
+
     check_ajax_referer('ghd-ajax-nonce', 'nonce');
     if (!current_user_can('read')) {
+        error_log('ghd_update_task_status: Permisos insuficientes para usuario ID ' . get_current_user_id());
         wp_send_json_error(['message' => 'No tienes permisos.']);
         wp_die();
     }
 
     $id = intval($_POST['order_id']);
-    $field = sanitize_key($_POST['field']);
-    $value = sanitize_text_field($_POST['value']);
-    $assignee_id = isset($_POST['assignee_id']) ? intval($_POST['assignee_id']) : 0;
+    $field = sanitize_key($_POST['field']); 
+    $value = sanitize_text_field($_POST['value']); 
+    $assignee_id = isset($_POST['assignee_id']) ? intval($_POST['assignee_id']) : 0; 
 
-    if (!$id || !$field || !$value) {
+    if (!$id || empty($field) || empty($value)) {
+        error_log('ghd_update_task_status: Datos de tarea incompletos. ID: ' . $id . ', Field: ' . $field . ', Value: ' . $value);
         wp_send_json_error(['message' => 'Faltan datos para actualizar la tarea.']);
         wp_die();
     }
     
-    // Si la acción es completar, el modal se encarga. Esta función solo es para 'Iniciar Tarea'.
-    if ($value === 'Completado') {
-        wp_send_json_error(['message' => 'La finalización se gestiona desde el modal de registro.']);
+    // --- IMPORTANTE: Lógica para Embalaje ---
+    // Si el campo es 'estado_embalaje' y se intenta marcar 'Completado' con este endpoint (sin modal),
+    // eso es un error, porque Embalaje SIEMPRE usa un modal.
+    // Los demás campos (Carpintería, Corte, etc., y Logística Líder) no usan modal y se completan directamente con este endpoint.
+    if ($value === 'Completado' && $field === 'estado_embalaje') {
+        error_log('ghd_update_task_status: ERROR - Finalización de embalaje intentada sin modal para Pedido ID: ' . $id);
+        wp_send_json_error(['message' => 'Error: La finalización de Embalaje se gestiona desde el modal de registro de puntos.']);
         wp_die();
     }
 
-    // Actualizar el estado del campo (ej. a 'En Progreso')
-    update_field($field, $value, $id);
+    // 1. Actualizar el estado del campo principal del sector (ej. estado_carpinteria -> 'En Progreso' o 'Completado')
+    $update_success_initial = update_field($field, $value, $id);
+    error_log('ghd_update_task_status: Actualización inicial de ' . $field . ' a ' . $value . ' para ID ' . $id . '. Resultado: ' . ($update_success_initial ? 'ÉXITO' : 'FALLO'));
 
-    // Si se está iniciando la tarea y se ha asignado un operario, guardar la asignación.
+    // 2. Asignación del operario (solo cuando la tarea pasa a 'En Progreso')
+    $historial_title = ucfirst(str_replace(['estado_', '_'], ' ', $field)) . ' -> ' . $value;
     if ($value === 'En Progreso' && $assignee_id > 0) {
         $assignee_field = str_replace('estado_', 'asignado_a_', $field);
-        update_field($assignee_field, $assignee_id, $id);
+        $update_success_assignee = update_field($assignee_field, $assignee_id, $id);
+        error_log('ghd_update_task_status: Asignación de ' . $assignee_field . ' a ' . $assignee_id . '. Resultado: ' . ($update_success_assignee ? 'ÉXITO' : 'FALLO'));
         
         $assignee_obj = get_userdata($assignee_id);
         $assignee_name = $assignee_obj ? $assignee_obj->display_name : 'ID ' . $assignee_id;
-        $historial_title = ucfirst(str_replace(['estado_', '_'], ' ', $field)) . ' -> ' . $value . ' (Asignado a ' . $assignee_name . ')';
-    } else {
-        $historial_title = ucfirst(str_replace(['estado_', '_'], ' ', $field)) . ' -> ' . $value;
+        $historial_title .= ' (Asignado a ' . $assignee_name . ')';
     }
 
+    // 3. Lógica de Transiciones de Flujo (se ejecuta cuando una tarea se marca como 'Completado' por botón directo)
+    if ($value === 'Completado') {
+        error_log('ghd_update_task_status: Procesando transición de flujo para ' . $field . ' (ID: ' . $id . ')');
+
+        switch ($field) {
+            case 'estado_carpinteria':
+                update_field('estado_corte', 'Pendiente', $id);
+                wp_insert_post(['post_title' => 'Fase Carpintería completa -> A Corte', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $id]]);
+                break;
+            
+            case 'estado_corte':
+                update_field('estado_costura', 'Pendiente', $id);
+                update_field('estado_pedido', 'En Costura', $id);
+                wp_insert_post(['post_title' => 'Fase Corte completa -> A Costura', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $id]]);
+                break;
+
+            case 'estado_costura':
+                update_field('estado_tapiceria', 'Pendiente', $id);
+                update_field('estado_pedido', 'En Tapicería/Embalaje', $id);
+                wp_insert_post(['post_title' => 'Fase Costura completa -> A Tapicería', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $id]]);
+                break;
+            
+            case 'estado_tapiceria':
+                // Al completar Tapicería, la tarea para el LÍDER de EMBALAJE se pone 'Pendiente'.
+                update_field('estado_embalaje', 'Pendiente', $id);
+                wp_insert_post(['post_title' => 'Fase Tapicería completa -> A Embalaje', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $id]]);
+                break;
+
+            // Este caso es CRÍTICO: Cuando el Líder de Logística completa su propia tarea.
+            case 'estado_logistica_lider':
+                error_log('ghd_update_task_status: Activando lógica de transición para Logística Líder (ID: ' . $id . ')');
+
+                $update_success_fecha = update_field('fecha_completado_logistica_lider', current_time('mysql'), $id);
+                error_log('ghd_update_task_status: Actualizando fecha_completado_logistica_lider. Resultado: ' . ($update_success_fecha ? 'ÉXITO' : 'FALLO'));
+
+                $fletero_responsable_id = (int)get_field('asignado_a_logistica_lider', $id); 
+                error_log('ghd_update_task_status: Fletero responsable ID obtenido de asignado_a_logistica_lider: ' . $fletero_responsable_id);
+
+                if ($fletero_responsable_id > 0) {
+                    $update_success_fletero_id = update_field('logistica_fletero_id', $fletero_responsable_id, $id);
+                    $update_success_fletero_estado = update_field('estado_logistica_fletero', 'Pendiente', $id);
+                    $update_success_estado_pedido = update_field('estado_pedido', 'En Despacho', $id);
+                    
+                    error_log('ghd_update_task_status: Asignación de logistica_fletero_id. Resultado: ' . ($update_success_fletero_id ? 'ÉXITO' : 'FALLO'));
+                    error_log('ghd_update_task_status: Actualización de estado_logistica_fletero. Resultado: ' . ($update_success_fletero_estado ? 'ÉXITO' : 'FALLO'));
+                    error_log('ghd_update_task_status: Actualización de estado_pedido. Resultado: ' . ($update_success_estado_pedido ? 'ÉXITO' : 'FALLO'));
+
+                    $fletero_obj = get_userdata($fletero_responsable_id);
+                    $fletero_name = $fletero_obj ? $fletero_obj->display_name : 'ID ' . $fletero_responsable_id;
+                    $historial_title .= ' -> En Despacho (Asignado a ' . $fletero_name . ')';
+                } else {
+                    error_log('ghd_update_task_status: Líder de Logística completó sin asignar fletero responsable (asignado_a_logistica_lider es 0).');
+                    $update_success_fletero_estado = update_field('estado_logistica_fletero', 'No Asignado', $id);
+                    $update_success_estado_pedido = update_field('estado_pedido', 'Logística Pendiente Asignación', $id);
+                    error_log('ghd_update_task_status: Actualización de estado_logistica_fletero (No Asignado). Resultado: ' . ($update_success_fletero_estado ? 'ÉXITO' : 'FALLO'));
+                    error_log('ghd_update_task_status: Actualización de estado_pedido (Logística Pendiente Asignación). Resultado: ' . ($update_success_estado_pedido ? 'ÉXITO' : 'FALLO'));
+                    $historial_title .= ' -> Logística Pendiente Asignación de Fletero (Error: no se asignó responsable)';
+                }
+                break;
+        }
+    }
+
+    // 4. Registrar en el historial de producción
     wp_insert_post([
         'post_title' => $historial_title,
         'post_type' => 'ghd_historial',
         'meta_input' => ['_orden_produccion_id' => $id]
     ]);
     
-    // Éxito. Solo devolvemos un mensaje y los KPIs. El JS se encargará de refrescar.
+    // 5. Calcular y devolver KPIs del sector
     $sector_kpi_data = ghd_calculate_sector_kpis($field);
     wp_send_json_success(['message' => 'Estado actualizado.', 'kpi_data' => $sector_kpi_data]);
     wp_die();
-}); // fin ghd_update_task_status //
+});
 
 // --- MANEJADOR AJAX PARA ARCHIVAR PEDIDOS (AHORA LLAMADO POR EL ADMIN PRINCIPAL) ---
 add_action('wp_ajax_ghd_archive_order', 'ghd_archive_order_callback');
@@ -1260,11 +1331,29 @@ function ghd_register_task_details_and_complete_callback() {
             wp_insert_post(['post_title' => 'Fase Embalaje completa -> A Logística', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id]]);
             break;
         
-        case 'estado_logistica':
-            update_field('estado_pedido', 'Pendiente de Cierre Admin', $order_id);
-            update_field('estado_administrativo', 'Listo para Archivar', $order_id);
-            wp_insert_post(['post_title' => 'Entrega Completada -> Pendiente de Cierre Admin', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id]]);
-            break;
+       case 'estado_logistica_lider':
+                error_log('ghd_update_task_status: Activando lógica de transición para Logística Líder (ID: ' . $id . ')');
+
+                update_field('fecha_completado_logistica_lider', current_time('mysql'), $id);
+
+                $fletero_responsable_id = (int)get_field('asignado_a_logistica_lider', $id); 
+                error_log('ghd_update_task_status: Fletero responsable ID obtenido de asignado_a_logistica_lider: ' . $fletero_responsable_id);
+
+                if ($fletero_responsable_id > 0) {
+                    update_field('logistica_fletero_id', $fletero_responsable_id, $id);
+                    update_field('estado_logistica_fletero', 'Pendiente', $id);
+                    update_field('estado_pedido', 'En Despacho', $id);
+                    
+                    $fletero_obj = get_userdata($fletero_responsable_id);
+                    $fletero_name = $fletero_obj ? $fletero_obj->display_name : 'ID ' . $fletero_responsable_id;
+                    $historial_title .= ' -> En Despacho (Asignado a ' . $fletero_name . ')';
+                } else {
+                    error_log('ghd_update_task_status: Líder de Logística completó sin asignar fletero responsable (asignado_a_logistica_lider es 0).');
+                    update_field('estado_logistica_fletero', 'No Asignado', $id);
+                    update_field('estado_pedido', 'Logística Pendiente Asignación', $id);
+                    $historial_title .= ' -> Logística Pendiente Asignación de Fletero (Error: no se asignó responsable)';
+                }
+                break; 
     }
 
     $sector_kpi_data = ghd_calculate_sector_kpis($field_estado_sector);
@@ -1541,20 +1630,29 @@ function ghd_fletero_complete_delivery_callback() {
 add_action('wp_ajax_ghd_refresh_fletero_tasks', 'ghd_refresh_fletero_tasks_callback');
 function ghd_refresh_fletero_tasks_callback() {
     error_log('ghd_refresh_fletero_tasks_callback: Inicio de la función.'); // DEBUG
-    check_ajax_referer('ghd-ajax-nonce', 'nonce');
 
+    // --- Verificación de Nonce y Permisos (esto estaba bien, lo restauramos) ---
+    // La depuración de Nonce se mantiene si aún necesitas ver los valores en el log.
+    // Si no, puedes simplemente usar check_ajax_referer('ghd-ajax-nonce', 'nonce');
+    $nonce_field = 'nonce';
+    $nonce_action = 'ghd-ajax-nonce';
+    if ( ! isset( $_POST[$nonce_field] ) || ! wp_verify_nonce( $_POST[$nonce_field], $nonce_action ) ) {
+        error_log('ghd_refresh_fletero_tasks_callback: FALLO DE NONCE. Nonce recibido: ' . (isset($_POST[$nonce_field]) ? sanitize_text_field($_POST[$nonce_field]) : 'NO_NONCE') . ' | Nonce esperado: ' . wp_create_nonce($nonce_action));
+        wp_send_json_error( ['message' => 'Fallo en la verificación de seguridad del Nonce.'] );
+        wp_die();
+    }
     if (!current_user_can('operario_logistica') && !current_user_can('lider_logistica') && !current_user_can('manage_options')) {
-        error_log('ghd_refresh_fletero_tasks_callback: Permisos insuficientes para el usuario ' . get_current_user_id()); // DEBUG
+        error_log('ghd_refresh_fletero_tasks_callback: Permisos insuficientes para el usuario ' . get_current_user_id());
         wp_send_json_error(['message' => 'No tienes permisos para ver entregas.']);
         wp_die();
     }
+    error_log('ghd_refresh_fletero_tasks_callback: Nonce y Permisos OK. Generando HTML.');
+    // --- FIN Verificación ---
 
-    error_log('ghd_refresh_fletero_tasks_callback: Permisos OK. Generando HTML.'); // DEBUG
-
-    ob_start();
+    ob_start(); // <-- ¡INICIAR BUFFER UNA ÚNICA VEZ, AQUÍ!
     $current_user_id = get_current_user_id();
     
-    // Consulta para obtener las órdenes de producción asignadas al fletero actual (duplicar lógica de template-fletero.php)
+    // Consulta para obtener las órdenes de producción asignadas al fletero actual
     $args_entregas_fletero = array(
         'post_type'      => 'orden_produccion',
         'posts_per_page' => -1,
@@ -1562,8 +1660,8 @@ function ghd_refresh_fletero_tasks_callback() {
         'meta_query'     => array(
             'relation' => 'AND',
             array(
-                'key'     => 'estado_logistica',
-                'value'   => ['Pendiente', 'En Progreso', 'Recogido'], 
+                'key'     => 'estado_logistica_fletero', // ¡CORRECTO! Busca el nuevo campo
+                'value'   => ['Pendiente', 'Recogido'], 
                 'compare' => 'IN',
             ),
             array(
@@ -1584,74 +1682,72 @@ function ghd_refresh_fletero_tasks_callback() {
             $codigo_pedido = get_the_title();
             $nombre_cliente = get_field('nombre_cliente', $order_id);
             $direccion_entrega = get_field('direccion_de_entrega', $order_id);
-            $estado_logistica = get_field('estado_logistica', $order_id);
+            $estado_fletero_actual = get_field('estado_logistica_fletero', $order_id); // <-- ¡NUEVO! Obtener el campo CORRECTO del fletero
             $nombre_producto = get_field('nombre_producto', $order_id);
             $cliente_telefono = get_field('cliente_telefono', $order_id);
 
             $action_button_html = '';
-            if ($estado_logistica === 'Pendiente' || $estado_logistica === 'En Progreso') {
-                $action_button_html = '<button class="ghd-btn ghd-btn-primary ghd-btn-small fletero-action-btn" data-order-id="' . esc_attr($order_id) . '" data-new-status="Recogido">Marcar como Recogido</button>';
-            } elseif ($estado_logistica === 'Recogido') {
-                $action_button_html = '<button class="ghd-btn ghd-btn-success ghd-btn-small fletero-action-btn open-upload-delivery-proof-modal" data-order-id="' . esc_attr($order_id) . '">Marcar Entregado y Subir Comprobante</button>';
+            if ($estado_fletero_actual === 'Pendiente') { // <-- ¡CORRECTO! Usar el estado real del fletero
+                $action_button_html = '<button class="ghd-btn ghd-btn-primary ghd-btn-small fletero-action-btn" data-order-id="' . esc_attr($order_id) . '" data-new-status="Recogido"><i class="fa-solid fa-hand-holding-box"></i> Marcar como Recogido</button>';
+            } elseif ($estado_fletero_actual === 'Recogido') { // <-- ¡CORRECTO! Usar el estado real del fletero
+                $action_button_html = '<button class="ghd-btn ghd-btn-success ghd-btn-small fletero-action-btn open-upload-delivery-proof-modal" data-order-id="' . esc_attr($order_id) . '"><i class="fa-solid fa-camera"></i> Entregado + Comprobante</button>';
             }
+            $fletero_tag_class = strtolower(str_replace([' ', '/'], ['-', ''], $estado_fletero_actual)); // <-- ¡CORRECTO! Usar el estado real del fletero
     ?>
         <div class="ghd-order-card fletero-card" id="fletero-order-<?php echo $order_id; ?>">
             <div class="order-card-main">
                 <div class="order-card-header">
-                    <h3><?php echo esc_html($codigo_pedido); ?></h3>
-                    <span class="ghd-tag status-<?php echo strtolower(str_replace(' ', '-', $estado_logistica)); ?>"><?php echo esc_html($estado_logistica); ?></span>
+                    <h3><i class="fa-solid fa-truck-fast"></i> <?php echo esc_html($codigo_pedido); ?></h3>
+                    <span class="ghd-tag status-<?php echo esc_attr($fletero_tag_class); ?>"><?php echo esc_html($estado_fletero_actual); ?></span> <!-- <-- ¡CORRECTO! Usar el estado real del fletero -->
                 </div>
                 <div class="order-card-body">
-                    <p><strong>Cliente:</strong> <?php echo esc_html($nombre_cliente); ?></p>
-                    <?php if ($nombre_producto) : ?><p><strong>Producto:</strong> <?php echo esc_html($nombre_producto); ?></p><?php endif; ?>
-                    <p><strong>Dirección:</strong> <?php echo nl2br(esc_html($direccion_entrega)); ?></p>
-                    <?php if ($cliente_telefono) : ?><p><strong>Teléfono:</strong> <a href="tel:<?php echo esc_attr($cliente_telefono); ?>"><?php echo esc_html($cliente_telefono); ?></a></p><?php endif; ?>
+                    <p><i class="fa-solid fa-user"></i> <strong>Cliente:</strong> <?php echo esc_html($nombre_cliente); ?></p>
+                    <?php if ($nombre_producto) : ?><p><i class="fa-solid fa-chair"></i> <strong>Producto:</strong> <?php echo esc_html($nombre_producto); ?></p><?php endif; ?>
+                    <p><i class="fa-solid fa-location-dot"></i> <strong>Dirección:</strong> <?php echo nl2br(esc_html($direccion_entrega)); ?></p>
+                    <?php if ($cliente_telefono) : ?><p><strong>Teléfono:</strong> <a href="tel:<?php echo esc_attr($cliente_telefono); ?>" class="phone-link"><?php echo esc_html($cliente_telefono); ?></a></p><?php endif; ?>
                 </div>
             </div>
             <div class="order-card-actions">
                 <?php echo $action_button_html; ?>
-                <a href="<?php the_permalink(); ?>" class="ghd-btn ghd-btn-secondary ghd-btn-small">Ver Detalles</a>
+                <a href="<?php the_permalink(); ?>" class="ghd-btn ghd-btn-secondary ghd-btn-small"><i class="fa-solid fa-info-circle"></i> Ver Detalles</a>
             </div>
         </div>
 
-        <!-- Modal para subir comprobante de entrega (DUPLICADO PARA AJAX) -->
+        <!-- Modal para subir comprobante de entrega -->
         <div id="upload-delivery-proof-modal-<?php echo $order_id; ?>" class="ghd-modal">
             <div class="ghd-modal-content">
                 <span class="close-button" data-modal-id="upload-delivery-proof-modal-<?php echo $order_id; ?>">&times;</span>
                 <h3>Completar Entrega: <?php echo esc_html($codigo_pedido); ?></h3>
                 <form class="complete-delivery-form" data-order-id="<?php echo $order_id; ?>" enctype="multipart/form-data">
                     <div class="form-group">
-                        <label for="foto_comprobante_<?php echo $order_id; ?>">Foto de Comprobante (Opcional):</label>
+                        <label for="foto_comprobante_<?php echo $order_id; ?>"><i class="fa-solid fa-image"></i> Foto de Comprobante (Opcional):</label>
                         <input type="file" id="foto_comprobante_<?php echo $order_id; ?>" name="foto_comprobante" accept="image/*">
                     </div>
                     <div class="form-group">
-                        <label for="firma_cliente_<?php echo $order_id; ?>">Firma del Cliente (Opcional):</label>
+                        <label for="firma_cliente_<?php echo $order_id; ?>"><i class="fa-solid fa-signature"></i> Firma del Cliente (Opcional):</label>
                         <textarea id="firma_cliente_<?php echo $order_id; ?>" name="firma_cliente" rows="3" placeholder="Ingresar el nombre del cliente que firma o descripción de la firma..."></textarea>
                     </div>
-                    <button type="submit" class="ghd-btn ghd-btn-success" style="margin-top: 20px;"><i class="fa-solid fa-check"></i> Marcar como Entregado</button>
+                    <button type="submit" class="ghd-btn ghd-btn-success" style="margin-top: 20px;"><i class="fa-solid fa-check-circle"></i> Marcar como Entregado</button>
                 </form>
             </div>
         </div>
-
     <?php
         endwhile;
     else : 
-        error_log('ghd_refresh_fletero_tasks_callback: No hay entregas para el usuario ' . $current_user_id); // DEBUG
-    ?>
-        <p class="no-tasks-message" style="text-align: center; padding: 20px;">No tienes entregas asignadas actualmente.</p>
-    <?php endif; wp_reset_postdata(); 
+        error_log('ghd_refresh_fletero_tasks_callback: No hay entregas para el usuario ' . $current_user_id);
+        echo '<p class="no-tasks-message" style="text-align: center; padding: 20px;">No tienes entregas asignadas actualmente.</p>'; 
+    endif; wp_reset_postdata(); 
     
-    $fletero_tasks_html = ob_get_clean();
-    error_log('ghd_refresh_fletero_tasks_callback: HTML generado. Enviando éxito.'); // DEBUG
-    // --- NUEVO: Enviar la respuesta JSON con el formato esperado por el frontend ---
+    $fletero_tasks_html = ob_get_clean(); // <-- CAPTURAR TODO EL HTML AL FINAL
+    error_log('ghd_refresh_fletero_tasks_callback: HTML generado. Enviando éxito.');
     wp_send_json_success([
         'tasks_html' => $fletero_tasks_html,
-        'message' => 'Entregas actualizadas.' // Mensaje de éxito si lo quieres mantener
+        'message' => 'Entregas actualizadas.' 
     ]);
-    // --- FIN NUEVO ---
     wp_die();
-}// fin ghd_refresh_fletero_tasks_callback()
+} // fin ghd_refresh_fletero_tasks_callback()
 ///////////////////////////////////////////////////////////// 
+
 
 
 /**

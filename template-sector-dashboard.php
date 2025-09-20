@@ -1,19 +1,13 @@
 <?php
-/**
- * Template Name: Panel de Tareas (Sector) V2
- */
+/*
+Template Name: Panel de Tareas (Sector) V2
+*/
 
-// --- 1. Lógica de Redirección y Determinación de Sector (TODO ANTES DE get_header()) ---
-
-// 1.1 Redirección de seguridad: Asegurar que el usuario esté logueado
-if (!is_user_logged_in()) {
-    auth_redirect(); // Esto envía cabeceras y sale, por lo que debe ser lo primero.
-}
+if (!is_user_logged_in()) { auth_redirect(); }
 
 $current_user = wp_get_current_user();
 $user_roles = (array) $current_user->roles;
 
-// 1.2 Determinar qué sectores son permitidos para el usuario actual (roles de líder)
 $allowed_leader_sectors = [];
 foreach ($user_roles as $role) {
     if (strpos($role, 'lider_') !== false) {
@@ -21,56 +15,74 @@ foreach ($user_roles as $role) {
     }
 }
 
-// 1.3 Limpiar y normalizar el sector solicitado desde la URL
 $requested_sector_raw = isset($_GET['sector']) ? sanitize_text_field($_GET['sector']) : '';
 $requested_sector = strtolower(remove_accents($requested_sector_raw));
 
 $base_sector_key = '';
-$is_leader = false; // Se inicializa aquí, se ajustará más adelante si es necesario para la vista
+$is_leader_for_rendering = false; // Flag para el renderizado del selector de asignación
 
-// 1.4 Lógica para determinar el $base_sector_key y si es un líder para propósitos de la vista
-// A) Si el usuario es administrador, puede ver cualquier sector válido solicitado
+// 1. Prioridad: Administrador viendo un sector específico
 if (current_user_can('manage_options') && !empty($requested_sector) && array_key_exists($requested_sector, ghd_get_sectores())) {
     $base_sector_key = $requested_sector;
-    $is_leader = true; // El admin actúa como líder de ese sector para la vista
+    $is_leader_for_rendering = true; // El Admin actúa como líder para la UI
 }
-// B) Si se solicita un sector y el usuario tiene permiso (es líder de ese sector)
+// 2. Si es un líder real del sector solicitado
 elseif (!empty($requested_sector) && in_array($requested_sector, $allowed_leader_sectors)) {
     $base_sector_key = $requested_sector;
-    $is_leader = true;
+    $is_leader_for_rendering = true; // Es líder del sector
 }
-// C) Si no se solicita un sector específico, pero el usuario es líder de al menos un sector, redirigimos al primero
+// 3. Si no se solicita un sector, pero es líder de alguno, redirigir al primero
 elseif (!empty($allowed_leader_sectors)) {
     wp_redirect( add_query_arg('sector', $allowed_leader_sectors[0], get_permalink() ) );
     exit;
 }
-// D) Si no es admin y no tiene roles de líder, lo mandamos al panel principal.
-elseif (!current_user_can('manage_options')) {
+// 4. Fallback si no es Admin y no es líder de ningún sector
+elseif (!current_user_can('manage_options') && empty($allowed_leader_sectors)) {
+    wp_redirect( home_url('/panel-de-control/') ); // Redirigir si no tiene permisos para ningún panel
+    exit;
+}
+
+// 5. Último fallback si $base_sector_key sigue vacío (ej. sector inválido solicitado)
+if (empty($base_sector_key)) {
     wp_redirect( home_url('/panel-de-control/') );
     exit;
 }
-// E) Si $base_sector_key sigue vacío después de todas las comprobaciones, es un caso de error o acceso no autorizado.
-//    (Esto debería capturar casos donde un sector no válido es solicitado o no hay permisos)
-if (empty($base_sector_key)) {
-    wp_redirect( home_url('/panel-de-control/') ); // Fallback si nada de lo anterior se cumple
-    exit;
+
+get_header();
+
+// --- ¡CRÍTICO! DETERMINACIÓN PRECISA DEL $campo_estado Y $is_leader FINAL ---
+$mapa_roles = ghd_get_mapa_roles_a_campos();
+$campo_estado = ''; // Se inicializa y se rellena con el campo ACF correcto.
+
+// Si el usuario actual tiene el rol de líder del $base_sector_key, o es Admin viendo ese sector
+if ($is_leader_for_rendering) {
+    // Si es un Admin, o un líder real, queremos el campo de estado para el ROL DE LÍDER de ese sector.
+    if (isset($mapa_roles['lider_' . $base_sector_key])) {
+        $campo_estado = $mapa_roles['lider_' . $base_sector_key];
+    }
+} 
+// Si NO es líder de renderizado (ej. un operario que tiene su propio panel)
+elseif (isset($mapa_roles['operario_' . $base_sector_key])) {
+    $campo_estado = $mapa_roles['operario_' . $base_sector_key];
+} 
+// Casos especiales para Control Final (Macarena)
+elseif ($base_sector_key === 'control_final') {
+    $campo_estado = 'estado_administrativo';
 }
 
-// --- 2. Ahora que hemos asegurado que todas las redirecciones posibles han ocurrido,
-//         y $base_sector_key está definido, podemos incluir el header y el resto del HTML. ---
+// Fallback si por alguna razón no se encontró un campo de estado específico
+if (empty($campo_estado)) {
+    // Esto no debería ocurrir si el mapeo de roles y los slugs son correctos.
+    error_log("GHD Error: campo_estado no determinado para base_sector_key: {$base_sector_key} y roles del usuario.");
+    $campo_estado = 'estado_' . $base_sector_key; // Último intento de inferir (pero indica un problema)
+}
 
-get_header(); // A PARTIR DE AQUÍ PUEDE HABER OUTPUT
+$is_leader = $is_leader_for_rendering; // La variable $is_leader para task-card.php ahora es $is_leader_for_rendering
 
-// A partir del $base_sector_key, definimos el resto de variables que usará el template
-$mapa_roles = ghd_get_mapa_roles_a_campos();
-$campo_estado = 'estado_' . $base_sector_key;
-
-$sector_display_map = ghd_get_sectores(); // Usamos la función ghd_get_sectores para obtener el nombre legible
+$sector_display_map = ghd_get_sectores(); 
 $sector_name = $sector_display_map[$base_sector_key] ?? ucfirst($base_sector_key);
 
-// Operarios del sector, esta lógica se mantiene similar a como la teníamos
 $operarios_del_sector = [];
-// Si $is_leader es true (sea por rol directo o por ser admin con permiso de ver todo)
 if ($is_leader && !empty($base_sector_key)) {
     $operarios_del_sector = get_users([
         'role__in' => ['lider_' . $base_sector_key, 'operario_' . $base_sector_key], 
@@ -79,15 +91,12 @@ if ($is_leader && !empty($base_sector_key)) {
     ]);
 }
 
-// Ajuste para el contexto de rendering, si se pasa a task-card.php
-// (Esta variable $is_leader ya la ajustamos en ghd_refresh_sector_tasks_callback)
-
 add_filter('body_class', function($classes) {
     $classes[] = 'is-sector-dashboard-panel';
     return $classes;
 });
 
-// Los KPIs y la consulta de pedidos inicial se realizan aquí, después de que todo lo anterior esté listo
+// Los KPIs y la consulta de pedidos inicial
 $sector_kpi_data = ghd_calculate_sector_kpis($campo_estado);
 $pedidos_query_args = [
     'post_type'      => 'orden_produccion', 
@@ -95,13 +104,13 @@ $pedidos_query_args = [
     'meta_query'     => [['key' => $campo_estado, 'value' => ['Pendiente', 'En Progreso'], 'compare' => 'IN']]
 ];
 
-// Lógica para filtrar por asignación si el usuario NO es admin y NO es líder para la vista
 if (!current_user_can('ghd_view_all_sector_tasks') && !$is_leader) {
     $asignado_a_field = str_replace('estado_', 'asignado_a_', $campo_estado);
     $pedidos_query_args['meta_query'][] = ['key' => $asignado_a_field, 'value' => $current_user->ID, 'compare' => '='];
 }
 
 $pedidos_query = new WP_Query($pedidos_query_args);
+
 ?>
 
 <div class="ghd-app-wrapper">
