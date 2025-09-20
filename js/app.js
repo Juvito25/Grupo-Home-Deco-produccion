@@ -68,12 +68,13 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // --- Función para refrescar la lista de tareas del Fletero ---
+        // --- Función para refrescar la lista de tareas del Fletero ---
     const refreshFleteroTasksList = () => {
         const fleteroTasksList = document.querySelector('.ghd-fletero-tasks-list');
         const refreshFleteroTasksBtn = document.getElementById('ghd-refresh-fletero-tasks');
 
         if (!fleteroTasksList || !refreshFleteroTasksBtn) {
-            console.warn('refreshFleteroTasksList: Elementos DOM (.ghd-fletero-tasks-list o #ghd-refresh-fletero-tasks) no encontrados. Posiblemente en otra página.');
+            console.warn('refreshFleteroTasksList: Elementos DOM no encontrados. Posiblemente en otra página.');
             return;
         }
 
@@ -86,28 +87,35 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) { 
+                    return res.text().then(text => { 
+                        const errorMsg = `Server responded with ${res.status}: ${text || 'No response body'}`;
+                        console.error("Error de carga HTTP en refresco de fletero:", errorMsg);
+                        // Mostrar un mensaje de error discreto en la UI, no un alert molesto
+                        fleteroTasksList.innerHTML = `<p class="no-tasks-message" style="text-align: center; padding: 20px;">Error de carga: ${res.status}. Por favor, intente de nuevo.</p>`;
+                        throw new Error(errorMsg); // Propagar el error para el .catch()
+                    });
+                }
+                return res.json();
+            })
             .then(response => { 
-                console.log('Respuesta completa de ghd_refresh_fletero_tasks:', response);
+                // console.log('Respuesta completa de ghd_refresh_fletero_tasks (depuración):', response); // Solo para depuración extrema si falla.
 
-                if (response.success) { 
-                    if (typeof response.data.tasks_html === 'string') {
-                        fleteroTasksList.innerHTML = response.data.tasks_html;
-                        console.log('Refresco de tareas de fletero exitoso. Contenido actualizado.');
-                    } else {
-                        const errorMessage = response.data.message || 'La respuesta de refresco del servidor es incompleta (falta HTML).';
-                        fleteroTasksList.innerHTML = '<p class="no-tasks-message" style="text-align: center; padding: 20px;">' + errorMessage + '</p>';
-                        console.error('Error de refresco (success=true, pero tasks_html inválido):', response);
-                    }
+                if (response.success && typeof response.data.tasks_html === 'string') {
+                    fleteroTasksList.innerHTML = response.data.tasks_html;
+                    // console.log('Refresco de tareas de fletero exitoso. Contenido actualizado.'); // Solo para depuración.
                 } else {
-                    const errorMessage = response.data?.message || 'Error desconocido del servidor al refrescar.';
-                    fleteroTasksList.innerHTML = '<p class="no-tasks-message" style="text-align: center; padding: 20px;">' + errorMessage + '</p>';
-                    console.error('Error de refresco (success=false):', response);
+                    const errorMessage = response.data.message || 'La respuesta del servidor para refresco es incompleta.';
+                    console.error('Error de refresco (respuesta inválida):', errorMessage, response);
+                    fleteroTasksList.innerHTML = '<p class="no-tasks-message" style="text-align: center; padding: 20px;">Error al cargar tareas. Inténtalo de nuevo.</p>';
                 }
             })
             .catch(error => {
-                console.error("Error de red al refrescar tareas de fletero:", error);
-                fleteroTasksList.innerHTML = '<p class="no-tasks-message" style="text-align: center; padding: 20px;">Error de red. Inténtalo de nuevo.</p>';
+                // El error ya se logueó en el .then(res => { if (!res.ok) ... })
+                // Si llega aquí, es un error de red puro o un error propagado.
+                console.error("Error de red en refresco de fletero:", error);
+                fleteroTasksList.innerHTML = `<p class="no-tasks-message" style="text-align: center; padding: 20px;">Error de red. Inténtalo de nuevo.</p>`;
             })
             .finally(() => {
                 fleteroTasksList.style.opacity = '1';
@@ -119,6 +127,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const mainContent = document.querySelector('.ghd-main-content');
     if (mainContent) {
 
+        // --- NUEVO: Declarar fleteroTasksList y refreshFleteroTasksBtn en un ámbito más global ---
+        const fleteroTasksList = document.querySelector('.ghd-fletero-tasks-list');
+        const refreshFleteroTasksBtn = document.getElementById('ghd-refresh-fletero-tasks');
+        // --- FIN NUEVO --refreshFleteroTasksList-
         // Listener para todos los CLICKS dentro de mainContent
         mainContent.addEventListener('click', function(e) {
             
@@ -315,7 +327,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 })
                 .catch(error => {
-                    console.error("Error de red al marcar como recogido:", error);
+                    console.error("Error de red al marcar como recogido:" + error);
                     alert('Error de red. Inténtalo de nuevo.');
                 })
                 .finally(() => {
@@ -419,17 +431,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
                 .then(res => res.json())
                 .then(response => { // Renombramos a 'response' para claridad
-                    if (response.success) {
-                        const modal = document.getElementById(`upload-delivery-proof-modal-${orderId}`);
-                        if (modal) {
-                            modal.style.display = 'none';
-                            completeDeliveryForm.reset();
-                        }
-                        console.log('Entrega completada: ' + (response.data?.message || ''));
-                        refreshFleteroTasksList();
+                   if (response.success) { 
+                    if (typeof response.data.tasks_html === 'string') {
+                        console.log('HTML recibido para fleteroTasksList:', response.data.tasks_html); // <-- ¡NUEVO: LOG DEL HTML!
+                        fleteroTasksList.innerHTML = response.data.tasks_html;
+                        console.log('Refresco de tareas de fletero exitoso. Contenido actualizado.');
                     } else {
-                        alert('Error al completar entrega: ' + (response.data?.message || 'Error desconocido.'));
+                        const errorMessage = response.data.message || 'La respuesta de refresco del servidor es incompleta (falta HTML).';
+                        fleteroTasksList.innerHTML = '<p class="no-tasks-message" style="text-align: center; padding: 20px;">' + errorMessage + '</p>';
+                        console.error('Error de refresco (success=true, pero tasks_html inválido):', response);
                     }
+                } else {
+                    const errorMessage = response.data?.message || 'Error desconocido del servidor al refrescar.';
+                    fleteroTasksList.innerHTML = '<p class="no-tasks-message" style="text-align: center; padding: 20px;">' + errorMessage + '</p>';
+                    console.error('Error de refresco (success=false):', response);
+                } 
                 })
                 .catch(error => {
                     console.error("Error de red al completar entrega:", error);
