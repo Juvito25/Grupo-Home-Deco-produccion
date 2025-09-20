@@ -1577,87 +1577,18 @@ function ghd_fletero_mark_recogido_callback() {
     wp_send_json_success(['message' => 'Pedido marcado como recogido.']);
     wp_die(); // Asegura que no se envíe ningún output adicional.
 }// fin ghd_fletero_mark_recogido_callback()
-// function ghd_fletero_mark_recogido_callback() {
-//     error_log('ghd_fletero_mark_recogido_callback: Inicio de la función.');
-//     check_ajax_referer('ghd-ajax-nonce', 'nonce');
-
-//     // Solo fleteros, líderes de logística o administradores pueden usar esto
-//     if (!current_user_can('ghd_manage_own_delivery') && !current_user_can('lider_logistica') && !current_user_can('manage_options')) {
-//         error_log('ghd_fletero_mark_recogido_callback: Permisos insuficientes para el usuario ' . get_current_user_id());
-//         wp_send_json_error(['message' => 'No tienes permisos para marcar entregas como recogidas.']);
-//         wp_die();
-//     }
-
-//     $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
-//     if (!$order_id) {
-//         error_log('ghd_fletero_mark_recogido_callback: ID de pedido no válido.');
-//         wp_send_json_error(['message' => 'ID de pedido no válido.']);
-//         wp_die();
-//     }
-
-//     // Opcional: Verificar que el pedido esté asignado al fletero actual si no es admin/líder
-//     if (!current_user_can('lider_logistica') && !current_user_can('manage_options')) {
-//         $assigned_fletero_id = (int) get_field('logistica_fletero_id', $order_id);
-//         if ($assigned_fletero_id !== get_current_user_id()) {
-//             wp_send_json_error(['message' => 'Este pedido no está asignado a ti.']);
-//             wp_die();
-//         }
-//     }
-
-//      // Leer el estado actual ANTES de intentar actualizar
-//     $estado_actual_antes = get_field('estado_logistica_fletero', $order_id);
-//     error_log("ghd_fletero_mark_recogido_callback: Pedido ID: {$order_id} - Estado_fletero ANTES del update: '{$estado_actual_antes}'");
-
-//     // Actualizar el estado de logística del pedido
-//     update_field('estado_logistica', 'Recogido', $order_id);
-//     update_field('fecha_recogido', current_time('mysql'), $order_id); // Guardar fecha de recogido
-    
-//     // --- CRÍTICO: Limpiar cachés de ACF y WordPress para el post (ROBUSTO) ---
-//     // Aseguramos que los "stores" de ACF existan antes de intentar limpiarlos
-//     if (function_exists('acf_get_store')) {
-//         $acf_local_store = acf_get_store('local');
-//         if ($acf_local_store && method_exists($acf_local_store, 'remove')) {
-//             $acf_local_store->remove('fields');
-//             error_log("GHD Debug: Caché local de ACF limpiada para fields.");
-//         } else {
-//             error_log("GHD Warning: acf_get_store('local') no disponible o no tiene método remove().");
-//         }
-
-//         $acf_posts_store = acf_get_store('posts');
-//         if ($acf_posts_store && method_exists($acf_posts_store, 'remove')) {
-//             $acf_posts_store->remove('post_id=' . $order_id);
-//             error_log("GHD Debug: Caché de posts de ACF limpiada para post_id={$order_id}.");
-//         } else {
-//             error_log("GHD Warning: acf_get_store('posts') no disponible o no tiene método remove().");
-//         }
-//     } else {
-//         error_log("GHD Warning: acf_get_store() no disponible, no se pudo limpiar caché de ACF.");
-//     }
-
-//     clean_post_cache($order_id); // Limpia caché de WordPress para el post
-//     wp_cache_delete($order_id, 'post_meta'); // Limpia caché de post_meta para el post
-//     wp_cache_delete($order_id, 'posts'); // Limpia caché de posts para el post
-//     error_log("GHD Debug: Cachés de WordPress limpiadas para post_id={$order_id}.");
-//     // --- FIN CRÍTICO DEPURACIÓN ---
-    
-//     // Registrar en el historial
-//     wp_insert_post([
-//         'post_title' => 'Pedido Recogido por Fletero ID ' . get_current_user_id(),
-//         'post_type' => 'ghd_historial',
-//         'meta_input' => ['_orden_produccion_id' => $order_id, '_logistica_estado' => 'Recogido']
-//     ]);
-
-//     wp_send_json_success(['message' => 'Pedido marcado como recogido.']);
-//     wp_die();
-// }
 
 // --- NUEVO: AJAX Handler para Fletero: Marcar Entrega como "Entregado" y Subir Comprobante ---
 add_action('wp_ajax_ghd_fletero_complete_delivery', 'ghd_fletero_complete_delivery_callback');
 function ghd_fletero_complete_delivery_callback() {
-    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+    error_log('ghd_fletero_complete_delivery_callback: Inicio de la función.'); // DEBUG
+    error_log('ghd_fletero_complete_delivery_callback: _POST: ' . print_r($_POST, true)); // DEBUG
 
-    // Solo fleteros, líderes de logística o administradores pueden usar esto
+    check_ajax_referer('ghd-ajax-nonce', 'nonce'); // Mantenemos el check para seguridad.
+
+    // Permisos (asumimos que están correctos)
     if (!current_user_can('ghd_manage_own_delivery') && !current_user_can('lider_logistica') && !current_user_can('manage_options')) {
+        error_log('ghd_fletero_complete_delivery_callback: Permisos insuficientes para el usuario ' . get_current_user_id());
         wp_send_json_error(['message' => 'No tienes permisos para completar entregas.']);
         wp_die();
     }
@@ -1666,26 +1597,35 @@ function ghd_fletero_complete_delivery_callback() {
     $firma_cliente = isset($_POST['firma_cliente']) ? sanitize_textarea_field($_POST['firma_cliente']) : '';
 
     if (!$order_id) {
+        error_log('ghd_fletero_complete_delivery_callback: ID de pedido no válido.');
         wp_send_json_error(['message' => 'ID de pedido no válido.']);
         wp_die();
     }
 
-    // Opcional: Verificar que el pedido esté asignado al fletero actual
-    if (!current_user_can('lider_logistica') && !current_user_can('manage_options')) {
-        $assigned_fletero_id = (int) get_field('logistica_fletero_id', $order_id);
-        if ($assigned_fletero_id !== get_current_user_id()) {
-            wp_send_json_error(['message' => 'Este pedido no está asignado a ti.']);
-            wp_die();
-        }
-    }
-
-    // Actualizar el estado de logística del pedido a 'Completado'
-    update_field('estado_logistica', 'Completado', $order_id);
-    update_field('fecha_entregado', current_time('mysql'), $order_id); // Guardar fecha de entrega
+    // --- ¡CRÍTICO! DEPURACIÓN Y ACTUALIZACIÓN DE update_field para estados finales ---
     
+    // Leer estados actuales ANTES de intentar actualizar
+    $estado_fletero_antes = get_field('estado_logistica_fletero', $order_id);
+    $estado_admin_antes = get_field('estado_administrativo', $order_id);
+    $estado_pedido_antes = get_field('estado_pedido', $order_id);
+    error_log("ghd_fletero_complete_delivery_callback: Pedido ID: {$order_id} - ANTES update. Fletero: '{$estado_fletero_antes}', Admin: '{$estado_admin_antes}', Pedido: '{$estado_pedido_antes}'");
+
+    // Actualizar los campos clave
+    $update_result_fletero_estado = update_field('estado_logistica_fletero', 'Entregado', $order_id);
+    $update_result_fecha_entregado = update_field('fecha_entregado', current_time('mysql'), $order_id); 
+    $update_result_admin_estado = update_field('estado_administrativo', 'Pendiente', $order_id); // <-- ¡CRÍTICO! Poner 'Listo para Archivar'
+    $update_result_pedido_estado = update_field('estado_pedido', 'Pendiente de Cierre Admin', $order_id);
+
+    error_log("ghd_fletero_complete_delivery_callback: Pedido ID: {$order_id} - RESULTADOS update_field:");
+    error_log("  - estado_logistica_fletero ('Entregado'): " . ($update_result_fletero_estado ? 'ÉXITO' : 'FALLO'));
+    error_log("  - fecha_entregado: " . ($update_result_fecha_entregado ? 'ÉXITO' : 'FALLO'));
+    error_log("  - estado_administrativo ('Pendiente'): " . ($update_result_admin_estado ? 'ÉXITO' : 'FALLO'));
+    error_log("  - estado_pedido ('Pendiente de Cierre Admin'): " . ($update_result_pedido_estado ? 'ÉXITO' : 'FALLO'));
+
     // Guardar la firma del cliente (si se proporcionó)
     if (!empty($firma_cliente)) {
-        update_field('logistica_firma_cliente', $firma_cliente, $order_id); // <-- Este campo ACF ya debió crearse
+        $update_result_firma = update_field('logistica_firma_cliente', $firma_cliente, $order_id); 
+        error_log("ghd_fletero_complete_delivery_callback: Pedido ID: {$order_id} - Resultado update_field('logistica_firma_cliente'): " . ($update_result_firma ? 'ÉXITO' : 'FALLO'));
     }
 
     // Manejar la subida de la foto de comprobante
@@ -1697,32 +1637,40 @@ function ghd_fletero_complete_delivery_callback() {
         
         $attachment_id = media_handle_upload('foto_comprobante', $order_id);
         if (!is_wp_error($attachment_id)) {
-            update_field('logistica_foto_comprobante', $attachment_id, $order_id); // <-- Este campo ACF ya debió crearse
+            $update_result_foto = update_field('logistica_foto_comprobante', $attachment_id, $order_id);
+            error_log("ghd_fletero_complete_delivery_callback: Pedido ID: {$order_id} - Resultado update_field('logistica_foto_comprobante'): " . ($update_result_foto ? 'ÉXITO' : 'FALLO'));
         } else {
-            error_log('Error al subir foto de comprobante para pedido ' . $order_id . ': ' . $attachment_id->get_error_message());
-            // No hacemos wp_send_json_error aquí, para que la entrega se marque como completada aunque falle la foto
+            error_log('ghd_fletero_complete_delivery_callback: Error al subir foto de comprobante para pedido ' . $order_id . ': ' . $attachment_id->get_error_message());
         }
     }
     
-    // Registrar en el historial
-    $historial_title = 'Entrega Completada por Fletero ID ' . get_current_user_id();
-    if ($attachment_id > 0) $historial_title .= ' (con foto)';
-    if (!empty($firma_cliente)) $historial_title .= ' (con firma)';
+    // Limpiar cachés de ACF y WordPress para el post (similar a mark_recogido)
+    if (function_exists('acf_get_meta')) {
+        acf_get_meta($order_id, false); 
+        error_log("GHD Debug: Caché interna de ACF para meta de post_id={$order_id} actualizada/limpiada.");
+    }
+    clean_post_cache($order_id);
+    wp_cache_delete($order_id, 'post_meta');
+    wp_cache_delete($order_id, 'posts');
+    error_log("GHD Debug: Cachés de WordPress limpiadas para post_id={$order_id}.");
 
+    // Leer estados DESPUÉS de actualizar y limpiar cachés
+    $estado_fletero_despues = get_field('estado_logistica_fletero', $order_id);
+    $estado_admin_despues = get_field('estado_administrativo', $order_id);
+    $estado_pedido_despues = get_field('estado_pedido', $order_id);
+    error_log("ghd_fletero_complete_delivery_callback: Pedido ID: {$order_id} - DESPUÉS update. Fletero: '{$estado_fletero_despues}', Admin: '{$estado_admin_despues}', Pedido: '{$estado_pedido_despues}'");
+
+    // Historial (se mantiene)
+    $historial_title = 'Entrega Completada por Fletero ID ' . get_current_user_id() . ' (resultado fletero: ' . ($update_result_fletero_estado ? 'OK' : 'FALLO') . ')';
     wp_insert_post([
         'post_title' => $historial_title,
         'post_type' => 'ghd_historial',
         'meta_input' => ['_orden_produccion_id' => $order_id, '_logistica_estado' => 'Completado']
     ]);
 
-    // Finalmente, cambiar el estado general del pedido para que Macarena lo vea
-    update_field('estado_pedido', 'Pendiente de Cierre Admin', $order_id);
-    update_field('estado_administrativo', 'Listo para Archivar', $order_id);
-
     wp_send_json_success(['message' => 'Entrega marcada como completada.']);
     wp_die();
-}// fin ghd_fletero_complete_delivery_callback()
-
+}// FIN ghd_fletero_complete_delivery_callback()
 ////// /////////////////////////////////////////////////////
 // --- NUEVO: AJAX Handler para refrescar las entregas asignadas al fletero ---
 add_action('wp_ajax_ghd_refresh_fletero_tasks', 'ghd_refresh_fletero_tasks_callback');

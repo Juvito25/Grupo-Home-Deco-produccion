@@ -121,7 +121,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 fleteroTasksList.style.opacity = '1';
                 refreshFleteroTasksBtn.disabled = false;
             });
-    }; // fin función refreshFleteroTasksList
+    }; // fin función refreshFleteroTasksLiscompleteDeliveryFormt
 
     // --- LÓGICA UNIVERSAL DE EVENTOS EN EL CONTENIDO PRINCIPAL ---
     const mainContent = document.querySelector('.ghd-main-content');
@@ -425,31 +425,40 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 completeDeliveryForm.style.opacity = '0.5';
 
-                fetch(ghd_ajax.ajax_url, {
+                                fetch(ghd_ajax.ajax_url, {
                     method: 'POST',
                     body: formData
                 })
-                .then(res => res.json())
-                .then(response => { // Renombramos a 'response' para claridad
-                   if (response.success) { 
-                    if (typeof response.data.tasks_html === 'string') {
-                        console.log('HTML recibido para fleteroTasksList:', response.data.tasks_html); // <-- ¡NUEVO: LOG DEL HTML!
-                        fleteroTasksList.innerHTML = response.data.tasks_html;
-                        console.log('Refresco de tareas de fletero exitoso. Contenido actualizado.');
-                    } else {
-                        const errorMessage = response.data.message || 'La respuesta de refresco del servidor es incompleta (falta HTML).';
-                        fleteroTasksList.innerHTML = '<p class="no-tasks-message" style="text-align: center; padding: 20px;">' + errorMessage + '</p>';
-                        console.error('Error de refresco (success=true, pero tasks_html inválido):', response);
+                .then(res => {
+                    if (!res.ok) { // Capturar errores HTTP como 400, 500
+                        return res.text().then(text => { 
+                            const errorMsg = `Server responded with ${res.status}: ${text || 'No response body'}`;
+                            console.error("Error de carga HTTP al completar entrega:", errorMsg);
+                            throw new Error(errorMsg); // Propagar el error
+                        });
                     }
-                } else {
-                    const errorMessage = response.data?.message || 'Error desconocido del servidor al refrescar.';
-                    fleteroTasksList.innerHTML = '<p class="no-tasks-message" style="text-align: center; padding: 20px;">' + errorMessage + '</p>';
-                    console.error('Error de refresco (success=false):', response);
-                } 
+                    return res.json();
+                })
+                .then(response => { // Renombramos a 'response' para claridad
+                    console.log('Respuesta completa de ghd_fletero_complete_delivery:', response); // DEBUG
+
+                    if (response.success) {
+                        const modal = document.getElementById(`upload-delivery-proof-modal-${orderId}`);
+                        if (modal) {
+                            modal.style.display = 'none';
+                            completeDeliveryForm.reset();
+                        }
+                        console.log('Entrega completada (éxito): ' + (response.data?.message || ''));
+                        refreshFleteroTasksList(); // Esto actualizará la interfaz (y eliminará el pedido)
+                    } else {
+                        // Si el backend envió success: false, pero se decodificó JSON, mostrar ese mensaje
+                        console.error('Error al completar entrega (server success=false): ' + (response.data?.message || 'Error desconocido del servidor.'));
+                        alert('Error: ' + (response.data?.message || 'No se pudo completar la entrega.')); // Mantener alerta para errores de lógica de negocio
+                    }
                 })
                 .catch(error => {
-                    console.error("Error de red al completar entrega:", error);
-                    alert('Error de red al completar entrega.');
+                    console.error("Error de red al completar entrega:", error); // Ya se logueó el error HTTP si lo hubo
+                    alert('Error de red al completar entrega. Por favor, intente de nuevo.'); 
                 })
                 .finally(() => {
                     if (submitButton) {
@@ -458,7 +467,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     completeDeliveryForm.style.opacity = '1';
                 });
-            } // fin if (completeDeliveryForm)
+                } // fin if (completeDeliveryForm)
+
 
             // --- Lógica para el SUBMIT del formulario de NUEVO PEDIDO (Admin) ---
             if (nuevoPedidoForm) {
