@@ -485,29 +485,37 @@ function ghd_get_pedidos_en_produccion_data() {
                 <td class="production-observations"><?php echo nl2br(esc_html(get_field('observaciones_personalizacion', $order_id))); ?></td>
                 <td><?php echo esc_html(get_field('estado_pedido', $order_id)); ?></td>
                 <td>
-                   <div class="production-substatus-badges">
+                  <div class="production-substatus-badges">
                         <?php
                         $sectores_produccion = ghd_get_sectores(); 
                         foreach ($sectores_produccion as $sector_key => $sector_display_name) {
                             $sub_estado_display = ''; // Texto a mostrar en el badge
                             $badge_class_to_assign = 'status-gray'; // Clase CSS a asignar
 
-                            if ($sector_key === 'logistica') {
-                                $estado_fletero = get_field('estado_logistica_fletero', $order_id);
-                                $estado_lider_logistica = get_field('estado_logistica_lider', $order_id);
+                            // --- CRÍTICO: Controlar la visibilidad de Logística ---
+                            // Logística solo se muestra si Embalaje está completado (o En Progreso)
+                            $estado_embalaje_actual = get_field('estado_embalaje', $order_id);
+                            $show_logistica_badges = ($estado_embalaje_actual === 'Completado' || $estado_embalaje_actual === 'En Progreso');
+                            // --- FIN CRÍTICO ---
 
-                                if ($estado_fletero === 'Pendiente') {
-                                    $sub_estado_display = 'Logística Fletero: Pendiente';
-                                    $badge_class_to_assign = 'status-blue';
-                                } elseif ($estado_fletero === 'Recogido') {
-                                    $sub_estado_display = 'Logística Fletero: Recogido';
-                                    $badge_class_to_assign = 'status-recogido-admin'; // <-- ¡NUEVA CLASE ESPECÍFICA!
-                                } elseif ($estado_lider_logistica === 'Completado') {
-                                    $sub_estado_display = 'Logística: Completado';
-                                    $badge_class_to_assign = 'status-green';
-                                } else {
-                                    $sub_estado_display = 'Logística: ' . ($estado_lider_logistica ?: 'No Asignado'); 
-                                    $badge_class_to_assign = 'status-gray';
+                            if ($sector_key === 'logistica') {
+                                if ($show_logistica_badges) { // Solo mostrar logística si embalaje está listo
+                                    $estado_fletero = get_field('estado_logistica_fletero', $order_id);
+                                    $estado_lider_logistica = get_field('estado_logistica_lider', $order_id);
+
+                                    if ($estado_fletero === 'Pendiente') {
+                                        $sub_estado_display = 'Logística Fletero: Pendiente';
+                                        $badge_class_to_assign = 'status-blue';
+                                    } elseif ($estado_fletero === 'Recogido') {
+                                        $sub_estado_display = 'Logística Fletero: Recogido';
+                                        $badge_class_to_assign = 'status-recogido-admin'; // Clase específica
+                                    } elseif ($estado_lider_logistica === 'Completado') {
+                                        $sub_estado_display = 'Logística: Completado';
+                                        $badge_class_to_assign = 'status-green';
+                                    } else {
+                                        $sub_estado_display = 'Logística: ' . ($estado_lider_logistica ?: 'No Asignado'); 
+                                        $badge_class_to_assign = 'status-gray';
+                                    }
                                 }
                             } else {
                                 // Para los demás sectores (Carpintería, Corte, etc.)
@@ -535,11 +543,21 @@ function ghd_get_pedidos_en_produccion_data() {
                             $completed_by_id = 0;
                             $show_info = false;
 
-                            if ($sector_key === 'logistica') {
-                                $assignee_id = intval(get_field('logistica_fletero_id', $order_id));
-                                $completed_by_id = intval(get_field('completado_por_logistica_lider', $order_id)); 
-                                $show_info = ($assignee_id > 0 || $completed_by_id > 0);
+                            // --- CRÍTICO: Controlar la visibilidad de Logística ---
+                            // Logística solo se muestra si Embalaje está completado (o En Progreso)
+                            $estado_embalaje_actual = get_field('estado_embalaje', $order_id);
+                            $show_logistica_info = ($estado_embalaje_actual === 'Completado' || $estado_embalaje_actual === 'En Progreso');
+                            // --- FIN CRÍTICO ---
 
+                            if ($sector_key === 'logistica') {
+                                if ($show_logistica_info) { // Solo mostrar info de logística si embalaje está listo
+                                    $assignee_id = intval(get_field('logistica_fletero_id', $order_id));
+                                    $completed_by_id = intval(get_field('completado_por_logistica_lider', $order_id)); 
+                                    $show_info = ($assignee_id > 0 || $completed_by_id > 0);
+
+                                    $estado_fletero = get_field('estado_logistica_fletero', $order_id);
+                                    // Si el fletero ya recogió o entregó, su nombre es el más relevante
+                                }
                             } else {
                                 $assignee_id = intval(get_field('asignado_a_' . $sector_key, $order_id));
                                 $completed_by_id = intval(get_field('completado_por_' . $sector_key, $order_id));
@@ -570,7 +588,7 @@ function ghd_get_pedidos_en_produccion_data() {
                             }
                         }
                         ?>
-                    </div>
+                    </div> 
                 </td> 
                 </td>                
                 <td><a href="<?php the_permalink(); ?>" class="ghd-btn ghd-btn-secondary ghd-btn-small">Ver</a></td>
@@ -1281,25 +1299,35 @@ function ghd_register_archived_orders_template( $templates ) {
 add_action('wp_ajax_ghd_register_task_details_and_complete', 'ghd_register_task_details_and_complete_callback');
 function ghd_register_task_details_and_complete_callback() {
     
+    error_log('ghd_register_task_details_and_complete_callback: Inicio de la función.'); // DEBUG (para ver si entra)
+
     check_ajax_referer('ghd-ajax-nonce', 'nonce');
     if (!current_user_can('read')) {
+        error_log('ghd_register_task_details_and_complete_callback: Permisos insuficientes para usuario ID ' . get_current_user_id());
         wp_send_json_error(['message' => 'No tienes permisos para completar tareas.']);
         wp_die();
     }
 
     $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
-    $field_estado_sector = isset($_POST['field']) ? sanitize_key($_POST['field']) : '';
+    // --- ¡CRÍTICO! Asegurar que $field_estado_sector se define y es accesible ---
+    $field_estado_sector = isset($_POST['field']) ? sanitize_key($_POST['field']) : ''; 
+    // --- FIN CRÍTICO ---
     $observaciones_tarea_completa = isset($_POST['observaciones_tarea_completa']) ? sanitize_textarea_field($_POST['observaciones_tarea_completa']) : '';
 
     if (!$order_id || empty($field_estado_sector)) {
+        error_log('ghd_register_task_details_and_complete_callback: Datos de tarea incompletos. Order ID: ' . $order_id . ', Field: ' . $field_estado_sector);
         wp_send_json_error(['message' => 'Datos de tarea incompletos.']);
         wp_die();
     }
-
     $current_user_id = get_current_user_id();
     
     // Guardar los datos de la tarea que se está completando
     update_field($field_estado_sector, 'Completado', $order_id);
+
+    // --- DEBUG: Uso de $field_estado_sector en str_replace ---
+    error_log("GHD Embalaje: field_estado_sector para fecha_completado: " . str_replace('estado_', 'fecha_completado_', $field_estado_sector));
+    // --- FIN DEBUG ---
+
     update_field(str_replace('estado_', 'fecha_completado_', $field_estado_sector), current_time('mysql'), $order_id);
     update_field(str_replace('estado_', 'completado_por_', $field_estado_sector), $current_user_id, $order_id);
     update_field(str_replace('estado_', '', $field_estado_sector) . '_observaciones_tarea_completa', $observaciones_tarea_completa, $order_id);
@@ -1325,6 +1353,10 @@ function ghd_register_task_details_and_complete_callback() {
         $modelo_embalado_id   = isset($_POST['modelo_embalado_id']) ? intval($_POST['modelo_embalado_id']) : 0;
         $cantidad_embalada    = isset($_POST['cantidad_embalada']) ? intval($_POST['cantidad_embalada']) : 0;
 
+          // --- DEBUG: Loguear valores recibidos ---
+        error_log("GHD Embalaje Callback: Recibido - Operario ID: {$operario_embalaje_id}, Modelo ID: {$modelo_embalado_id}, Cantidad: {$cantidad_embalada}");
+        // --- FIN DEBUG ---
+
         if ($operario_embalaje_id === 0 || $modelo_embalado_id === 0 || $cantidad_embalada === 0) {
             wp_send_json_error(['message' => 'Faltan datos obligatorios para el registro de puntos de embalaje.']);
             wp_die();
@@ -1348,11 +1380,36 @@ function ghd_register_task_details_and_complete_callback() {
         $puntos_por_modelo = $modelo_puntos_obj->points;
         $puntos_totales_tarea = $puntos_por_modelo * $cantidad_embalada;
 
-        // 2. Guardar estos datos específicos en campos ACF de la orden_produccion
-        update_field('embalaje_operario_id', $operario_embalaje_id, $order_id);
-        update_field('embalaje_modelo_id', $modelo_embalado_id, $order_id);
-        update_field('embalaje_cantidad', $cantidad_embalada, $order_id);
-        update_field('embalaje_puntos_tarea', $puntos_totales_tarea, $order_id);
+         // 2. Guardar estos datos específicos en campos ACF de la orden_produccion (¡CRÍTICO!)
+        // --- ¡NUEVO! Inicializar variables de resultado para evitar Undefined warnings ---
+        $update_op_id = false; 
+        $update_mod_id = false; 
+        $update_cant = false; 
+        $update_puntos = false;
+        // --- FIN NUEVO ---
+
+        $update_op_id = update_field('embalaje_operario_id', $operario_embalaje_id, $order_id);
+        $update_mod_id = update_field('embalaje_modelo_id', $modelo_embalado_id, $order_id);
+        $update_cant = update_field('embalaje_cantidad', $cantidad_embalada, $order_id);
+        $update_puntos = update_field('embalaje_puntos_tarea', $puntos_totales_tarea, $order_id);
+        
+        error_log("GHD Embalaje Callback: Resultados update_field para Pedido ID: {$order_id}");
+        error_log("  - embalaje_operario_id: " . ($update_op_id ? 'ÉXITO' : 'FALLO'));
+        error_log("  - embalaje_modelo_id: " . ($update_mod_id ? 'ÉXITO' : 'FALLO'));
+        error_log("  - embalaje_cantidad: " . ($update_cant ? 'ÉXITO' : 'FALLO'));
+        error_log("  - embalaje_puntos_tarea: " . ($update_puntos ? 'ÉXITO' : 'FALLO'));
+        // // 2. Guardar estos datos específicos en campos ACF de la orden_produccion
+        // update_field('embalaje_operario_id', $operario_embalaje_id, $order_id);
+        // update_field('embalaje_modelo_id', $modelo_embalado_id, $order_id);
+        // update_field('embalaje_cantidad', $cantidad_embalada, $order_id);
+        // update_field('embalaje_puntos_tarea', $puntos_totales_tarea, $order_id);
+
+        //   // --- DEBUG: Verificar que los campos se actualizaron correctamente ---
+        //   error_log("GHD Embalaje Callback: Resultados update_field para Pedido ID: {$order_id}");
+        // error_log("  - embalaje_operario_id: " . ($update_op_id ? 'ÉXITO' : 'FALLO'));
+        // error_log("  - embalaje_modelo_id: " . ($update_mod_id ? 'ÉXITO' : 'FALLO'));
+        // error_log("  - embalaje_cantidad: " . ($update_cant ? 'ÉXITO' : 'FALLO'));
+        // error_log("  - embalaje_puntos_tarea: " . ($update_puntos ? 'ÉXITO' : 'FALLO'));
         
         // 3. Sumar los puntos al perfil del operario (User Meta)
         $current_total_points = (int) get_user_meta($operario_embalaje_id, 'ghd_total_puntos_embalaje', true);

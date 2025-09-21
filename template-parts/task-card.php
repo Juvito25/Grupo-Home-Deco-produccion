@@ -196,11 +196,13 @@ if ($estado_actual === 'Pendiente') {
                     <input type="number" id="cantidad_embalada_<?php echo $post_id; ?>" name="cantidad_embalada" min="1" value="<?php echo esc_attr($cantidad_producto_en_pedido); ?>" required>
                 </div>
                 
-                <p style="font-size: 0.9em; color: #555; margin-top: 10px;">Puntos estimados para esta tarea: <strong id="puntos_estimados_<?php echo $post_id; ?>">0</strong></p>
+                <p style="font-size: 0.9em; color: #555; margin-top: 10px;">Puntos estimados para esta tarea: <strong id="puntos_estimados_<?php echo $post_id; ?>"></strong></p>
 
-                            <script>
+                                            <script>
                 // Lógica JS para actualizar los puntos estimados en el modal
-                document.addEventListener('DOMContentLoaded', function() {
+                // --- CRÍTICO: Este script se ejecutará INMEDIATAMENTE al cargarse el HTML.
+                // NO se envuelve en DOMContentLoaded, ya que el HTML puede cargarse vía AJAX.
+                (function() { // Se envuelve en una función anónima autoejecutable para aislar el scope
                     const modal = document.getElementById('complete-task-modal-<?php echo $post_id; ?>');
                     if (modal) {
                         const modeloSelector = modal.querySelector('#modelo_embalado_<?php echo $post_id; ?>');
@@ -208,6 +210,16 @@ if ($estado_actual === 'Pendiente') {
                         const puntosEstimadosSpan = modal.querySelector('#puntos_estimados_<?php echo $post_id; ?>');
 
                         const updateEstimatedPoints = () => {
+                            // --- DEBUG: Loguear valores para depurar ---
+                            console.log('Update estimated points ejecutado para pedido ' + <?php echo $post_id; ?>);
+                            console.log('Modelo Selector Value:', modeloSelector ? modeloSelector.value : 'N/A');
+                            console.log('Cantidad Input Value:', cantidadInput ? cantidadInput.value : 'N/A');
+                            // --- FIN DEBUG ---
+
+                            if (!modeloSelector || !cantidadInput || modeloSelector.selectedIndex === -1 || modeloSelector.value === '') {
+                                puntosEstimadosSpan.textContent = '0';
+                                return;
+                            }
                             const selectedOption = modeloSelector.options[modeloSelector.selectedIndex];
                             const modelPoints = parseInt(selectedOption.dataset.points || '0');
                             const quantity = parseInt(cantidadInput.value || '0');
@@ -215,23 +227,23 @@ if ($estado_actual === 'Pendiente') {
                             puntosEstimadosSpan.textContent = totalPoints;
                         };
 
-                        // Escuchar cambios en los selectores y el input de cantidad
+                        // Escuchar cambios en los selectores y el input de cantidad para actualizaciones dinámicas
                         modeloSelector.addEventListener('change', updateEstimatedPoints);
                         cantidadInput.addEventListener('input', updateEstimatedPoints);
 
-                        // --- NUEVO: Escuchar un evento personalizado cuando el modal se abre ---
-                        modal.addEventListener('ghdModalOpened', updateEstimatedPoints); // <-- CLAVE: Escuchar este evento
-                        // --- FIN NUEVO ---
-
-                        // Llamar una vez para inicializar al cargar el DOM, si el modal ya estuviera abierto por alguna razón
-                        // (menos probable, pero por seguridad)
-                        if (modal.style.display === 'flex') {
-                            updateEstimatedPoints();
+                        // --- ¡CRÍTICO! Asegurar la inicialización de puntos cuando el modal se abre ---
+                        // El evento 'ghdModalOpened' es el disparador principal.
+                        modal.addEventListener('ghdModalOpened', updateEstimatedPoints); 
+                        
+                        // Forzar una inicialización inmediata si el modal ya tiene valores por defecto
+                        // (ej. si el primer modelo está pre-seleccionado al cargar la tarjeta).
+                        if (modeloSelector && modeloSelector.value !== '') { 
+                           updateEstimatedPoints(); 
                         }
                     }
-                });
+                })(); // <-- ¡Se autoejecuta inmediatamente!
                 </script>
-            <?php endif; // Fin de campos específicos para embalaje ?>
+                <?php endif; // Fin de campos específicos para embalaje ?>
             <button type="submit" class="ghd-btn ghd-btn-success"><i class="fa-solid fa-check"></i> Completar Tarea</button>
         </form>
     </div>
