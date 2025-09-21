@@ -484,19 +484,44 @@ function ghd_get_pedidos_en_produccion_data() {
                 </td>
                 <td class="production-observations"><?php echo nl2br(esc_html(get_field('observaciones_personalizacion', $order_id))); ?></td>
                 <td><?php echo esc_html(get_field('estado_pedido', $order_id)); ?></td>
-                <td>
+                                <td>
                     <div class="production-substatus-badges">
                         <?php
-                        // --- CORRECCIÓN: Iterar sobre una lista limpia de sectores para evitar duplicados ---
-                        $sectores = ['carpinteria', 'corte', 'costura', 'tapiceria', 'embalaje', 'logistica'];
-                        foreach ($sectores as $sector) {
-                            $sub_estado = get_field('estado_' . $sector, $order_id);
-                            if ($sub_estado && $sub_estado !== 'No Asignado') {
-                                $badge_class = 'status-gray';
-                                if ($sub_estado === 'Completado') $badge_class = 'status-green';
-                                elseif ($sub_estado === 'En Progreso') $badge_class = 'status-yellow';
-                                elseif ($sub_estado === 'Pendiente') $badge_class = 'status-blue';
-                                echo '<span class="ghd-badge ' . esc_attr($badge_class) . '">' . esc_html(ucfirst($sector)) . ': ' . esc_html($sub_estado) . '</span>';
+                        $sectores_produccion = ghd_get_sectores(); 
+                        foreach ($sectores_produccion as $sector_key => $sector_display_name) {
+                            $sub_estado = '';
+                            $badge_class = 'status-gray'; // Por defecto
+
+                            if ($sector_key === 'logistica') {
+                                $estado_fletero = get_field('estado_logistica_fletero', $order_id);
+                                $estado_lider_logistica = get_field('estado_logistica_lider', $order_id);
+
+                                if ($estado_fletero === 'Pendiente') {
+                                    $sub_estado = 'Logística Fletero: Pendiente';
+                                    $badge_class = 'status-blue';
+                                } elseif ($estado_fletero === 'Recogido') {
+                                    $sub_estado = 'Logística Fletero: Recogido';
+                                    $badge_class = 'status-info'; // Usar un color para 'Recogido'
+                                } elseif ($estado_lider_logistica === 'Completado') {
+                                    $sub_estado = 'Logística: Completado'; // Si el fletero no ha actuado, pero el líder sí.
+                                    $badge_class = 'status-green';
+                                } else {
+                                    $sub_estado = 'Logística: ' . ($estado_lider_logistica ?: 'No Asignado'); // Fallback
+                                    $badge_class = 'status-gray';
+                                }
+                            } else {
+                                // Para los demás sectores (Carpintería, Corte, etc.)
+                                $sub_estado_sector = get_field('estado_' . $sector_key, $order_id);
+                                if ($sub_estado_sector && $sub_estado_sector !== 'No Asignado') {
+                                    $sub_estado = ucfirst($sector_display_name) . ': ' . $sub_estado_sector;
+                                    if ($sub_estado_sector === 'Completado') $badge_class = 'status-green';
+                                    elseif ($sub_estado_sector === 'En Progreso') $badge_class = 'status-yellow';
+                                    elseif ($sub_estado_sector === 'Pendiente') $badge_class = 'status-blue';
+                                }
+                            }
+
+                            if ($sub_estado) { // Solo si se determinó un sub_estado
+                                echo '<span class="ghd-badge ' . esc_attr($badge_class) . '">' . esc_html($sub_estado) . '</span>';
                             }
                         }
                         ?>
@@ -505,27 +530,49 @@ function ghd_get_pedidos_en_produccion_data() {
                 <td>
                     <div class="assigned-completed-info">
                         <?php 
-                        // --- CORRECCIÓN: Usar la misma lista limpia de sectores ---
-                        foreach ($sectores as $sector) {
-                            $assignee_id = intval(get_field('asignado_a_' . $sector, $order_id));
-                            $completed_by_id = intval(get_field('completado_por_' . $sector, $order_id));
+                        foreach ($sectores_produccion as $sector_key => $sector_display_name) {
+                            $assignee_id = 0;
+                            $completed_by_id = 0;
+                            $show_info = false;
+
+                            if ($sector_key === 'logistica') {
+                                // Para Logística, el "Asignado" es el fletero, el "Completado" es el líder
+                                $assignee_id = intval(get_field('logistica_fletero_id', $order_id));
+                                $completed_by_id = intval(get_field('completado_por_logistica_lider', $order_id));
+                                $show_info = ($assignee_id > 0 || $completed_by_id > 0);
+
+                                // Si el fletero ya recogió o entregó, su nombre es el más relevante
+                                $estado_fletero = get_field('estado_logistica_fletero', $order_id);
+                                if ($estado_fletero === 'Recogido' || $estado_fletero === 'Entregado') {
+                                    $completed_by_id = $assignee_id; // Se asume que el fletero completa su parte
+                                }
+
+                            } else {
+                                // Para otros sectores, usar los campos genéricos
+                                $assignee_id = intval(get_field('asignado_a_' . $sector_key, $order_id));
+                                $completed_by_id = intval(get_field('completado_por_' . $sector_key, $order_id));
+                                $show_info = ($assignee_id > 0 || $completed_by_id > 0);
+                            }
                             
                             $assignee_obj = ($assignee_id > 0) ? get_userdata($assignee_id) : null;
                             $completed_by_obj = ($completed_by_id > 0) ? get_userdata($completed_by_id) : null;
                             
-                            if ($assignee_obj || $completed_by_obj) {
-                                echo '<p><strong>' . esc_html(ucfirst($sector)) . ':</strong></p>';
+                            if ($show_info) { // Solo mostrar si hay información relevante
+                                echo '<p><strong>' . esc_html(ucfirst($sector_display_name)) . ':</strong></p>';
                                 if ($assignee_obj) {
                                     echo '<span class="ghd-info-badge info-assigned">Asignado: ' . esc_html($assignee_obj->display_name) . '</span>';
                                 }
-                                if ($completed_by_obj) {
+                                if ($completed_by_obj && $completed_by_obj->ID !== $assignee_id) { // Evitar duplicar "Completado por" si es el mismo que "Asignado"
                                     echo '<span class="ghd-info-badge info-completed">Completado: ' . esc_html($completed_by_obj->display_name) . '</span>';
+                                } elseif ($estado_fletero === 'Recogido' || $estado_fletero === 'Entregado') {
+                                    // Si el fletero ha avanzado, el "Completado" es su acción
+                                    echo '<span class="ghd-info-badge info-completed">' . esc_html($estado_fletero) . ' por: ' . esc_html($assignee_obj->display_name) . '</span>';
                                 }
                             }
                         }
                         ?>
                     </div>
-                </td>
+                </td>                
                 <td><a href="<?php the_permalink(); ?>" class="ghd-btn ghd-btn-secondary ghd-btn-small">Ver</a></td>
             </tr>
             <?php
@@ -752,9 +799,12 @@ function ghd_update_priority_callback() {
 /////////////////////////////////////////////////////fin de ghd_update_priority() //////////////////////////////////////////////////
 
 add_action('wp_ajax_ghd_update_task_status', function() {
+    // --- DEBUG: Inicio de la función y valores recibidos ---
     error_log('ghd_update_task_status: Inicio de la función.');
     error_log('ghd_update_task_status: _POST: ' . print_r($_POST, true));
+    // --- FIN DEBUG ---
 
+    // 1. Verificación de seguridad y permisos
     check_ajax_referer('ghd-ajax-nonce', 'nonce');
     if (!current_user_can('read')) {
         error_log('ghd_update_task_status: Permisos insuficientes para usuario ID ' . get_current_user_id());
@@ -762,10 +812,11 @@ add_action('wp_ajax_ghd_update_task_status', function() {
         wp_die();
     }
 
+    // 2. Obtención y validación de datos
     $id = intval($_POST['order_id']);
-    $field = sanitize_key($_POST['field']); 
-    $value = sanitize_text_field($_POST['value']); 
-    $assignee_id = isset($_POST['assignee_id']) ? intval($_POST['assignee_id']) : 0; 
+    $field = sanitize_key($_POST['field']); // Campo de estado que se actualiza (ej. estado_carpinteria, estado_logistica_lider)
+    $value = sanitize_text_field($_POST['value']); // Nuevo valor de estado (ej. En Progreso, Completado)
+    $assignee_id = isset($_POST['assignee_id']) ? intval($_POST['assignee_id']) : 0; // ID del operario asignado (si se envía)
 
     if (!$id || empty($field) || empty($value)) {
         error_log('ghd_update_task_status: Datos de tarea incompletos. ID: ' . $id . ', Field: ' . $field . ', Value: ' . $value);
@@ -773,21 +824,19 @@ add_action('wp_ajax_ghd_update_task_status', function() {
         wp_die();
     }
     
-    // --- IMPORTANTE: Lógica para Embalaje ---
-    // Si el campo es 'estado_embalaje' y se intenta marcar 'Completado' con este endpoint (sin modal),
-    // eso es un error, porque Embalaje SIEMPRE usa un modal.
-    // Los demás campos (Carpintería, Corte, etc., y Logística Líder) no usan modal y se completan directamente con este endpoint.
-    if ($value === 'Completado' && $field === 'estado_embalaje') {
+    // 3. Excepción para Embalaje: forzar el uso del modal si se intenta "Completar"
+    $is_embalaje_field = (strpos($field, 'estado_embalaje') !== false);
+    if ($value === 'Completado' && $is_embalaje_field) {
         error_log('ghd_update_task_status: ERROR - Finalización de embalaje intentada sin modal para Pedido ID: ' . $id);
         wp_send_json_error(['message' => 'Error: La finalización de Embalaje se gestiona desde el modal de registro de puntos.']);
         wp_die();
     }
 
-    // 1. Actualizar el estado del campo principal del sector (ej. estado_carpinteria -> 'En Progreso' o 'Completado')
+    // 4. Actualización del campo de estado principal del sector (ej. estado_carpinteria -> 'En Progreso' o 'Completado')
     $update_success_initial = update_field($field, $value, $id);
     error_log('ghd_update_task_status: Actualización inicial de ' . $field . ' a ' . $value . ' para ID ' . $id . '. Resultado: ' . ($update_success_initial ? 'ÉXITO' : 'FALLO'));
 
-    // 2. Asignación del operario (solo cuando la tarea pasa a 'En Progreso')
+    // 5. Asignación del operario (solo cuando la tarea pasa a 'En Progreso')
     $historial_title = ucfirst(str_replace(['estado_', '_'], ' ', $field)) . ' -> ' . $value;
     if ($value === 'En Progreso' && $assignee_id > 0) {
         $assignee_field = str_replace('estado_', 'asignado_a_', $field);
@@ -799,7 +848,17 @@ add_action('wp_ajax_ghd_update_task_status', function() {
         $historial_title .= ' (Asignado a ' . $assignee_name . ')';
     }
 
-    // 3. Lógica de Transiciones de Flujo (se ejecuta cuando una tarea se marca como 'Completado' por botón directo)
+    // --- ¡NUEVO! Lógica para la transición de estado_pedido al iniciar la PRIMERA tarea (Carpintería) ---
+    if ($value === 'En Progreso' && $field === 'estado_carpinteria') { // Solo para la primera tarea del flujo
+        $current_estado_pedido_general = get_field('estado_pedido', $id);
+        if ($current_estado_pedido_general === 'Pendiente de Asignación') {
+            $update_success_estado_general = update_field('estado_pedido', 'En Producción', $id);
+            error_log('ghd_update_task_status: Transición de estado_pedido a "En Producción" al iniciar Carpintería. Resultado: ' . ($update_success_estado_general ? 'ÉXITO' : 'FALLO'));
+        }
+    }
+    // --- FIN NUEVO ---
+
+    // 6. Lógica de Transiciones de Flujo (se ejecuta cuando una tarea se marca como 'Completado' por botón directo)
     if ($value === 'Completado') {
         error_log('ghd_update_task_status: Procesando transición de flujo para ' . $field . ' (ID: ' . $id . ')');
 
@@ -827,9 +886,25 @@ add_action('wp_ajax_ghd_update_task_status', function() {
                 wp_insert_post(['post_title' => 'Fase Tapicería completa -> A Embalaje', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $id]]);
                 break;
 
-            // Este caso es CRÍTICO: Cuando el Líder de Logística completa su propia tarea.
+            case 'estado_embalaje': // <-- Este caso se ejecuta cuando Embalaje se completa desde el MODAL.
+                // Esta lógica se dispara en el ghd_register_task_details_and_complete_callback (que es para los modales)
+                // NO DEBERÍA ESTAR AQUÍ si ghd_register_task_details_and_complete_callback lo maneja.
+                // Si el embalaje se completa por modal, el switch en ghd_register_task_details_and_complete_callback lo transiciona.
+                // Si por alguna razón se llama a ghd_update_task_status para completar embalaje, deberíamos transicionar.
+                // Para consistencia, la transición de embalaje -> logística líder DEBE estar en ghd_register_task_details_and_complete_callback.
+                // POR AHORA: Si llega aquí, es un completado directo, lo transicionamos.
+                update_field('estado_logistica_lider', 'Pendiente', $id);
+                update_field('estado_pedido', 'Listo para Entrega', $id);
+                wp_insert_post(['post_title' => 'Fase Embalaje completa -> A Logística Líder (via directo)', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $id]]);
+                break;
+
             case 'estado_logistica_lider':
                 error_log('ghd_update_task_status: Activando lógica de transición para Logística Líder (ID: ' . $id . ')');
+
+                // --- ¡NUEVO! CRÍTICO: Actualizar el campo estado_logistica para el panel del Admin ---
+                $update_success_logistica_general = update_field('estado_logistica', 'Completado', $id);
+                error_log('ghd_update_task_status: Actualización de estado_logistica (general). Resultado: ' . ($update_success_logistica_general ? 'ÉXITO' : 'FALLO'));
+                // --- FIN NUEVO ---
 
                 $update_success_fecha = update_field('fecha_completado_logistica_lider', current_time('mysql'), $id);
                 error_log('ghd_update_task_status: Actualizando fecha_completado_logistica_lider. Resultado: ' . ($update_success_fecha ? 'ÉXITO' : 'FALLO'));
@@ -861,18 +936,18 @@ add_action('wp_ajax_ghd_update_task_status', function() {
         }
     }
 
-    // 4. Registrar en el historial de producción
+    // 7. Registrar en el historial de producción
     wp_insert_post([
         'post_title' => $historial_title,
         'post_type' => 'ghd_historial',
         'meta_input' => ['_orden_produccion_id' => $id]
     ]);
     
-    // 5. Calcular y devolver KPIs del sector
+    // 8. Calcular y devolver KPIs del sector
     $sector_kpi_data = ghd_calculate_sector_kpis($field);
     wp_send_json_success(['message' => 'Estado actualizado.', 'kpi_data' => $sector_kpi_data]);
     wp_die();
-});
+}); // fin ghd_update_task_status
 
 // --- MANEJADOR AJAX PARA ARCHIVAR PEDIDOS (AHORA LLAMADO POR EL ADMIN PRINCIPAL) ---
 add_action('wp_ajax_ghd_archive_order', 'ghd_archive_order_callback');
@@ -1326,6 +1401,7 @@ function ghd_register_task_details_and_complete_callback() {
             break;
 
         case 'estado_embalaje':
+            update_field('estado_logistica_lider', 'Pendiente', $order_id);
             update_field('estado_logistica', 'Pendiente', $order_id);
             update_field('estado_pedido', 'Listo para Entrega', $order_id);
             wp_insert_post(['post_title' => 'Fase Embalaje completa -> A Logística', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id]]);

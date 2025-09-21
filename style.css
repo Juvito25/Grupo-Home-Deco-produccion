@@ -942,6 +942,15 @@ body.page-template-template-login {
 .ghd-badge.status-green { background-color: #dcfce7; color: #16a34a; } /* Completado */
 .ghd-badge.status-gray { background-color: #e5e7eb; color: #4b5563; } /* No Asignado */
 
+.ghd-badge.status-recogido { /* Específico para el badge del fletero 'Recogido' */
+    background-color: var(--color-info); /* Azul */
+    color: var(--color-negro); /* <-- ¡CRÍTICO! Texto NEGRO para contraste */
+}
+/* Asegurarse que el status-info también tenga texto oscuro si se usa para otros fines */
+.ghd-badge.status-info {
+    color: var(--color-negro); /* <-- Texto negro para info badges (si no es ya el caso) */
+}
+
 /* Pequeño ajuste para botones en tablas que contienen badges */
 .ghd-btn.ghd-btn-small {
     padding: 6px 12px;
