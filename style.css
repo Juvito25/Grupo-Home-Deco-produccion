@@ -1790,7 +1790,12 @@ body.page-template-template-login {
 /* Estados específicos */
 .ghd-badge.status-pendiente { background-color: var(--color-info); }
 .ghd-badge.status-en-progreso { background-color: var(--color-warning); }
-.ghd-badge.status-recogido { background-color: var(--color-info); } /* Mismo que pendiente, o un azul distinto */
+.ghd-badge.status-recogido { color: #fff; background-color: var(--color-info); } /* Mismo que pendiente, o un azul distinto */
+/* --- NUEVO ESTILO ESPECÍFICO PARA LOGÍSTICA FLETERO: RECOGIDO en Admin Panel --- */
+.ghd-badge.status-recogido-admin {
+    background-color: var(--color-info); /* El azul claro (o el color que quieras para el fondo de este badge) */
+    color: var(--color-sidebar-text); /* <-- ¡TEXTO blanco para contraste en el fondo! */
+}
 .ghd-badge.status-completado { background-color: var(--color-success); }
 .ghd-badge.status-no-asignado { background-color: var(--color-secondary); }
 .ghd-badge.status-pendientedecierreadmin { background-color: var(--color-danger); }

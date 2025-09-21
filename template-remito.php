@@ -32,10 +32,17 @@ $producto_especificaciones = get_field('especificaciones_producto', $order_id);
 $direccion_entrega = get_field('direccion_de_entrega', $order_id); // Asumo este nombre de campo
 $instrucciones_entrega = get_field('instrucciones_de_entrega', $order_id); // Asumo este nombre de campo
 
-$valor_total = get_field('valor_total_del_pedido', $order_id); // Asumo este nombre de campo
-$sena_pagada = get_field('sena_pagada', $order_id); // Asumo este nombre de campo
-$saldo_pendiente = ($valor_total && $sena_pagada) ? ($valor_total - $sena_pagada) : 'N/A';
+// Obtener valores de los campos ACF, asegurando que siempre sean numéricos (float)
+$valor_total_raw = get_field('valor_total_del_pedido', $order_id);
+$sena_pagada_raw = get_field('sena_pagada', $order_id);
 
+// Convertir a float, usando 0.00 como valor por defecto si no es numérico
+$valor_total = is_numeric($valor_total_raw) ? (float)$valor_total_raw : 0.00;
+$sena_pagada = is_numeric($sena_pagada_raw) ? (float)$sena_pagada_raw : 0.00;
+
+// Calcular el saldo pendiente
+$saldo_pendiente = $valor_total - $sena_pagada; 
+// Ya no necesitamos 'N/A' porque $valor_total y $sena_pagada siempre serán números.
 // Cargar la cabecera mínima para un remito
 // No queremos el header completo del tema, solo lo necesario para el HTML y CSS
 ?>

@@ -484,44 +484,44 @@ function ghd_get_pedidos_en_produccion_data() {
                 </td>
                 <td class="production-observations"><?php echo nl2br(esc_html(get_field('observaciones_personalizacion', $order_id))); ?></td>
                 <td><?php echo esc_html(get_field('estado_pedido', $order_id)); ?></td>
-                                <td>
-                    <div class="production-substatus-badges">
+                <td>
+                   <div class="production-substatus-badges">
                         <?php
                         $sectores_produccion = ghd_get_sectores(); 
                         foreach ($sectores_produccion as $sector_key => $sector_display_name) {
-                            $sub_estado = '';
-                            $badge_class = 'status-gray'; // Por defecto
+                            $sub_estado_display = ''; // Texto a mostrar en el badge
+                            $badge_class_to_assign = 'status-gray'; // Clase CSS a asignar
 
                             if ($sector_key === 'logistica') {
                                 $estado_fletero = get_field('estado_logistica_fletero', $order_id);
                                 $estado_lider_logistica = get_field('estado_logistica_lider', $order_id);
 
                                 if ($estado_fletero === 'Pendiente') {
-                                    $sub_estado = 'Logística Fletero: Pendiente';
-                                    $badge_class = 'status-blue';
+                                    $sub_estado_display = 'Logística Fletero: Pendiente';
+                                    $badge_class_to_assign = 'status-blue';
                                 } elseif ($estado_fletero === 'Recogido') {
-                                    $sub_estado = 'Logística Fletero: Recogido';
-                                    $badge_class = 'status-info'; // Usar un color para 'Recogido'
+                                    $sub_estado_display = 'Logística Fletero: Recogido';
+                                    $badge_class_to_assign = 'status-recogido-admin'; // <-- ¡NUEVA CLASE ESPECÍFICA!
                                 } elseif ($estado_lider_logistica === 'Completado') {
-                                    $sub_estado = 'Logística: Completado'; // Si el fletero no ha actuado, pero el líder sí.
-                                    $badge_class = 'status-green';
+                                    $sub_estado_display = 'Logística: Completado';
+                                    $badge_class_to_assign = 'status-green';
                                 } else {
-                                    $sub_estado = 'Logística: ' . ($estado_lider_logistica ?: 'No Asignado'); // Fallback
-                                    $badge_class = 'status-gray';
+                                    $sub_estado_display = 'Logística: ' . ($estado_lider_logistica ?: 'No Asignado'); 
+                                    $badge_class_to_assign = 'status-gray';
                                 }
                             } else {
                                 // Para los demás sectores (Carpintería, Corte, etc.)
                                 $sub_estado_sector = get_field('estado_' . $sector_key, $order_id);
                                 if ($sub_estado_sector && $sub_estado_sector !== 'No Asignado') {
-                                    $sub_estado = ucfirst($sector_display_name) . ': ' . $sub_estado_sector;
-                                    if ($sub_estado_sector === 'Completado') $badge_class = 'status-green';
-                                    elseif ($sub_estado_sector === 'En Progreso') $badge_class = 'status-yellow';
-                                    elseif ($sub_estado_sector === 'Pendiente') $badge_class = 'status-blue';
+                                    $sub_estado_display = ucfirst($sector_display_name) . ': ' . $sub_estado_sector;
+                                    if ($sub_estado_sector === 'Completado') $badge_class_to_assign = 'status-green';
+                                    elseif ($sub_estado_sector === 'En Progreso') $badge_class_to_assign = 'status-yellow';
+                                    elseif ($sub_estado_sector === 'Pendiente') $badge_class_to_assign = 'status-blue';
                                 }
                             }
 
-                            if ($sub_estado) { // Solo si se determinó un sub_estado
-                                echo '<span class="ghd-badge ' . esc_attr($badge_class) . '">' . esc_html($sub_estado) . '</span>';
+                            if ($sub_estado_display) { // Solo si se determinó un texto para mostrar
+                                echo '<span class="ghd-badge ' . esc_attr($badge_class_to_assign) . '">' . esc_html($sub_estado_display) . '</span>';
                             }
                         }
                         ?>
@@ -536,19 +536,11 @@ function ghd_get_pedidos_en_produccion_data() {
                             $show_info = false;
 
                             if ($sector_key === 'logistica') {
-                                // Para Logística, el "Asignado" es el fletero, el "Completado" es el líder
                                 $assignee_id = intval(get_field('logistica_fletero_id', $order_id));
-                                $completed_by_id = intval(get_field('completado_por_logistica_lider', $order_id));
+                                $completed_by_id = intval(get_field('completado_por_logistica_lider', $order_id)); 
                                 $show_info = ($assignee_id > 0 || $completed_by_id > 0);
 
-                                // Si el fletero ya recogió o entregó, su nombre es el más relevante
-                                $estado_fletero = get_field('estado_logistica_fletero', $order_id);
-                                if ($estado_fletero === 'Recogido' || $estado_fletero === 'Entregado') {
-                                    $completed_by_id = $assignee_id; // Se asume que el fletero completa su parte
-                                }
-
                             } else {
-                                // Para otros sectores, usar los campos genéricos
                                 $assignee_id = intval(get_field('asignado_a_' . $sector_key, $order_id));
                                 $completed_by_id = intval(get_field('completado_por_' . $sector_key, $order_id));
                                 $show_info = ($assignee_id > 0 || $completed_by_id > 0);
@@ -557,21 +549,29 @@ function ghd_get_pedidos_en_produccion_data() {
                             $assignee_obj = ($assignee_id > 0) ? get_userdata($assignee_id) : null;
                             $completed_by_obj = ($completed_by_id > 0) ? get_userdata($completed_by_id) : null;
                             
-                            if ($show_info) { // Solo mostrar si hay información relevante
+                            if ($show_info) {
                                 echo '<p><strong>' . esc_html(ucfirst($sector_display_name)) . ':</strong></p>';
                                 if ($assignee_obj) {
                                     echo '<span class="ghd-info-badge info-assigned">Asignado: ' . esc_html($assignee_obj->display_name) . '</span>';
                                 }
-                                if ($completed_by_obj && $completed_by_obj->ID !== $assignee_id) { // Evitar duplicar "Completado por" si es el mismo que "Asignado"
+                                // Lógica de "Completado" (más explícita)
+                                if ($sector_key === 'logistica') {
+                                    $estado_fletero_actual_log = get_field('estado_logistica_fletero', $order_id);
+                                    if ($estado_fletero_actual_log === 'Recogido') {
+                                        echo '<span class="ghd-info-badge info-completed">Recogido por: ' . esc_html($assignee_obj->display_name) . '</span>';
+                                    } elseif ($estado_fletero_actual_log === 'Entregado') {
+                                        echo '<span class="ghd-info-badge info-completed">Entregado por: ' . esc_html($assignee_obj->display_name) . '</span>';
+                                    } elseif ($completed_by_obj) { // Si el líder completó pero el fletero aún no actuó
+                                        echo '<span class="ghd-info-badge info-completed">Completado Líder: ' . esc_html($completed_by_obj->display_name) . '</span>';
+                                    }
+                                } elseif ($completed_by_obj) { // Para otros sectores
                                     echo '<span class="ghd-info-badge info-completed">Completado: ' . esc_html($completed_by_obj->display_name) . '</span>';
-                                } elseif ($estado_fletero === 'Recogido' || $estado_fletero === 'Entregado') {
-                                    // Si el fletero ha avanzado, el "Completado" es su acción
-                                    echo '<span class="ghd-info-badge info-completed">' . esc_html($estado_fletero) . ' por: ' . esc_html($assignee_obj->display_name) . '</span>';
                                 }
                             }
                         }
                         ?>
                     </div>
+                </td> 
                 </td>                
                 <td><a href="<?php the_permalink(); ?>" class="ghd-btn ghd-btn-secondary ghd-btn-small">Ver</a></td>
             </tr>
