@@ -13,7 +13,18 @@ get_header();
 
 <div class="ghd-app-wrapper">
     
-    <?php get_template_part('template-parts/sidebar-admin'); ?>
+    <?php 
+        // ---  Incluir el sidebar condicionalmente ---
+        if (current_user_can('manage_options')) { // Si es Admin, mostrar el sidebar completo del Admin
+            get_template_part('template-parts/sidebar-admin'); 
+        } elseif (current_user_can('control_final_macarena')) { // Si es Macarena, mostrar su sidebar limitado
+            get_template_part('template-parts/sidebar-control-final');
+        } else {
+            // Fallback si por alguna razón un rol no esperado llega aquí (podría redirigir)
+            get_template_part('template-parts/sidebar-admin'); // Por defecto, el de admin si no hay otro
+        }
+        // --- FIN SIDEBAR CONDICIONAL ---
+    ?>
 
     <main class="ghd-main-content">
         

@@ -25,7 +25,18 @@ get_header();
 
 <div class="ghd-app-wrapper">
     
-    <?php get_template_part('template-parts/sidebar-admin'); ?>
+    <?php 
+        // --- Sidebar condicional ---
+        if (current_user_can('manage_options')) { // Si es Admin, mostrar el sidebar completo del Admin
+            get_template_part('template-parts/sidebar-admin'); 
+        } elseif (current_user_can('control_final_macarena')) { // Si es Macarena, mostrar su sidebar limitado
+            get_template_part('template-parts/sidebar-control-final');
+        } else {
+            // Fallback si por alguna razón un rol no esperado llega aquí (podría redirigir)
+            get_template_part('template-parts/sidebar-admin'); // Por defecto, el de admin si no hay otro
+        }
+        // --- FIN SIDEBAR CONDICIONAL ---
+    ?>
 
     <main class="ghd-main-content">
         
@@ -244,9 +255,9 @@ get_header();
         <span class="close-button">&times;</span>
         <h3>Crear Nuevo Pedido</h3>
         <form id="nuevo-pedido-form">
-            
+                    
             <div class="form-group" style="margin-bottom: 1rem;">
-                <label for="np_nombre_cliente">Nombre del Cliente</label>
+                <label for="np_nombre_cliente">Nombre del Cliente <span style="color:red;">*</span></label>
                 <input type="text" id="np_nombre_cliente" name="nombre_cliente" required>
             </div>
 
@@ -256,21 +267,66 @@ get_header();
             </div>
 
             <div class="form-group" style="margin-bottom: 1rem;">
-                <label for="np_nombre_producto">Nombre del Producto</label>
+                <label for="np_cliente_telefono">Teléfono del Cliente</label>
+                <input type="tel" id="np_cliente_telefono" name="cliente_telefono">
+            </div>
+
+            <hr style="margin: 20px 0; border-color: #eee;">
+            <h4>Detalles del Producto y Entrega</h4>
+
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="np_nombre_producto">Nombre del Producto <span style="color:red;">*</span></label>
                 <input type="text" id="np_nombre_producto" name="nombre_producto" required>
             </div>
             
             <div class="form-group" style="margin-bottom: 1rem;">
-                <label for="np_color_producto">Color</label>
+                <label for="np_material_producto">Material del Producto</label>
+                <input type="text" id="np_material_producto" name="material_del_producto">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="np_color_producto">Color del Producto</label>
                 <input type="color" id="np_color_producto" name="color_del_producto" value="#ffffff" style="height: 40px; padding: 5px;">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="np_cantidad_unidades">Cantidad de Unidades del Producto <span style="color:red;">*</span></label>
+                <input type="number" id="np_cantidad_unidades" name="cantidad_unidades_producto" value="1" min="1" step="1" required>
+                <p class="description">Número total de unidades del producto principal en este pedido (ej. 2 sillones).</p>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="np_observaciones_personalizacion">Observaciones / Personalización</label>
+                <textarea id="np_observaciones_personalizacion" name="observaciones_personalizacion" rows="3"></textarea>
             </div>
 
             <div class="form-group" style="margin-bottom: 1rem;">
                 <label for="np_direccion_entrega">Dirección de Entrega</label>
                 <textarea id="np_direccion_entrega" name="direccion_de_entrega" rows="3"></textarea>
             </div>
+            
+            <hr style="margin: 20px 0; border-color: #eee;">
+            <h4>Detalles de Valor y Comisión</h4>
 
-            <button type="submit" class="ghd-btn ghd-btn-primary"><i class="fa-solid fa-plus"></i> Crear Pedido</button>
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="np_valor_total">Valor Total del Pedido (Bruto)</label>
+                <input type="number" id="np_valor_total" name="valor_total_del_pedido" value="0" min="0" step="1">
+                <p class="description">Valor bruto del pedido (antes de descuentos o flete).</p>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="np_valor_comisionable">Valor Final Comisionable <span style="color:red;">*</span></label>
+                <input type="number" id="np_valor_comisionable" name="valor_final_comisionable" value="0" min="0" step="1" required>
+                <p class="description">Valor del producto en efectivo descontando pagos con tarjeta (base para la comisión).</p>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="np_valor_flete">Valor Flete Comisionable <span style="color:red;">*</span></label>
+                <input type="number" id="np_valor_flete" name="valor_flete_comisionable" value="35000" min="0" step="1" required>
+                <p class="description">Valor del flete a descontar para el cálculo de la comisión (por defecto $35.000).</p>
+            </div>
+
+            <button type="submit" class="ghd-btn ghd-btn-primary" style="margin-top: 20px;"><i class="fa-solid fa-plus"></i> Crear Pedido</button>
         </form>
     </div>
 </div>

@@ -36,11 +36,11 @@ $current_page_id = get_the_ID();
                     <i class="fa-solid fa-gauge-high"></i> Panel de Control
                 </a>
             </li>
-            <li class="nav-item">
-                <a href="#" id="abrir-nuevo-pedido-modal-sidebar" class="nav-link"> <!-- Asume que el botón de nuevo pedido abre un modal -->
+            <!-- <li class="nav-item">
+                <a href="#" id="abrir-nuevo-pedido-modal-sidebar" class="nav-link">  Asume que el botón de nuevo pedido abre un modal 
                     <i class="fa-solid fa-plus"></i> Nuevo Pedido
                 </a>
-            </li>
+            </li> -->
             <li class="nav-item">
                 <a href="<?php echo esc_url($sectores_produccion_url); ?>" class="nav-link <?php echo (is_page_template('template-sectores.php') || is_page_template('template-sector-dashboard.php')) ? 'is-active' : ''; ?>">
                     <i class="fa-solid fa-boxes-stacked"></i> Sectores de Producción

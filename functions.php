@@ -2407,18 +2407,27 @@ function ghd_crear_nuevo_pedido_callback() {
         'codigo_de_pedido'       => $nuevo_codigo,
         'nombre_cliente'         => $nombre_cliente,
         'cliente_email'          => $cliente_email,
+        'cliente_telefono'       => sanitize_text_field($_POST['cliente_telefono'] ?? ''), // Nuevo campo
         'nombre_producto'        => $nombre_producto,
+        'material_del_producto'  => sanitize_text_field($_POST['material_del_producto'] ?? ''), // Nuevo campo
         'color_del_producto'     => $color_producto,
+        'observaciones_personalizacion' => sanitize_textarea_field($_POST['observaciones_personalizacion'] ?? ''), // Nuevo campo
         'direccion_de_entrega'   => $direccion_entrega,
-        'estado_pedido'          => 'Pendiente de Asignación', // El estado crucial
+        'valor_total_del_pedido' => isset($_POST['valor_total_del_pedido']) ? floatval($_POST['valor_total_del_pedido']) : 0, // Nuevo campo
+        'estado_pedido'          => 'Pendiente de Asignación', // Estado inicial
         'estado_carpinteria'     => 'No Asignado', // Inicializar los estados de producción
         'estado_corte'           => 'No Asignado',
         'estado_costura'         => 'No Asignado',
         'estado_tapiceria'       => 'No Asignado',
         'estado_embalaje'        => 'No Asignado',
-        'estado_logistica'       => 'No Asignado',
+        'estado_logistica_lider' => 'No Asignado', 
+        'estado_logistica_fletero' => 'No Asignado',
         'estado_administrativo'  => 'No Asignado',
         'prioridad_pedido'       => 'Baja', // Establecer una prioridad por defecto
+        'cantidad_unidades_producto' => isset($_POST['cantidad_unidades_producto']) ? intval($_POST['cantidad_unidades_producto']) : 1,
+        'valor_final_comisionable'   => isset($_POST['valor_final_comisionable']) ? floatval($_POST['valor_final_comisionable']) : 0,
+        'valor_flete_comisionable'   => isset($_POST['valor_flete_comisionable']) ? floatval($_POST['valor_flete_comisionable']) : 35000,
+        'comision_calculada'         => 0.0,
     ];
 
     foreach ($fields_to_update as $field_name => $value) {
@@ -2429,6 +2438,15 @@ function ghd_crear_nuevo_pedido_callback() {
             error_log("ghd_crear_nuevo_pedido_callback: ÉXITO al guardar ACF '{$field_name}' con valor '{$value}'.");
         }
     }
+
+    // foreach ($fields_to_update as $field_name => $value) {
+    //     $update_success = update_field($field_name, $value, $new_post_id);
+    //     if (!$update_success) {
+    //         error_log("ghd_crear_nuevo_pedido_callback: FALLO al guardar ACF '{$field_name}' con valor '{$value}'.");
+    //     } else {
+    //         error_log("ghd_crear_nuevo_pedido_callback: ÉXITO al guardar ACF '{$field_name}' con valor '{$value}'.");
+    //     }
+    // }
     // --- FIN CORRECCIÓN CLAVE ---
 
     // Generar el HTML de la fila de la tabla para devolverlo

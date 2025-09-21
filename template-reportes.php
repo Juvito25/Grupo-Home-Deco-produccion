@@ -1,16 +1,35 @@
 <?php
 /**
  * Template Name: GHD - Reportes
+ * Descripción: Panel de reportes para Admin y Gerencia de Ventas.
  */
+
+// Redirección de seguridad: Asegurar que solo Admin y Gerente de Ventas accedan
 if ( ! is_user_logged_in() || ( ! current_user_can('gerente_ventas') && ! current_user_can('manage_options') ) ) {
-    auth_redirect();
+    auth_redirect(); 
 }
+
 get_header(); 
+
+$current_user = wp_get_current_user();
+$es_admin = current_user_can('manage_options');
+$es_gerente_ventas = current_user_can('gerente_ventas');
 ?>
 
 <div class="ghd-app-wrapper">
     
-    <?php get_template_part('template-parts/sidebar-sales'); ?>
+    <?php 
+    // --- NUEVO: Incluir el sidebar condicionalmente ---
+    if ($es_admin) {
+        get_template_part('template-parts/sidebar-admin'); // Admin: sidebar completo
+    } elseif ($es_gerente_ventas) {
+        get_template_part('template-parts/sidebar-sales'); // Gerente de Ventas: sidebar de ventas
+    } else {
+        // Fallback (ej. si un rol inesperado llega aquí)
+        get_template_part('template-parts/sidebar-admin'); // Por defecto el de admin si no hay otro más específico
+    }
+    // --- FIN NUEVO ---
+    ?>
 
     <main class="ghd-main-content">
         
@@ -20,35 +39,17 @@ get_header();
                 <h2>Reportes de Producción</h2>
             </div> 
             <div class="header-actions">
-                <!-- Aquí podrías añadir filtros por fecha, sector, etc. si fueran necesarios a futuro -->
+                <!-- Aquí podrías añadir un botón de refresco o filtros para reportes -->
             </div>
         </header>
 
-        <div class="ghd-reports-grid">
-            <!-- GRÁFICO 1: PEDIDOS POR ESTADO ACTUAL -->
-            <div class="ghd-card report-card">
-                <h3 class="card-section-title">Pedidos por Estado Actual</h3>
-                <div class="chart-container">
-                    <canvas id="pedidosPorEstadoChart"></canvas>
-                </div>
-            </div>
-
-            <!-- GRÁFICO 2: CARGA DE TRABAJO POR SECTOR -->
-            <div class="ghd-card report-card">
-                <h3 class="card-section-title">Carga de Trabajo por Sector</h3>
-                <div class="chart-container">
-                    <canvas id="cargaPorSectorChart"></canvas>
-                </div>
-            </div>
-
-            <!-- GRÁFICO 3: PEDIDOS POR PRIORIDAD -->
-            <div class="ghd-card report-card">
-                <h3 class="card-section-title">Pedidos por Prioridad</h3>
-                <div class="chart-container">
-                    <canvas id="pedidosPorPrioridadChart"></canvas>
-                </div>
-            </div>
+        <div class="ghd-kpi-grid" style="margin-top: 20px;">
+            <div class="ghd-card"><h3>Pedidos por Estado Actual</h3><!-- Gráfico 1 --></div>
+            <div class="ghd-card"><h3>Carga de Trabajo por Sector</h3><!-- Gráfico 2 --></div>
+            <div class="ghd-card"><h3>Pedidos por Prioridad</h3><!-- Gráfico 3 --></div>
         </div>
+
     </main>
 </div>
+
 <?php get_footer(); ?>
