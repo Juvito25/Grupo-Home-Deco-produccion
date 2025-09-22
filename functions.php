@@ -210,6 +210,24 @@ function ghd_get_sectores() {
     ]; 
 }
 
+// --- NUEVO: Función de ayuda para obtener la URL base del remito ---
+/**
+ * Obtiene la URL base de la página de generación de remitos de forma robusta.
+ * @return string La URL base del remito.
+ */
+function ghd_get_remito_base_url() {
+    $remito_page_slug = 'generador-de-remitos'; // <-- ¡VERIFICA ESTE SLUG REAL!
+    $remito_page_obj = get_page_by_path($remito_page_slug); 
+    
+    if ($remito_page_obj instanceof WP_Post) {
+        return get_permalink($remito_page_obj->ID);
+    } else {
+        // Fallback si la página no se encuentra o no es un objeto válido.
+        return home_url('/' . $remito_page_slug . '/');
+    }
+}
+// --- FIN NUEVO ---
+
 function ghd_get_mapa_roles_a_campos() {
     return [
         'lider_carpinteria'    => 'estado_carpinteria', 
@@ -878,7 +896,36 @@ add_action('wp_ajax_ghd_update_task_status', function() {
 
     // 6. Lógica de Transiciones de Flujo (se ejecuta cuando una tarea se marca como 'Completado' por botón directo)
     if ($value === 'Completado') {
+        // error_log('ghd_update_task_status: Procesando transición de flujo para ' . $field . ' (ID: ' . $id . ')');
         error_log('ghd_update_task_status: Procesando transición de flujo para ' . $field . ' (ID: ' . $id . ')');
+
+        $current_user_id_completing = get_current_user_id(); // ID del usuario que está haciendo el 'Completado'
+        $completed_by_field = str_replace('estado_', 'completado_por_', $field); // Campo ACF para registrar quién completó
+
+        // CRÍTICO: Actualizar el campo 'completado_por_X' para este sector
+        $update_success_completed_by = update_field($completed_by_field, $current_user_id_completing, $id);
+        error_log('ghd_update_task_status: Actualizando ' . $completed_by_field . '. Resultado: ' . ($update_success_completed_by ? 'ÉXITO' : 'FALLO'));
+        
+        // --- También, si es el líder de Logística, su completado es el que inicia la tarea del fletero ---
+        if ($field === 'estado_logistica_lider') {
+            update_field('fecha_completado_logistica_lider', current_time('mysql'), $id); // Fecha de completado del líder
+            $fletero_responsable_id = (int)get_field('asignado_a_logistica_lider', $id); // Quién fue asignado por el líder
+
+            if ($fletero_responsable_id > 0) {
+                update_field('logistica_fletero_id', $fletero_responsable_id, $id); // Asignar al fletero
+                update_field('estado_logistica_fletero', 'Pendiente', $id); // Tarea del fletero: Pendiente
+                update_field('estado_pedido', 'En Despacho', $id); // Estado general: En Despacho
+                
+                $fletero_obj = get_userdata($fletero_responsable_id);
+                $fletero_name = $fletero_obj ? $fletero_obj->display_name : 'ID ' . $fletero_responsable_id;
+                $historial_title .= ' -> En Despacho (Asignado a ' . $fletero_name . ')';
+            } else {
+                update_field('estado_logistica_fletero', 'No Asignado', $id);
+                update_field('estado_pedido', 'Logística Pendiente Asignación', $id);
+                $historial_title .= ' -> Logística Pendiente Asignación de Fletero (Error: no se asignó responsable)';
+            }
+        }
+        // --- FIN CRÍTICO: Lógica de Logística Líder ---
 
         switch ($field) {
             case 'estado_carpinteria':
@@ -1217,12 +1264,7 @@ function ghd_refresh_admin_closure_section_callback() {
     //     'meta_key'   => '_wp_page_template',
     //     'meta_value' => 'template-remito.php'
     // ]);
-    // $remito_base_url = !empty($remito_page_id) ? get_permalink($remito_page_id[0]) : home_url();
-    
-
-    // --- CORRECCIÓN: Usar get_page_by_path para obtener la URL de la página de remito ---
-    $remito_page = get_page_by_path('remito'); // ASEGÚRATE DE QUE EL SLUG DE TU PÁGINA SEA 'remito'
-    $remito_base_url = $remito_page ? get_permalink($remito_page->ID) : home_url();
+    $remito_base_url = ghd_get_remito_base_url();
 
     if ($pedidos_cierre_query->have_posts()) :
         while ($pedidos_cierre_query->have_posts()) : $pedidos_cierre_query->the_post();

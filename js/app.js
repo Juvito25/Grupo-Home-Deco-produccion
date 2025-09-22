@@ -450,6 +450,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                         console.log('Entrega completada (éxito): ' + (response.data?.message || ''));
                         refreshFleteroTasksList(); // Esto actualizará la interfaz (y eliminará el pedido)
+                        // --- ¡NUEVO! Disparar refresco del panel de cierre del Admin ---
+                        // Si el Admin está en su dashboard principal, debe ver este cambio.
+                        const refreshClosureBtn = document.getElementById('ghd-refresh-closure-tasks');
+                        if (refreshClosureBtn && document.body.classList.contains('is-admin-dashboard-panel')) {
+                            refreshClosureBtn.click(); // Forzar el refresco de la sección de cierre del admin
+                        }
+                        // --- FIN NUEVO ---
                     } else {
                         // Si el backend envió success: false, pero se decodificó JSON, mostrar ese mensaje
                         console.error('Error al completar entrega (server success=false): ' + (response.data?.message || 'Error desconocido del servidor.'));

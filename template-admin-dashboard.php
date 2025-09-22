@@ -212,10 +212,7 @@ get_header();
                     );
                     $pedidos_cierre_query = new WP_Query($args_cierre);
 
-                    // Obtener la URL base para el remito una sola vez
-                    $remito_page = get_page_by_path('/generador-de-remitos/'); // Asegúrate de que el slug de tu página de remito sea 'remito'
-                    $remito_base_url = $remito_page ? get_permalink($remito_page->ID) : home_url();
-
+                    $remito_base_url = ghd_get_remito_base_url();
                     if ($pedidos_cierre_query->have_posts()) :
                         while ($pedidos_cierre_query->have_posts()) : $pedidos_cierre_query->the_post();
                             $order_id = get_the_ID();
