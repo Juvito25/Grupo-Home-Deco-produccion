@@ -1,3 +1,44 @@
+// --- NUEVO: Función global para inicializar puntos estimados en modales de Embalaje ---
+const initEmbalajeModalPoints = (modalElement, postId) => {
+    // Evitar re-inicializar si ya se hizo o si los elementos no existen
+    if (!modalElement || modalElement.dataset.pointsInitialized === 'true') {
+        return;
+    }
+
+    const modeloSelector = modalElement.querySelector('#modelo_embalado_' + postId);
+    const cantidadInput = modalElement.querySelector('#cantidad_embalada_' + postId);
+    const puntosEstimadosSpan = modalElement.querySelector('#puntos_estimados_' + postId);
+
+    const updateEstimatedPoints = () => {
+        if (!modeloSelector || !cantidadInput || modeloSelector.selectedIndex === -1 || modeloSelector.value === '') {
+            puntosEstimadosSpan.textContent = '0';
+            return;
+        }
+        const selectedOption = modeloSelector.options[modeloSelector.selectedIndex];
+        const modelPoints = parseInt(selectedOption.dataset.points || '0');
+        const quantity = parseInt(cantidadInput.value || '0');
+        const totalPoints = modelPoints * quantity;
+        puntosEstimadosSpan.textContent = totalPoints;
+    };
+
+    // Escuchar cambios en los selectores y el input de cantidad
+    if (modeloSelector) modeloSelector.addEventListener('change', updateEstimatedPoints);
+    if (cantidadInput) cantidadInput.addEventListener('input', updateEstimatedPoints);
+
+    // Disparar updateEstimatedPoints al abrir el modal (evento principal)
+    modalElement.addEventListener('ghdModalOpened', updateEstimatedPoints); 
+    
+    // Forzar una inicialización inmediata si el selector de modelo existe y tiene un valor inicial
+    if (modeloSelector && modeloSelector.value !== '') { 
+        updateEstimatedPoints(); 
+    } else { // Si el selector existe pero no tiene un valor (ej. "Selecciona un modelo")
+        puntosEstimadosSpan.textContent = '0'; // Asegurar que muestre 0
+    }
+
+    // Marcar el modal como inicializado para evitar re-inicializaciones
+    modalElement.dataset.pointsInitialized = 'true';
+};
+// --- FIN NUEVO ---
 document.addEventListener('DOMContentLoaded', function() {
     
     // --- LÓGICA DEL MENÚ MÓVIL (Estable) ---
@@ -167,11 +208,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                     .then(res => res.json())
-                    .then(response => { // Renombrado a 'response'
-                        if (response.success && response.data) {
-                            sectorTasksList.innerHTML = response.data.tasks_html;
+                    .then(response => { 
+                        if (response.success && response.data && typeof response.data.tasks_html === 'string') {
+                            sectorTasksList.innerHTML = response.data.tasks_html; 
                             if (response.data.kpi_data) updateSectorKPIs(response.data.kpi_data);
                             console.log('Refresco de tareas de sector exitoso: ' + (response.data?.message || ''));
+
+                            // --- NUEVO: Re-inicializar los modales de Embalaje en las nuevas tarjetas ---
+                            // Obtener todos los botones que abren modales de Embalaje recién inyectados
+                            const openEmbalajeModals = sectorTasksList.querySelectorAll('.open-complete-task-modal[data-field="estado_embalaje"]');
+                            openEmbalajeModals.forEach(btn => {
+                                const orderId = btn.dataset.orderId;
+                                const modal = document.getElementById(`complete-task-modal-${orderId}`);
+                                if (modal && typeof initEmbalajeModalPoints === 'function') {
+                                    initEmbalajeModalPoints(modal, orderId);
+                                }
+                            });
+                            // --- FIN NUEVO ---
+
                         } else {
                             console.error('Error al refrescar tareas de sector: ' + (response.data?.message || 'Error desconocido.'));
                             sectorTasksList.innerHTML = '<p class="no-tasks-message">Error al cargar tareas.</p>';
@@ -232,7 +286,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 const modal = document.getElementById(`complete-task-modal-${openModalButton.dataset.orderId}`);
                 if (modal) {
                     modal.style.display = 'flex';
-                    modal.dispatchEvent(new Event('ghdModalOpened'));
+                    modal.dispatchEvent(new Event('ghdModalOpened')); // Disparar el evento para la inicialización
+                    
+                    // --- NUEVO: Llamar a la función de inicialización si es el modal de Embalaje ---
+                    const orderId = openModalButton.dataset.orderId;
+                    const fieldEstado = openModalButton.dataset.field; // Obtener el campo de estado
+                    if (fieldEstado === 'estado_embalaje' && typeof initEmbalajeModalPoints === 'function') {
+                        initEmbalajeModalPoints(modal, orderId);
+                    }
+                    // --- FIN NUEVO ---
                     e.stopPropagation(); 
                 }
             }

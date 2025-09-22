@@ -100,7 +100,16 @@ $current_user = wp_get_current_user();
                     <div class="order-card-main">
                         <div class="order-card-header">
                             <h3><i class="fa-solid fa-truck-fast"></i> <?php echo esc_html($codigo_pedido); ?></h3>
-                            <span class="ghd-tag status-<?php echo esc_attr($fletero_tag_class); ?>"><?php echo esc_html($estado_fletero_actual); ?></span>
+                            <?php 
+                            // Determinar la clase para el badge del estado del fletero
+                            $fletero_badge_class = 'status-gray'; // Por defecto
+                            if ($estado_fletero_actual === 'Pendiente') {
+                                $fletero_badge_class = 'status-pendiente-fletero'; // Nueva clase específica para el fletero
+                            } elseif ($estado_fletero_actual === 'Recogido') {
+                                $fletero_badge_class = 'status-recogido-fletero'; // Nueva clase específica para el fletero
+                            }
+                            ?>
+                            <span class="ghd-badge <?php echo esc_attr($fletero_badge_class); ?>"><?php echo esc_html($estado_fletero_actual); ?></span>
                         </div>
                         <div class="order-card-body">
                             <p><i class="fa-solid fa-user"></i> <strong>Cliente:</strong> <?php echo esc_html($nombre_cliente); ?></p>

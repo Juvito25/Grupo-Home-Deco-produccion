@@ -1895,13 +1895,13 @@ function ghd_refresh_fletero_tasks_callback() {
 
     $entregas_fletero_query = new WP_Query($args_entregas_fletero);
 
-    if ($entregas_fletero_query->have_posts()) :
+        if ($entregas_fletero_query->have_posts()) :
         while ($entregas_fletero_query->have_posts()) : $entregas_fletero_query->the_post();
             $order_id = get_the_ID();
             $codigo_pedido = get_the_title();
             $nombre_cliente = get_field('nombre_cliente', $order_id);
             $direccion_entrega = get_field('direccion_de_entrega', $order_id);
-            $estado_fletero_actual = get_field('estado_logistica_fletero', $order_id); // <-- ¡USAR ESTA VARIABLE!
+            $estado_fletero_actual = get_field('estado_logistica_fletero', $order_id); 
             $nombre_producto = get_field('nombre_producto', $order_id);
             $cliente_telefono = get_field('cliente_telefono', $order_id);
 
@@ -1911,13 +1911,22 @@ function ghd_refresh_fletero_tasks_callback() {
             } elseif ($estado_fletero_actual === 'Recogido') {
                 $action_button_html = '<button class="ghd-btn ghd-btn-success ghd-btn-small fletero-action-btn open-upload-delivery-proof-modal" data-order-id="' . esc_attr($order_id) . '"><i class="fa-solid fa-camera"></i> Entregado + Comprobante</button>';
             }
-            $fletero_tag_class = strtolower(str_replace([' ', '/'], ['-', ''], $estado_fletero_actual));
+            
+            // --- ¡CRÍTICO! Definir la clase del badge aquí y asegurar el uso de ghd-badge ---
+            $fletero_badge_class = 'status-gray'; // Por defecto
+            if ($estado_fletero_actual === 'Pendiente') {
+                $fletero_badge_class = 'status-pendiente-fletero'; 
+            } elseif ($estado_fletero_actual === 'Recogido') {
+                $fletero_badge_class = 'status-recogido-fletero'; 
+            }
+            // --- FIN CRÍTICO ---
     ?>
         <div class="ghd-order-card fletero-card" id="fletero-order-<?php echo $order_id; ?>">
             <div class="order-card-main">
                 <div class="order-card-header">
                     <h3><i class="fa-solid fa-truck-fast"></i> <?php echo esc_html($codigo_pedido); ?></h3>
-                    <span class="ghd-tag status-<?php echo esc_attr($fletero_tag_class); ?>"><?php echo esc_html($estado_fletero_actual); ?></span>
+                    <!-- ¡CRÍTICO! Usar SIEMPRE ghd-badge y la clase definida dinámicamente -->
+                    <span class="ghd-badge <?php echo esc_attr($fletero_badge_class); ?>"><?php echo esc_html($estado_fletero_actual); ?></span>
                 </div>
                 <div class="order-card-body">
                     <p><i class="fa-solid fa-user"></i> <strong>Cliente:</strong> <?php echo esc_html($nombre_cliente); ?></p>
@@ -1953,21 +1962,17 @@ function ghd_refresh_fletero_tasks_callback() {
     <?php
         endwhile;
     else : 
-        // error_log('ghd_refresh_fletero_tasks_callback: No hay entregas para el usuario ' . $current_user_id); // Este log no es necesario aquí.
         echo '<p class="no-tasks-message" style="text-align: center; padding: 20px;">No tienes entregas asignadas actualmente.</p>'; 
     endif; wp_reset_postdata(); 
     
-    $fletero_tasks_html = ob_get_clean(); // <-- CAPTURAR TODO EL HTML AL FINAL
-    // error_log('ghd_refresh_fletero_tasks_callback: HTML generado. Enviando éxito.'); // Este log tampoco es necesario aquí.
+    $fletero_tasks_html = ob_get_clean();
     
-    // --- ¡CRÍTICO! Enviamos el JSON. WordPress se encarga del header. ---
     wp_send_json_success([
         'tasks_html' => $fletero_tasks_html,
         'message' => 'Entregas actualizadas.' 
     ]);
-    // --- FIN CRÍTICO ---
     wp_die();
-}
+} // fin ghd_refresh_fletero_tasks_callback()
 ///////////////////////////////////////////////////////////// 
 
 

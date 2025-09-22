@@ -180,7 +180,8 @@ if ($estado_actual === 'Pendiente') {
                 <div class="form-group">
                     <label for="modelo_embalado_<?php echo $post_id; ?>">Modelo de Producto Embalado:</label>
                     <select id="modelo_embalado_<?php echo $post_id; ?>" name="modelo_embalado_id" required>
-                        <option value="">Selecciona un modelo</option>
+                        <!-- --- ¡CRÍTICO! La opción por defecto DEBE tener data-points="0" --- -->
+                        <option value="" data-points="0">Selecciona un modelo</option> <!-- <-- ¡CORRECCIÓN AQUÍ! -->
                         <?php if (!empty($embalaje_models)) : ?>
                             <?php foreach ($embalaje_models as $model) : ?>
                                 <option value="<?php echo esc_attr($model->id); ?>" data-points="<?php echo esc_attr($model->points); ?>">
@@ -189,7 +190,7 @@ if ($estado_actual === 'Pendiente') {
                             <?php endforeach; ?>
                         <?php endif; ?>
                     </select>
-                </div>
+                </div> 
 
                 <div class="form-group">
                     <label for="cantidad_embalada_<?php echo $post_id; ?>">Cantidad Embalada:</label>
@@ -197,51 +198,18 @@ if ($estado_actual === 'Pendiente') {
                 </div>
                 
                 <p style="font-size: 0.9em; color: #555; margin-top: 10px;">Puntos estimados para esta tarea: <strong id="puntos_estimados_<?php echo $post_id; ?>"></strong></p>
-
-                                            <script>
-                // Lógica JS para actualizar los puntos estimados en el modal
-                // --- CRÍTICO: Este script se ejecutará INMEDIATAMENTE al cargarse el HTML.
-                // NO se envuelve en DOMContentLoaded, ya que el HTML puede cargarse vía AJAX.
-                (function() { // Se envuelve en una función anónima autoejecutable para aislar el scope
-                    const modal = document.getElementById('complete-task-modal-<?php echo $post_id; ?>');
-                    if (modal) {
-                        const modeloSelector = modal.querySelector('#modelo_embalado_<?php echo $post_id; ?>');
-                        const cantidadInput = modal.querySelector('#cantidad_embalada_<?php echo $post_id; ?>');
-                        const puntosEstimadosSpan = modal.querySelector('#puntos_estimados_<?php echo $post_id; ?>');
-
-                        const updateEstimatedPoints = () => {
-                            // --- DEBUG: Loguear valores para depurar ---
-                            console.log('Update estimated points ejecutado para pedido ' + <?php echo $post_id; ?>);
-                            console.log('Modelo Selector Value:', modeloSelector ? modeloSelector.value : 'N/A');
-                            console.log('Cantidad Input Value:', cantidadInput ? cantidadInput.value : 'N/A');
-                            // --- FIN DEBUG ---
-
-                            if (!modeloSelector || !cantidadInput || modeloSelector.selectedIndex === -1 || modeloSelector.value === '') {
-                                puntosEstimadosSpan.textContent = '0';
-                                return;
-                            }
-                            const selectedOption = modeloSelector.options[modeloSelector.selectedIndex];
-                            const modelPoints = parseInt(selectedOption.dataset.points || '0');
-                            const quantity = parseInt(cantidadInput.value || '0');
-                            const totalPoints = modelPoints * quantity;
-                            puntosEstimadosSpan.textContent = totalPoints;
-                        };
-
-                        // Escuchar cambios en los selectores y el input de cantidad para actualizaciones dinámicas
-                        modeloSelector.addEventListener('change', updateEstimatedPoints);
-                        cantidadInput.addEventListener('input', updateEstimatedPoints);
-
-                        // --- ¡CRÍTICO! Asegurar la inicialización de puntos cuando el modal se abre ---
-                        // El evento 'ghdModalOpened' es el disparador principal.
-                        modal.addEventListener('ghdModalOpened', updateEstimatedPoints); 
-                        
-                        // Forzar una inicialización inmediata si el modal ya tiene valores por defecto
-                        // (ej. si el primer modelo está pre-seleccionado al cargar la tarjeta).
-                        if (modeloSelector && modeloSelector.value !== '') { 
-                           updateEstimatedPoints(); 
-                        }
-                    }
-                })(); // <-- ¡Se autoejecuta inmediatamente!
+                <script>
+                // --- CRÍTICO: Llamar a la función global de inicialización de puntos ---
+                // Esta función será definida en app.js y será llamada después de que el HTML sea inyectado.
+                // También se autoejecutará para asegurar la carga inicial.
+                if (typeof initEmbalajeModalPoints === 'function') {
+                    initEmbalajeModalPoints(
+                        document.getElementById('complete-task-modal-<?php echo $post_id; ?>'),
+                        <?php echo $post_id; ?>
+                    );
+                } else {
+                    console.error('initEmbalajeModalPoints no está definida en app.js');
+                }
                 </script>
                 <?php endif; // Fin de campos específicos para embalaje ?>
             <button type="submit" class="ghd-btn ghd-btn-success"><i class="fa-solid fa-check"></i> Completar Tarea</button>

@@ -72,7 +72,7 @@ if (empty($login_error_message) && isset($_GET['login']) && $_GET['login'] === '
 
                     <form name="loginform" id="loginform" action="<?php echo esc_url( home_url('/iniciar-sesion/') ); ?>" method="post">
                         <p>
-                            <label for="user_login">Correo Electrónico</label>
+                            <label for="user_login">Correo Electrónico o Usuario</label>
                             <input type="text" name="log" id="user_login" class="input" value="<?php echo ( isset( $_POST['log'] ) ? esc_attr( wp_unslash( $_POST['log'] ) ) : '' ); ?>" size="20" autocomplete="username" required>
                         </p>
                         <p>

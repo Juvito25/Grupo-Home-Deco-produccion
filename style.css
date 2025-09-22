@@ -1833,3 +1833,17 @@ body.page-template-template-login {
 .ghd-badge.status-cancelado { /* Si tienes un estado "Cancelado" */
     background-color: var(--color-rojo); /* Rojo para cancelado */
 }
+
+/* ------ ESTILOS ESPECÍFICOS PARA LOS ESTADOS DEL FLETERO EN SU PANEL --------- */
+.ghd-badge.status-pendiente-fletero {
+    background-color: var(--color-danger); /* Naranja para Pendiente (más visible) */
+    color: var(--color-blanco);
+}
+.ghd-badge.status-recogido-fletero {
+    background-color: var(--color-warning); /* Naranja para Recogido (como se veía) */
+    color: var(--color-negro); /* Texto negro para contraste en naranja */
+}
+.ghd-badge.status-entregado { /* Si el estado final 'Entregado' se muestra como badge */
+    background-color: var(--color-success);
+    color: var(--color-blanco);
+}
