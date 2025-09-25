@@ -43,207 +43,351 @@ get_header();
         <?php // --- SECCIONES SOLO PARA ADMINISTRADOR --- ?>
         <?php if (current_user_can('manage_options')) : ?>
             
-            <header class="ghd-main-header">
-                <div class="header-title-wrapper">
-                    <button id="mobile-menu-toggle" class="ghd-btn-icon"><i class="fa-solid fa-bars"></i></button>
-                    <h2>Pedidos Pendientes de Asignación</h2>
-                </div> 
-                <div class="header-actions">
-                    <button id="abrir-nuevo-pedido-modal" class="ghd-btn ghd-btn-primary"><i class="fa-solid fa-plus"></i> <span>Nuevo Pedido</span></button>
-                </div>
-            </header>
-
-            <div class="ghd-card ghd-table-wrapper">
-                <table class="ghd-table">
-                    <thead>
-                        <tr>
-                            <th>Código</th>
-                            <th>Cliente</th>
-                            <th>Producto</th>
-                            <th>Vendedora</th>
-                            <th>Prioridad</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="ghd-orders-table-body">
-                        <?php
-                        // Carga inicial de pedidos pendientes de asignación
-                        $args_asignacion = array(
-                            'post_type'      => 'orden_produccion',
-                            'posts_per_page' => -1,
-                            'meta_query'     => array(
-                                array(
-                                    'key'     => 'estado_pedido',
-                                    'value'   => 'Pendiente de Asignación',
-                                    'compare' => '=',
-                                ),
-                            ),
-                            // Ordenar para que los nuevos aparezcan primero por defecto
-                            'orderby' => 'date',
-                            'order'   => 'DESC',
-                        );
-                        $pedidos_asignacion_query = new WP_Query($args_asignacion);
-
-                        // Obtener la lista de vendedoras una sola vez para optimizar
-                        $vendedoras_users = get_users([
-                            'role__in' => ['vendedora', 'gerente_ventas'],
-                            'orderby'  => 'display_name',
-                            'order'    => 'ASC'
-                        ]);
-
-                        if ($pedidos_asignacion_query->have_posts()) :
-                            while ($pedidos_asignacion_query->have_posts()) : $pedidos_asignacion_query->the_post();
-                                $order_id = get_the_ID();
-                                $current_vendedora_id = get_field('vendedora_asignada', $order_id);
-                                $current_priority = get_field('prioridad_pedido', $order_id);
-                        ?>
-                            <tr id="order-row-<?php echo $order_id; ?>">
-                                <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
-                                <td><?php echo esc_html(get_field('nombre_cliente', $order_id)); ?></td>
-                                <td><?php echo esc_html(get_field('nombre_producto', $order_id)); ?></td>
-                                <td>
-                                    <select class="ghd-vendedora-selector" data-order-id="<?php echo $order_id; ?>">
-                                        <option value="0" <?php selected($current_vendedora_id, 0); ?>>Asignar Vendedora</option>
-                                        <?php foreach ($vendedoras_users as $vendedora) : ?>
-                                            <option value="<?php echo esc_attr($vendedora->ID); ?>" <?php selected($current_vendedora_id, $vendedora->ID); ?>>
-                                                <?php echo esc_html($vendedora->display_name); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </td>
-                                <td>
-                                    <select class="ghd-priority-selector" data-order-id="<?php echo $order_id; ?>">
-                                        <option value="" <?php selected($current_priority, ''); ?>>Seleccionar Prioridad</option>
-                                        <option value="Alta" <?php selected($current_priority, 'Alta'); ?>>Alta</option>
-                                        <option value="Media" <?php selected($current_priority, 'Media'); ?>>Media</option>
-                                        <option value="Baja" <?php selected($current_priority, 'Baja'); ?>>Baja</option>
-                                    </select>
-                                </td>
-                                <td>
-                                    <button class="ghd-btn ghd-btn-primary start-production-btn" data-order-id="<?php echo $order_id; ?>" disabled>
-                                        Iniciar Producción
-                                    </button>
-                                </td>
-                            </tr>
-                        <?php
-                            endwhile;
-                        else: 
-                        ?>
-                            <tr><td colspan="6" style="text-align:center;">No hay pedidos pendientes de asignación.</td></tr>
-                        <?php
-                        endif;
-                        wp_reset_postdata(); 
-                        ?>
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="header-title-wrapper" style="margin-top: 40px;">
-                <h2>Pedidos en Producción</h2>
-                <button id="ghd-refresh-production-tasks" class="ghd-btn ghd-btn-secondary"><i class="fa-solid fa-sync"></i> <span>Refrescar</span></button>
-            </div>
-
-            <?php 
-            $production_data = ghd_get_pedidos_en_produccion_data();
-            $production_kpis = $production_data['kpi_data'];
-            ?>
-            <div class="ghd-kpi-grid" style="margin-bottom: 30px;">
-                <div class="ghd-kpi-card"><div class="kpi-icon icon-blue"><i class="fa-solid fa-list-check"></i></div><div class="kpi-info"><span id="kpi-produccion-activas" class="kpi-value"><?php echo $production_kpis['total_pedidos_produccion']; ?></span><span class="kpi-label">Activas</span></div></div>
-                <div class="ghd-kpi-card"><div class="kpi-icon icon-red"><i class="fa-solid fa-triangle-exclamation"></i></div><div class="kpi-info"><span id="kpi-produccion-prioridad-alta" class="kpi-value"><?php echo $production_kpis['total_prioridad_alta_produccion']; ?></span><span class="kpi-label">Prioridad Alta</span></div></div>
-                <div class="ghd-kpi-card"><div class="kpi-icon icon-green"><i class="fa-solid fa-check"></i></div><div class="kpi-info"><span id="kpi-produccion-completadas-hoy" class="kpi-value"><?php echo $production_kpis['completadas_hoy_produccion']; ?></span><span class="kpi-label">Completadas Hoy</span></div></div>
-                <div class="ghd-kpi-card"><div class="kpi-icon icon-yellow"><i class="fa-solid fa-clock"></i></div><div class="kpi-info"><span id="kpi-produccion-tiempo-promedio" class="kpi-value"><?php echo esc_html($production_kpis['tiempo_promedio_str_produccion']); ?></span><span class="kpi-label">Tiempo Promedio</span></div></div>
-            </div>
-
-            <div class="ghd-card ghd-table-wrapper" id="admin-production-tasks-container">
-                <table class="ghd-table">
-                    <thead>
-                        <tr>
-                            <th>Código</th> <th>Cliente</th> <th>Vendedora</th> <th>Producto</th> <th>Material</th> <th>Color</th> <th>Observaciones</th> <th>Estado General</th> <th>Asignación/Completado</th> <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="ghd-production-table-body">
-                        <?php echo $production_data['tasks_html']; ?>
-                    </tbody>
-                </table>
-            </div>
-
-        <?php endif; // --- FIN DE SECCIONES SOLO PARA ADMINISTRADOR --- ?>
-
-
-        <?php // --- SECCIÓN PARA ADMIN Y MACARENA --- ?>
-        <div class="header-title-wrapper" style="margin-top: 40px;">
-             <?php if (!current_user_can('manage_options')) : // Título específico para Macarena ?>
-                <h2>Panel de Control Final</h2>
-             <?php else: ?>
-                <h2>Pedidos Pendientes de Cierre</h2>
-             <?php endif; ?>
-            <button id="ghd-refresh-closure-tasks" class="ghd-btn ghd-btn-secondary"><i class="fa-solid fa-sync"></i> <span>Refrescar</span></button>
-        </div>
-
-        <?php $admin_closure_kpis = ghd_calculate_admin_closure_kpis(); ?>
-        <div class="ghd-kpi-grid" style="margin-bottom: 30px;">
-            <div class="ghd-kpi-card"><div class="kpi-icon icon-blue"><i class="fa-solid fa-list-check"></i></div><div class="kpi-info"><span id="kpi-cierre-activas" class="kpi-value"><?php echo $admin_closure_kpis['total_pedidos_cierre']; ?></span><span class="kpi-label">Activas</span></div></div>
-            <div class="ghd-kpi-card"><div class="kpi-icon icon-red"><i class="fa-solid fa-triangle-exclamation"></i></div><div class="kpi-info"><span id="kpi-cierre-prioridad-alta" class="kpi-value"><?php echo $admin_closure_kpis['total_prioridad_alta_cierre']; ?></span><span class="kpi-label">Prioridad Alta</span></div></div>
-            <div class="ghd-kpi-card"><div class="kpi-icon icon-green"><i class="fa-solid fa-check"></i></div><div class="kpi-info"><span id="kpi-cierre-completadas-hoy" class="kpi-value"><?php echo $admin_closure_kpis['completadas_hoy_cierre']; ?></span><span class="kpi-label">Completadas Hoy</span></div></div>
-            <div class="ghd-kpi-card"><div class="kpi-icon icon-yellow"><i class="fa-solid fa-clock"></i></div><div class="kpi-info"><span id="kpi-cierre-tiempo-promedio" class="kpi-value"><?php echo esc_html($admin_closure_kpis['tiempo_promedio_str_cierre']); ?></span><span class="kpi-label">Tiempo Promedio</span></div></div>
-        </div>
-
-        <div class="ghd-card ghd-table-wrapper" id="admin-closure-tasks-container">
-            <table class="ghd-table">
-                <thead>
-                    <tr>
-                        <th>Código</th> <th>Cliente</th> <th>Producto</th> <th>Fecha de Pedido</th> <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody id="ghd-closure-table-body">
-                    <?php
-                    $args_cierre = array(
+            <!-- Contenedor de Pestañas -->
+            <div class="ghd-tabs-container">
+                <!-- Navegación de Pestañas -->
+                <div class="ghd-tabs-nav">
+                    <?php 
+                    // Obtener KPIs para los contadores de las pestañas
+                    $args_asignacion_count = array(
                         'post_type'      => 'orden_produccion',
                         'posts_per_page' => -1,
                         'meta_query'     => array(
                             array(
                                 'key'     => 'estado_pedido',
-                                'value'   => 'Pendiente de Cierre Admin',
+                                'value'   => 'Pendiente de Asignación',
                                 'compare' => '=',
                             ),
                         ),
-                        'orderby' => 'date',
-                        'order'   => 'ASC',
+                        'fields' => 'ids', // Solo obtener IDs para contar
                     );
-                    $pedidos_cierre_query = new WP_Query($args_cierre);
+                    $pedidos_asignacion_count_query = new WP_Query($args_asignacion_count);
+                    $total_pedidos_asignacion = $pedidos_asignacion_count_query->found_posts;
+                    wp_reset_postdata();
 
-                    $remito_base_url = ghd_get_remito_base_url();
-                    if ($pedidos_cierre_query->have_posts()) :
-                        while ($pedidos_cierre_query->have_posts()) : $pedidos_cierre_query->the_post();
-                            $order_id = get_the_ID();
-                            $remito_url = esc_url(add_query_arg('order_id', $order_id, $remito_base_url));
+                    $production_data_for_tabs = ghd_get_pedidos_en_produccion_data();
+                    $admin_closure_kpis_for_tabs = ghd_calculate_admin_closure_kpis();
                     ?>
-                        <tr id="order-row-closure-<?php echo $order_id; ?>">
-                            <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
-                            <td><?php echo esc_html(get_field('nombre_cliente', $order_id)); ?></td>
-                            <td><?php echo esc_html(get_field('nombre_producto', $order_id)); ?></td>
-                            <td><?php echo get_the_date('d/m/Y', $order_id); ?></td>
-                            <td>
-                                <a href="<?php echo $remito_url; ?>" target="_blank" class="ghd-btn ghd-btn-secondary ghd-btn-small">
-                                    <i class="fa-solid fa-file-invoice"></i> Generar Remito
-                                </a>
-                                <button class="ghd-btn ghd-btn-success archive-order-btn" data-order-id="<?php echo $order_id; ?>">
-                                    Archivar Pedido
-                                </button>
-                            </td>
-                        </tr>
-                    <?php
-                        endwhile;
-                    else: 
+                    <button class="ghd-tab-button active" data-tab="assignation">
+                        Pendientes de Asignación 
+                        <span class="ghd-tab-counter" id="tab-counter-assignation">
+                            <?php echo $total_pedidos_asignacion; ?>
+                        </span>
+                    </button>
+                    <button class="ghd-tab-button" data-tab="production">
+                        Pedidos en Producción 
+                        <span class="ghd-tab-counter" id="tab-counter-production">
+                            <?php echo $production_data_for_tabs['kpi_data']['total_pedidos_produccion']; ?>
+                        </span>
+                    </button>
+                    <button class="ghd-tab-button" data-tab="closure">
+                        Pedidos Pendientes de Cierre 
+                        <span class="ghd-tab-counter" id="tab-counter-closure">
+                            <?php echo $admin_closure_kpis_for_tabs['total_pedidos_cierre']; ?>
+                        </span>
+                    </button>
+                    <!-- Puedes añadir más pestañas aquí en el futuro, ej. Pedidos Archivados -->
+                </div>
+
+                <!-- Contenido de las Pestañas -->
+                <div class="ghd-tab-content active" id="tab-assignation">
+                    <header class="ghd-main-header">
+                        <div class="header-title-wrapper">
+                            <button id="mobile-menu-toggle" class="ghd-btn-icon"><i class="fa-solid fa-bars"></i></button>
+                            <h2>Pedidos Pendientes de Asignación</h2>
+                            <button id="ghd-refresh-assignation-tasks" class="ghd-btn ghd-btn-secondary"><i class="fa-solid fa-sync"></i> <span>Refrescar</span></button>
+                        </div> 
+                        <div class="header-actions">
+                            <button id="abrir-nuevo-pedido-modal" class="ghd-btn ghd-btn-primary"><i class="fa-solid fa-plus"></i> <span>Nuevo Pedido</span></button>
+                        </div>
+                    </header>
+
+                    <div class="ghd-card ghd-table-wrapper">
+                        <table class="ghd-table">
+                            <thead>
+                                <tr>
+                                    <th>Código</th>
+                                    <th>Cliente</th>
+                                    <th>Producto</th>
+                                    <th>Vendedora</th>
+                                    <th>Prioridad</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ghd-orders-table-body">
+                                <?php
+                                // Carga inicial de pedidos pendientes de asignación
+                                $args_asignacion = array(
+                                    'post_type'      => 'orden_produccion',
+                                    'posts_per_page' => -1,
+                                    'meta_query'     => array(
+                                        array(
+                                            'key'     => 'estado_pedido',
+                                            'value'   => 'Pendiente de Asignación',
+                                            'compare' => '=',
+                                        ),
+                                    ),
+                                    // Ordenar para que los nuevos aparezcan primero por defecto
+                                    'orderby' => 'date',
+                                    'order'   => 'DESC',
+                                );
+                                $pedidos_asignacion_query = new WP_Query($args_asignacion);
+
+                                // Obtener la lista de vendedoras una sola vez para optimizar
+                                $vendedoras_users = get_users([
+                                    'role__in' => ['vendedora', 'gerente_ventas'],
+                                    'orderby'  => 'display_name',
+                                    'order'    => 'ASC'
+                                ]);
+
+                                if ($pedidos_asignacion_query->have_posts()) :
+                                    while ($pedidos_asignacion_query->have_posts()) : $pedidos_asignacion_query->the_post();
+                                        $order_id = get_the_ID();
+                                        $current_vendedora_id = get_field('vendedora_asignada', $order_id);
+                                        $current_priority = get_field('prioridad_pedido', $order_id);
+                                ?>
+                                    <tr id="order-row-<?php echo $order_id; ?>">
+                                        <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
+                                        <td><?php echo esc_html(get_field('nombre_cliente', $order_id)); ?></td>
+                                        <td><?php echo esc_html(get_field('nombre_producto', $order_id)); ?></td>
+                                        <td>
+                                            <select class="ghd-vendedora-selector" data-order-id="<?php echo $order_id; ?>">
+                                                <option value="0" <?php selected($current_vendedora_id, 0); ?>>Asignar Vendedora</option>
+                                                <?php foreach ($vendedoras_users as $vendedora) : ?>
+                                                    <option value="<?php echo esc_attr($vendedora->ID); ?>" <?php selected($current_vendedora_id, $vendedora->ID); ?>>
+                                                        <?php echo esc_html($vendedora->display_name); ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select class="ghd-priority-selector" data-order-id="<?php echo $order_id; ?>">
+                                                <option value="" <?php selected($current_priority, ''); ?>>Seleccionar Prioridad</option>
+                                                <option value="Alta" <?php selected($current_priority, 'Alta'); ?>>Alta</option>
+                                                <option value="Media" <?php selected($current_priority, 'Media'); ?>>Media</option>
+                                                <option value="Baja" <?php selected($current_priority, 'Baja'); ?>>Baja</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <button class="ghd-btn ghd-btn-primary start-production-btn" data-order-id="<?php echo $order_id; ?>" disabled>
+                                                Iniciar Producción
+                                            </button>
+                                        </td>
+                                    </tr>
+                                <?php
+                                    endwhile;
+                                else: 
+                                ?>
+                                    <tr><td colspan="6" style="text-align:center;">No hay pedidos pendientes de asignación.</td></tr>
+                                <?php
+                                endif;
+                                wp_reset_postdata(); 
+                                ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="ghd-tab-content" id="tab-production">
+                    <!-- Contenido de "Pedidos en Producción" -->
+                    <div class="header-title-wrapper" style="margin-top: 20px;">
+                        <h2>Pedidos en Producción</h2>
+                        <button id="ghd-refresh-production-tasks" class="ghd-btn ghd-btn-secondary"><i class="fa-solid fa-sync"></i> <span>Refrescar</span></button>
+                    </div>
+
+                    <?php 
+                    $production_kpis = $production_data_for_tabs['kpi_data']; // Reutilizamos los datos ya obtenidos
                     ?>
-                        <tr><td colspan="5" style="text-align:center;">No hay pedidos pendientes de cierre.</td></tr>
-                    <?php
-                    endif;
-                    wp_reset_postdata(); 
+                    <div class="ghd-kpi-grid" style="margin-bottom: 30px;">
+                        <div class="ghd-kpi-card"><div class="kpi-icon icon-blue"><i class="fa-solid fa-list-check"></i></div><div class="kpi-info"><span id="kpi-produccion-activas" class="kpi-value"><?php echo $production_kpis['total_pedidos_produccion']; ?></span><span class="kpi-label">Activas</span></div></div>
+                        <div class="ghd-kpi-card"><div class="kpi-icon icon-red"><i class="fa-solid fa-triangle-exclamation"></i></div><div class="kpi-info"><span id="kpi-produccion-prioridad-alta" class="kpi-value"><?php echo $production_kpis['total_prioridad_alta_produccion']; ?></span><span class="kpi-label">Prioridad Alta</span></div></div>
+                        <div class="ghd-kpi-card"><div class="kpi-icon icon-green"><i class="fa-solid fa-check"></i></div><div class="kpi-info"><span id="kpi-produccion-completadas-hoy" class="kpi-value"><?php echo $production_kpis['completadas_hoy_produccion']; ?></span><span class="kpi-label">Completadas Hoy</span></div></div>
+                        <div class="ghd-kpi-card"><div class="kpi-icon icon-yellow"><i class="fa-solid fa-clock"></i></div><div class="kpi-info"><span id="kpi-produccion-tiempo-promedio" class="kpi-value"><?php echo esc_html($production_kpis['tiempo_promedio_str_produccion']); ?></span><span class="kpi-label">Tiempo Promedio</span></div></div>
+                    </div>
+
+                    <div class="ghd-card ghd-table-wrapper" id="admin-production-tasks-container">
+                        <table class="ghd-table">
+                            <thead>
+                                <tr>
+                                    <th>Código</th> <th>Cliente</th> <th>Vendedora</th> <th>Producto</th> <th>Material</th> <th>Color</th> <th>Observaciones</th> <th>Estado General</th> <th>Asignación/Completado</th> <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ghd-production-table-body">
+                                <?php echo $production_data_for_tabs['tasks_html']; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="ghd-tab-content" id="tab-closure">
+                    <!-- Contenido de "Pedidos Pendientes de Cierre" -->
+                    <div class="header-title-wrapper" style="margin-top: 20px;">
+                        <?php if (!current_user_can('manage_options')) : // Título específico para Macarena ?>
+                            <h2>Panel de Control Final</h2>
+                        <?php else: ?>
+                            <h2>Pedidos Pendientes de Cierre</h2>
+                        <?php endif; ?>
+                        <button id="ghd-refresh-closure-tasks" class="ghd-btn ghd-btn-secondary"><i class="fa-solid fa-sync"></i> <span>Refrescar</span></button>
+                    </div>
+
+                    <?php $admin_closure_kpis = $admin_closure_kpis_for_tabs; // Reutilizamos los datos ya obtenidos ?>
+                    <div class="ghd-kpi-grid" style="margin-bottom: 30px;">
+                        <div class="ghd-kpi-card"><div class="kpi-icon icon-blue"><i class="fa-solid fa-list-check"></i></div><div class="kpi-info"><span id="kpi-cierre-activas" class="kpi-value"><?php echo $admin_closure_kpis['total_pedidos_cierre']; ?></span><span class="kpi-label">Activas</span></div></div>
+                        <div class="ghd-kpi-card"><div class="kpi-icon icon-red"><i class="fa-solid fa-triangle-exclamation"></i></div><div class="kpi-info"><span id="kpi-cierre-prioridad-alta" class="kpi-value"><?php echo $admin_closure_kpis['total_prioridad_alta_cierre']; ?></span><span class="kpi-label">Prioridad Alta</span></div></div>
+                        <div class="ghd-kpi-card"><div class="kpi-icon icon-green"><i class="fa-solid fa-check"></i></div><div class="kpi-info"><span id="kpi-cierre-completadas-hoy" class="kpi-value"><?php echo $admin_closure_kpis['completadas_hoy_cierre']; ?></span><span class="kpi-label">Completadas Hoy</span></div></div>
+                        <div class="ghd-kpi-card"><div class="kpi-icon icon-yellow"><i class="fa-solid fa-clock"></i></div><div class="kpi-info"><span id="kpi-cierre-tiempo-promedio" class="kpi-value"><?php echo esc_html($admin_closure_kpis['tiempo_promedio_str_cierre']); ?></span><span class="kpi-label">Tiempo Promedio</span></div></div>
+                    </div>
+
+                    <div class="ghd-card ghd-table-wrapper" id="admin-closure-tasks-container">
+                        <table class="ghd-table">
+                            <thead>
+                                <tr>
+                                    <th>Código</th> <th>Cliente</th> <th>Producto</th> <th>Fecha de Pedido</th> <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ghd-closure-table-body">
+                                <?php
+                                $args_cierre = array(
+                                    'post_type'      => 'orden_produccion',
+                                    'posts_per_page' => -1,
+                                    'meta_query'     => array(
+                                        array(
+                                            'key'     => 'estado_pedido',
+                                            'value'   => 'Pendiente de Cierre Admin',
+                                            'compare' => '=',
+                                        ),
+                                    ),
+                                    'orderby' => 'date',
+                                    'order'   => 'ASC',
+                                );
+                                $pedidos_cierre_query = new WP_Query($args_cierre);
+
+                                $remito_base_url = ghd_get_remito_base_url();
+                                if ($pedidos_cierre_query->have_posts()) :
+                                    while ($pedidos_cierre_query->have_posts()) : $pedidos_cierre_query->the_post();
+                                        $order_id = get_the_ID();
+                                        $remito_url = esc_url(add_query_arg('order_id', $order_id, $remito_base_url));
+                                ?>
+                                    <tr id="order-row-closure-<?php echo $order_id; ?>">
+                                        <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
+                                        <td><?php echo esc_html(get_field('nombre_cliente', $order_id)); ?></td>
+                                        <td><?php echo esc_html(get_field('nombre_producto', $order_id)); ?></td>
+                                        <td><?php echo get_the_date('d/m/Y', $order_id); ?></td>
+                                        <td>
+                                            <a href="<?php echo $remito_url; ?>" target="_blank" class="ghd-btn ghd-btn-secondary ghd-btn-small">
+                                                <i class="fa-solid fa-file-invoice"></i> Generar Remito
+                                            </a>
+                                            <button class="ghd-btn ghd-btn-success archive-order-btn" data-order-id="<?php echo $order_id; ?>">
+                                                Archivar Pedido
+                                            </button>
+                                        </td>
+                                    </tr>
+                                <?php
+                                    endwhile;
+                                else: 
+                                ?>
+                                    <tr><td colspan="5" style="text-align:center;">No hay pedidos pendientes de cierre.</td></tr>
+                                <?php
+                                endif;
+                                wp_reset_postdata(); 
+                                ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div> <!-- FIN NUEVO: Contenedor de Pestañas -->
+
+        <?php endif; // --- FIN DE SECCIONES SOLO PARA ADMINISTRADOR --- ?>
+
+
+        <?php // --- SECCIÓN PARA MACARENA (Control Final) si NO es Admin --- ?>
+        <?php if (current_user_can('control_final_macarena') && !current_user_can('manage_options')) : ?>
+            <div class="ghd-tabs-container">
+                <div class="ghd-tabs-nav">
+                    <?php 
+                    $admin_closure_kpis_for_tabs = ghd_calculate_admin_closure_kpis(); // Recalcular si es necesario para Macarena
                     ?>
-                </tbody>
-            </table>
-        </div>
+                    <button class="ghd-tab-button active" data-tab="closure">
+                        Pedidos Pendientes de Cierre 
+                        <span class="ghd-tab-counter" id="tab-counter-closure">
+                            <?php echo $admin_closure_kpis_for_tabs['total_pedidos_cierre']; ?>
+                        </span>
+                    </button>
+                </div>
+                <div class="ghd-tab-content active" id="tab-closure">
+                    <div class="header-title-wrapper" style="margin-top: 20px;">
+                        <h2>Panel de Control Final</h2>
+                        <button id="ghd-refresh-closure-tasks" class="ghd-btn ghd-btn-secondary"><i class="fa-solid fa-sync"></i> <span>Refrescar</span></button>
+                    </div>
+
+                    <?php $admin_closure_kpis = $admin_closure_kpis_for_tabs; ?>
+                    <div class="ghd-kpi-grid" style="margin-bottom: 30px;">
+                        <div class="ghd-kpi-card"><div class="kpi-icon icon-blue"><i class="fa-solid fa-list-check"></i></div><div class="kpi-info"><span id="kpi-cierre-activas" class="kpi-value"><?php echo $admin_closure_kpis['total_pedidos_cierre']; ?></span><span class="kpi-label">Activas</span></div></div>
+                        <div class="ghd-kpi-card"><div class="kpi-icon icon-red"><i class="fa-solid fa-triangle-exclamation"></i></div><div class="kpi-info"><span id="kpi-cierre-prioridad-alta" class="kpi-value"><?php echo $admin_closure_kpis['total_prioridad_alta_cierre']; ?></span><span class="kpi-label">Prioridad Alta</span></div></div>
+                        <div class="ghd-kpi-card"><div class="kpi-icon icon-green"><i class="fa-solid fa-check"></i></div><div class="kpi-info"><span id="kpi-cierre-completadas-hoy" class="kpi-value"><?php echo $admin_closure_kpis['completadas_hoy_cierre']; ?></span><span class="kpi-label">Completadas Hoy</span></div></div>
+                        <div class="ghd-kpi-card"><div class="kpi-icon icon-yellow"><i class="fa-solid fa-clock"></i></div><div class="kpi-info"><span id="kpi-cierre-tiempo-promedio" class="kpi-value"><?php echo esc_html($admin_closure_kpis['tiempo_promedio_str_cierre']); ?></span><span class="kpi-label">Tiempo Promedio</span></div></div>
+                    </div>
+
+                    <div class="ghd-card ghd-table-wrapper" id="admin-closure-tasks-container">
+                        <table class="ghd-table">
+                            <thead>
+                                <tr>
+                                    <th>Código</th> <th>Cliente</th> <th>Producto</th> <th>Fecha de Pedido</th> <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ghd-closure-table-body">
+                                <?php
+                                $args_cierre = array(
+                                    'post_type'      => 'orden_produccion',
+                                    'posts_per_page' => -1,
+                                    'meta_query'     => array(
+                                        array(
+                                            'key'     => 'estado_pedido',
+                                            'value'   => 'Pendiente de Cierre Admin',
+                                            'compare' => '=',
+                                        ),
+                                    ),
+                                    'orderby' => 'date',
+                                    'order'   => 'ASC',
+                                );
+                                $pedidos_cierre_query = new WP_Query($args_cierre);
+
+                                $remito_base_url = ghd_get_remito_base_url();
+                                if ($pedidos_cierre_query->have_posts()) :
+                                    while ($pedidos_cierre_query->have_posts()) : $pedidos_cierre_query->the_post();
+                                        $order_id = get_the_ID();
+                                        $remito_url = esc_url(add_query_arg('order_id', $order_id, $remito_base_url));
+                                ?>
+                                    <tr id="order-row-closure-<?php echo $order_id; ?>">
+                                        <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
+                                        <td><?php echo esc_html(get_field('nombre_cliente', $order_id)); ?></td>
+                                        <td><?php echo esc_html(get_field('nombre_producto', $order_id)); ?></td>
+                                        <td><?php echo get_the_date('d/m/Y', $order_id); ?></td>
+                                        <td>
+                                            <a href="<?php echo $remito_url; ?>" target="_blank" class="ghd-btn ghd-btn-secondary ghd-btn-small">
+                                                <i class="fa-solid fa-file-invoice"></i> Generar Remito
+                                            </a>
+                                            <button class="ghd-btn ghd-btn-success archive-order-btn" data-order-id="<?php echo $order_id; ?>">
+                                                Archivar Pedido
+                                            </button>
+                                        </td>
+                                    </tr>
+                                <?php
+                                    endwhile;
+                                else: 
+                                ?>
+                                    <tr><td colspan="5" style="text-align:center;">No hay pedidos pendientes de cierre.</td></tr>
+                                <?php
+                                endif;
+                                wp_reset_postdata(); 
+                                ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        <?php endif; // --- FIN DE SECCIÓN PARA MACARENA --- ?>
+
     </main>
 </div>
 <!-- Popup para Nuevo Pedido -->

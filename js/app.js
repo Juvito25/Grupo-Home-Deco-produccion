@@ -39,6 +39,7 @@ const initEmbalajeModalPoints = (modalElement, postId) => {
     modalElement.dataset.pointsInitialized = 'true';
 };
 // --- FIN NUEVO ---
+
 document.addEventListener('DOMContentLoaded', function() {
     
     // --- LÓGICA DEL MENÚ MÓVIL (Estable) ---
@@ -71,6 +72,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // --- Declaración de elementos de contadores de pestañas en un ámbito más amplio ---
+    const tabCounterAssignation = document.getElementById('tab-counter-assignation');
+    const tabCounterProduction = document.getElementById('tab-counter-production');
+    const tabCounterClosure = document.getElementById('tab-counter-closure');
+
     // --- Funciones para actualizar los KPIs ---
     const updateSectorKPIs = (kpiData) => {
         const activasEl = document.getElementById('kpi-activas');
@@ -84,16 +90,23 @@ document.addEventListener('DOMContentLoaded', function() {
         if (tiempoEl) tiempoEl.textContent = kpiData.tiempo_promedio_str;
     };
 
+    const updateAdminAssignationKPIs = (totalPedidos) => {
+        if (tabCounterAssignation) {
+            tabCounterAssignation.textContent = totalPedidos;
+        }
+    };
+
     const updateAdminClosureKPIs = (kpiData) => {
         const activasEl = document.getElementById('kpi-cierre-activas');
         const prioridadEl = document.getElementById('kpi-cierre-prioridad-alta');
         const completadasHoyEl = document.getElementById('kpi-cierre-completadas-hoy');
         const tiempoEl = document.getElementById('kpi-cierre-tiempo-promedio');
-
+        
         if (activasEl) activasEl.textContent = kpiData.total_pedidos_cierre;
         if (prioridadEl) prioridadEl.textContent = kpiData.total_prioridad_alta_cierre;
         if (completadasHoyEl) completadasHoyEl.textContent = kpiData.completadas_hoy_cierre;
         if (tiempoEl) tiempoEl.textContent = kpiData.tiempo_promedio_str_cierre;
+        if (tabCounterClosure) tabCounterClosure.textContent = kpiData.total_pedidos_cierre; // Actualizar contador de pestaña
     };
 
     const updateAdminProductionKPIs = (kpiData) => {
@@ -101,15 +114,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const prioridadEl = document.getElementById('kpi-produccion-prioridad-alta');
         const completadasHoyEl = document.getElementById('kpi-produccion-completadas-hoy');
         const tiempoEl = document.getElementById('kpi-produccion-tiempo-promedio');
-
+        
         if (activasEl) activasEl.textContent = kpiData.total_pedidos_produccion;
         if (prioridadEl) prioridadEl.textContent = kpiData.total_prioridad_alta_produccion;
         if (completadasHoyEl) completadasHoyEl.textContent = kpiData.completadas_hoy_produccion;
         if (tiempoEl) tiempoEl.textContent = kpiData.tiempo_promedio_str_produccion;
+        if (tabCounterProduction) tabCounterProduction.textContent = kpiData.total_pedidos_produccion; // Actualizar contador de pestaña
     };
 
     // --- Función para refrescar la lista de tareas del Fletero ---
-        // --- Función para refrescar la lista de tareas del Fletero ---
     const refreshFleteroTasksList = () => {
         const fleteroTasksList = document.querySelector('.ghd-fletero-tasks-list');
         const refreshFleteroTasksBtn = document.getElementById('ghd-refresh-fletero-tasks');
@@ -133,7 +146,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     return res.text().then(text => { 
                         const errorMsg = `Server responded with ${res.status}: ${text || 'No response body'}`;
                         console.error("Error de carga HTTP en refresco de fletero:", errorMsg);
-                        // Mostrar un mensaje de error discreto en la UI, no un alert molesto
                         fleteroTasksList.innerHTML = `<p class="no-tasks-message" style="text-align: center; padding: 20px;">Error de carga: ${res.status}. Por favor, intente de nuevo.</p>`;
                         throw new Error(errorMsg); // Propagar el error para el .catch()
                     });
@@ -141,11 +153,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 return res.json();
             })
             .then(response => { 
-                // console.log('Respuesta completa de ghd_refresh_fletero_tasks (depuración):', response); // Solo para depuración extrema si falla.
-
                 if (response.success && typeof response.data.tasks_html === 'string') {
-                    fleteroTasksList.innerHTML = response.data.tasks_html;
-                    // console.log('Refresco de tareas de fletero exitoso. Contenido actualizado.'); // Solo para depuración.
+                    fleteroTasksList.innerHTML = response.data.tasks_html; 
                 } else {
                     const errorMessage = response.data.message || 'La respuesta del servidor para refresco es incompleta.';
                     console.error('Error de refresco (respuesta inválida):', errorMessage, response);
@@ -153,8 +162,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             })
             .catch(error => {
-                // El error ya se logueó en el .then(res => { if (!res.ok) ... })
-                // Si llega aquí, es un error de red puro o un error propagado.
                 console.error("Error de red en refresco de fletero:", error);
                 fleteroTasksList.innerHTML = `<p class="no-tasks-message" style="text-align: center; padding: 20px;">Error de red. Inténtalo de nuevo.</p>`;
             })
@@ -162,21 +169,90 @@ document.addEventListener('DOMContentLoaded', function() {
                 fleteroTasksList.style.opacity = '1';
                 refreshFleteroTasksBtn.disabled = false;
             });
-    }; // fin función refreshFleteroTasksLiscompleteDeliveryFormt
+    }; // fin función refreshFleteroTasksList
+
+    // --- Función para refrescar la tabla de Pedidos Pendientes de Asignación ---
+    const refreshAssignationTable = () => {
+        const assignationTableBody = document.getElementById('ghd-orders-table-body');
+        const refreshAssignationBtn = document.getElementById('ghd-refresh-assignation-tasks');
+
+        if (!assignationTableBody || !refreshAssignationBtn) {
+            console.warn('refreshAssignationTable: Elementos DOM no encontrados.');
+            return;
+        }
+
+        assignationTableBody.style.opacity = '0.5';
+        refreshAssignationBtn.disabled = true;
+
+        const params = new URLSearchParams({
+            action: 'ghd_refresh_assignation_section', // Este es el nuevo endpoint AJAX en PHP
+            nonce: ghd_ajax.nonce
+        });
+
+        fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+            .then(res => res.json())
+            .then(response => {
+                if (response.success && typeof response.data.table_html === 'string') {
+                    assignationTableBody.innerHTML = response.data.table_html;
+                    if (response.data.total_pedidos_asignacion !== undefined) {
+                        updateAdminAssignationKPIs(response.data.total_pedidos_asignacion);
+                    }
+                    console.log('Refresco de asignación exitoso: ' + (response.data?.message || ''));
+                } else {
+                    console.error('Error al refrescar pedidos de asignación: ' + (response.data?.message || 'Error desconocido.'));
+                    assignationTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Error al cargar pedidos de asignación.</td></tr>';
+                }
+            })
+            .catch(error => {
+                console.error("Error de red al refrescar asignación:", error);
+                assignationTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Error de red. Inténtalo de nuevo.</td></tr>';
+            })
+            .finally(() => {
+                assignationTableBody.style.opacity = '1';
+                refreshAssignationBtn.disabled = false;
+            });
+    };
+
 
     // --- LÓGICA UNIVERSAL DE EVENTOS EN EL CONTENIDO PRINCIPAL ---
     const mainContent = document.querySelector('.ghd-main-content');
     if (mainContent) {
 
-        // --- NUEVO: Declarar fleteroTasksList y refreshFleteroTasksBtn en un ámbito más global ---
         const fleteroTasksList = document.querySelector('.ghd-fletero-tasks-list');
-        const refreshFleteroTasksBtn = document.getElementById('ghd-refresh-fletero-tasks');
-        // --- FIN NUEVO --refreshFleteroTasksList-
+        // const refreshFleteroTasksBtn = document.getElementById('ghd-refresh-fletero-tasks'); // Ya declarado arriba
+
+        // --- Lógica para Pestañas (Tabs) usando delegación de eventos ---
+        mainContent.addEventListener('click', function(e) {
+            const tabButton = e.target.closest('.ghd-tab-button');
+            if (tabButton) {
+                e.preventDefault();
+                const container = tabButton.closest('.ghd-tabs-container');
+                if (!container) return;
+
+                const tabButtons = container.querySelectorAll('.ghd-tab-button');
+                const tabContents = container.querySelectorAll('.ghd-tab-content');
+
+                // Remover clase 'active' de todos los botones y contenidos
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabContents.forEach(content => content.classList.remove('active'));
+
+                // Añadir clase 'active' al botón clickeado
+                tabButton.classList.add('active');
+
+                // Mostrar el contenido correspondiente
+                const targetTabId = tabButton.dataset.tab;
+                const targetContent = container.querySelector(`#tab-${targetTabId}`);
+                if (targetContent) {
+                    targetContent.classList.add('active');
+                }
+            }
+        });
+        // --- FIN Lógica para Pestañas (Tabs) usando delegación de eventos ---
+        
         // Listener para todos los CLICKS dentro de mainContent
         mainContent.addEventListener('click', function(e) {
             
             const target = e.target;
-            // Botones de paneles de Administrador/Sector
             const actionButton = target.closest('.action-button');
             const openModalButton = target.closest('.open-complete-task-modal');
             const closeModalButton = target.closest('.close-button');
@@ -186,13 +262,22 @@ document.addEventListener('DOMContentLoaded', function() {
             // Botones de panel de Fletero
             const fleteroActionButton = target.closest('.fletero-action-btn'); // Marcar Recogido / Marcar Entregado
             const openUploadDeliveryProofModalBtn = target.closest('.open-upload-delivery-proof-modal'); // Abre modal de comprobante de fletero
-            const refreshFleteroTasksBtn = target.closest('#ghd-refresh-fletero-tasks'); // Refrescar panel de fletero
 
             // Otros botones
             const exportAssignationOrdersBtn = target.closest('#ghd-export-assignation-orders'); // Botón de exportar
-
+            const abrirModalBtn = target.closest('#abrir-nuevo-pedido-modal'); // Botón "Nuevo Pedido"
+            const refreshAssignationBtn = target.closest('#ghd-refresh-assignation-tasks'); // Botón "Refrescar" de asignación
 
             // --- MANEJADORES DE CLICKS ---
+
+            // Lógica para abrir el modal de Nuevo Pedido
+            if (abrirModalBtn) {
+                e.preventDefault();
+                const nuevoPedidoModal = document.getElementById('nuevo-pedido-modal');
+                if (nuevoPedidoModal) {
+                    nuevoPedidoModal.style.display = 'flex';
+                }
+            }
 
             // Lógica para el botón "Refrescar" en el panel de sector (NO fletero)
             if (refreshTasksBtn) {
@@ -214,8 +299,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (response.data.kpi_data) updateSectorKPIs(response.data.kpi_data);
                             console.log('Refresco de tareas de sector exitoso: ' + (response.data?.message || ''));
 
-                            // --- NUEVO: Re-inicializar los modales de Embalaje en las nuevas tarjetas ---
-                            // Obtener todos los botones que abren modales de Embalaje recién inyectados
                             const openEmbalajeModals = sectorTasksList.querySelectorAll('.open-complete-task-modal[data-field="estado_embalaje"]');
                             openEmbalajeModals.forEach(btn => {
                                 const orderId = btn.dataset.orderId;
@@ -224,7 +307,6 @@ document.addEventListener('DOMContentLoaded', function() {
                                     initEmbalajeModalPoints(modal, orderId);
                                 }
                             });
-                            // --- FIN NUEVO ---
 
                         } else {
                             console.error('Error al refrescar tareas de sector: ' + (response.data?.message || 'Error desconocido.'));
@@ -262,7 +344,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                     .then(res => res.json())
-                    .then(response => { // Renombrado a 'response'
+                    .then(response => { 
                         if (response.success) {
                             document.getElementById('ghd-refresh-tasks')?.click();
                             console.log('Estado de tarea actualizado: ' + (response.data?.message || ''));
@@ -286,15 +368,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 const modal = document.getElementById(`complete-task-modal-${openModalButton.dataset.orderId}`);
                 if (modal) {
                     modal.style.display = 'flex';
-                    modal.dispatchEvent(new Event('ghdModalOpened')); // Disparar el evento para la inicialización
+                    modal.dispatchEvent(new Event('ghdModalOpened')); 
                     
-                    // --- NUEVO: Llamar a la función de inicialización si es el modal de Embalaje ---
                     const orderId = openModalButton.dataset.orderId;
-                    const fieldEstado = openModalButton.dataset.field; // Obtener el campo de estado
+                    const fieldEstado = openModalButton.dataset.field; 
                     if (fieldEstado === 'estado_embalaje' && typeof initEmbalajeModalPoints === 'function') {
                         initEmbalajeModalPoints(modal, orderId);
                     }
-                    // --- FIN NUEVO ---
                     e.stopPropagation(); 
                 }
             }
@@ -328,12 +408,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                     .then(res => res.json())
-                    .then(response => { // Renombrado a 'response'
+                    .then(response => { 
                         if (response.success) {
                             container.remove();
                             if (response.data && response.data.kpi_data) {
                                 updateAdminClosureKPIs(response.data.kpi_data);
                             }
+                            // Actualizar contador de la pestaña de cierre
+                            // const currentClosureCount = parseInt(tabCounterClosure?.textContent || '0');
+                            // updateAdminClosureKPIs({ 
+                            //     total_pedidos_cierre: currentClosureCount - 1,
+                            //     total_prioridad_alta_cierre: 0, 
+                            //     completadas_hoy_cierre: 0,
+                            //     tiempo_promedio_str_cierre: '0h'
+                            // });
                             console.log('Pedido archivado: ' + (response.data?.message || ''));
                         } else {
                             alert('Error: ' + (response.data?.message || 'No se pudo archivar.'));
@@ -352,9 +440,10 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // --- Lógica para el botón "Refrescar" en el panel de fletero ---
-            if (refreshFleteroTasksBtn) {
+            const refreshFleteroTasksBtn = document.getElementById('ghd-refresh-fletero-tasks');
+            if (refreshFleteroTasksBtn && target.closest('#ghd-refresh-fletero-tasks')) { 
                 e.preventDefault();
-                refreshFleteroTasksList(); // Llama a la función centralizada de refresco
+                refreshFleteroTasksList(); 
             }
 
             // --- Lógica para el botón "Marcar como Recogido" del Fletero ---
@@ -412,34 +501,31 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // --- Lógica para el botón "Refrescar" en la sección de pedidos en asignación del admin ---
-            // Este bloque existía anteriormente, se ha movido para evitar duplicados y errores
-            const refreshAssignationTasksBtn = document.getElementById('ghd-refresh-assignation-tasks'); // Si tienes un botón con este ID
-            if (refreshAssignationTasksBtn) {
+            const refreshAssignationBtnElement = document.getElementById('ghd-refresh-assignation-tasks'); 
+            if (refreshAssignationBtnElement && target.closest('#ghd-refresh-assignation-tasks')) { 
                 e.preventDefault();
-                // Llama a la función applyFilters o a una función de refresco específica para asignación
-                // Asumiendo que applyFilters se encarga de esto en template-admin-dashboard.php
-                // applyFilters(); // Si applyFilters existe globalmente o se puede llamar
+                refreshAssignationTable(); // Llama a la nueva función de refresco
             }
 
         }); // fin listener clicks 
 
         // Listener para los SUBMITS (envío de formularios)
         mainContent.addEventListener('submit', function(e) {
-            const completeTaskForm = e.target.closest('.complete-task-form'); // Formulario de tareas de sector (general)
-            const completeDeliveryForm = e.target.closest('.complete-delivery-form'); // Formulario de entrega del Fletero
-            const nuevoPedidoForm = e.target.closest('#nuevo-pedido-form'); // Formulario de nuevo pedido (Admin)
+            const completeTaskForm = e.target.closest('.complete-task-form'); 
+            const completeDeliveryForm = e.target.closest('.complete-delivery-form'); 
+            const nuevoPedidoForm = e.target.closest('#nuevo-pedido-form'); 
 
 
             if (completeTaskForm) {
                 e.preventDefault();
                 const orderId = completeTaskForm.dataset.orderId;
-                const fieldEstadoSector = completeTaskForm.dataset.field; // <-- ¡NUEVO: Obtener el campo de estado!
+                const fieldEstadoSector = completeTaskForm.dataset.field; 
 
                 const formData = new FormData(completeTaskForm);
                 formData.append('action', 'ghd_register_task_details_and_complete');
                 formData.append('nonce', ghd_ajax.nonce);
-                formData.append('order_id', orderId); // <-- Asegurar que orderId se envía explícitamente
-                formData.append('field', fieldEstadoSector); // <-- ¡NUEVO: Adjuntar el campo de estado!
+                formData.append('order_id', orderId); 
+                formData.append('field', fieldEstadoSector); 
 
                 const submitButton = completeTaskForm.querySelector('button[type="submit"]');
                 if (submitButton) {
@@ -449,7 +535,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: formData })
                 .then(res => res.json())
-                .then(response => { // Renombrado a 'response'
+                .then(response => { 
                     if (response.success) {
                         alert(response.data.message || 'Tarea completada.');
                         const modal = document.getElementById(`complete-task-modal-${orderId}`);
@@ -487,23 +573,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 completeDeliveryForm.style.opacity = '0.5';
 
-                                fetch(ghd_ajax.ajax_url, {
+                fetch(ghd_ajax.ajax_url, {
                     method: 'POST',
                     body: formData
                 })
                 .then(res => {
-                    if (!res.ok) { // Capturar errores HTTP como 400, 500
+                    if (!res.ok) { 
                         return res.text().then(text => { 
                             const errorMsg = `Server responded with ${res.status}: ${text || 'No response body'}`;
                             console.error("Error de carga HTTP al completar entrega:", errorMsg);
-                            throw new Error(errorMsg); // Propagar el error
+                            throw new Error(errorMsg); 
                         });
                     }
                     return res.json();
                 })
-                .then(response => { // Renombramos a 'response' para claridad
-                    console.log('Respuesta completa de ghd_fletero_complete_delivery:', response); // DEBUG
-
+                .then(response => { 
                     if (response.success) {
                         const modal = document.getElementById(`upload-delivery-proof-modal-${orderId}`);
                         if (modal) {
@@ -511,22 +595,19 @@ document.addEventListener('DOMContentLoaded', function() {
                             completeDeliveryForm.reset();
                         }
                         console.log('Entrega completada (éxito): ' + (response.data?.message || ''));
-                        refreshFleteroTasksList(); // Esto actualizará la interfaz (y eliminará el pedido)
-                        // --- ¡NUEVO! Disparar refresco del panel de cierre del Admin ---
-                        // Si el Admin está en su dashboard principal, debe ver este cambio.
+                        refreshFleteroTasksList(); 
+                        
                         const refreshClosureBtn = document.getElementById('ghd-refresh-closure-tasks');
                         if (refreshClosureBtn && document.body.classList.contains('is-admin-dashboard-panel')) {
-                            refreshClosureBtn.click(); // Forzar el refresco de la sección de cierre del admin
+                            refreshClosureBtn.click(); 
                         }
-                        // --- FIN NUEVO ---
                     } else {
-                        // Si el backend envió success: false, pero se decodificó JSON, mostrar ese mensaje
                         console.error('Error al completar entrega (server success=false): ' + (response.data?.message || 'Error desconocido del servidor.'));
-                        alert('Error: ' + (response.data?.message || 'No se pudo completar la entrega.')); // Mantener alerta para errores de lógica de negocio
+                        alert('Error: ' + (response.data?.message || 'No se pudo completar la entrega.')); 
                     }
                 })
                 .catch(error => {
-                    console.error("Error de red al completar entrega:", error); // Ya se logueó el error HTTP si lo hubo
+                    console.error("Error de red al completar entrega:", error); 
                     alert('Error de red al completar entrega. Por favor, intente de nuevo.'); 
                 })
                 .finally(() => {
@@ -536,7 +617,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     completeDeliveryForm.style.opacity = '1';
                 });
-                } // fin if (completeDeliveryForm)
+            } // fin if (completeDeliveryForm)
 
 
             // --- Lógica para el SUBMIT del formulario de NUEVO PEDIDO (Admin) ---
@@ -556,11 +637,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     body: new URLSearchParams(formData)
                 })
                 .then(res => res.json())
-                .then(response => { // Renombrado a 'response'
+                .then(response => { 
                     if (response.success) {
                         alert(response.data.message);
-                        nuevoPedidoModal.style.display = 'none'; // Asegurarse que nuevoPedidoModal esté en scope
-                        nuevoPedidoForm.reset();
+                        const nuevoPedidoModal = document.getElementById('nuevo-pedido-modal'); 
+                        if (nuevoPedidoModal) nuevoPedidoModal.style.display = 'none';
+                        this.reset();
 
                         const tableBody = document.getElementById('ghd-orders-table-body');
                         if (tableBody) {
@@ -570,6 +652,9 @@ document.addEventListener('DOMContentLoaded', function() {
                             } else {
                                 tableBody.insertAdjacentHTML('afterbegin', response.data.new_row_html);
                             }
+                            // Actualizar contador de la pestaña de asignación
+                            const currentAssignationCount = parseInt(tabCounterAssignation?.textContent || '0');
+                            updateAdminAssignationKPIs(currentAssignationCount + 1);
                         } 
                     } else {
                         alert('Error: ' + (response.data?.message || 'No se pudo crear el pedido.'));
@@ -620,9 +705,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Ejecutar la inicialización para cada fila al cargar la página
             ordersTableBody.querySelectorAll('tr').forEach(row => {
-                updateStartProductionButtonState(row); // Inicializa el estado del botón y las clases "no-seleccionada"
+                updateStartProductionButtonState(row); 
                 
-                // --- Aplicar clases de color al selector de PRIORIDAD si ya tiene un valor ---
                 const prioritySelector = row.querySelector('.ghd-priority-selector');
                 if (prioritySelector && prioritySelector.value !== 'Seleccionar Prioridad') {
                     prioritySelector.classList.remove('prioridad-no-seleccionada');
@@ -635,12 +719,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
 
-                // --- NUEVO BLOQUE: Aplicar clases de color al selector de VENDEDORA si ya tiene un valor ---
                 const vendedoraSelector = row.querySelector('.ghd-vendedora-selector');
-                if (vendedoraSelector && vendedoraSelector.value !== '0') { // '0' es el valor para "Asignar Vendedora"
+                if (vendedoraSelector && vendedoraSelector.value !== '0') { 
                     vendedoraSelector.classList.remove('vendedora-no-seleccionada');
                 }
-                // --- FIN NUEVO BLOQUE ---
             });
 
             // Manejar cambios en los selectores (Prioridad y Vendedora)
@@ -654,7 +736,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     updateStartProductionButtonState(row);
                     
-                    // Limpiar clases de prioridad existentes y añadir la nueva
                     target.classList.remove('prioridad-alta', 'prioridad-media', 'prioridad-baja');
                     if (selectedPriority === 'Alta') {
                         target.classList.add('prioridad-alta');
@@ -664,7 +745,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         target.classList.add('prioridad-baja');
                     }
 
-                    // Enviar la prioridad al backend vía AJAX
                     const params = new URLSearchParams({
                         action: 'ghd_update_priority',
                         nonce: ghd_ajax.nonce,
@@ -674,7 +754,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                         .then(res => res.json())
-                        .then(response => { // Renombrado a 'response'
+                        .then(response => { 
                             if (!response.success) {
                                 console.error('Error al guardar prioridad:', response.data?.message || 'Error desconocido.');
                             } else {
@@ -690,7 +770,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     
                     updateStartProductionButtonState(row);
 
-                    // Enviar la vendedora al backend vía AJAX
                     const params = new URLSearchParams({
                         action: 'ghd_update_vendedora',
                         nonce: ghd_ajax.nonce,
@@ -700,7 +779,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                         .then(res => res.json())
-                        .then(response => { // Renombrado a 'response'
+                        .then(response => { 
                             if (!response.success) {
                                 console.error('Error al guardar vendedora:', response.data?.message || 'Error desconocido.');
                             } else {
@@ -713,8 +792,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
 
-        // --- NUEVO BLOQUE: Manejar cambios en el selector de Asignación de Operarios usando delegación de eventos ---
-        mainContent.addEventListener('change', function(e) { // Escuchar 'change' en el contenedor principal
+        mainContent.addEventListener('change', function(e) { 
             const assigneeSelector = e.target.closest('.ghd-assignee-selector');
             if (assigneeSelector) {
                 const orderId = assigneeSelector.dataset.orderId;
@@ -734,7 +812,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                     .then(res => res.json())
-                    .then(response => { // Renombrado a 'response'
+                    .then(response => { 
                         if (response.success) {
                             console.log('Operario asignado:', response.data.message);
                             document.getElementById('ghd-refresh-tasks')?.click();
@@ -751,10 +829,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (card) card.style.opacity = '1';
                     });
             }
-        }); // fin listener delegación de eventos
-        // --- FIN NUEVO BLOQUE ---
+        }); 
 
-            // --- NUEVO BLOQUE: Manejar click en "Iniciar Producción" ---
+            // --- Manejar click en "Iniciar Producción" ---
             ordersTableBody.addEventListener('click', function(e) {
                 const startProductionBtn = e.target.closest('.start-production-btn');
                 if (startProductionBtn && !startProductionBtn.disabled) {
@@ -779,20 +856,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                         .then(res => res.json())
-                        .then(response => { // Renombrado a 'response'
+                        .then(response => { 
                             if (response.success) {
                                 alert(response.data.message);
                                 row.remove();
 
-                                const productionTableBody = document.getElementById('ghd-production-table-body');
+                                // Disminuir contador de asignación
+                                const currentAssignationCount = parseInt(tabCounterAssignation?.textContent || '0');
+                                updateAdminAssignationKPIs(currentAssignationCount - 1);
+
+                                // Refrescar la tabla de producción y sus KPIs (que ya actualiza el contador de producción)
                                 const refreshProductionTasksBtn = document.getElementById('ghd-refresh-production-tasks');
-                                
-                                if (productionTableBody && response.data.production_tasks_html) {
-                                     productionTableBody.innerHTML = response.data.production_tasks_html;
-                                    if (response.data.kpi_data) {
-                                        updateAdminProductionKPIs(response.data.kpi_data);
-                                    }
-                                } else if (refreshProductionTasksBtn) {
+                                if (refreshProductionTasksBtn) {
                                     refreshProductionTasksBtn.click();
                                 }
                             } else {
@@ -811,7 +886,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         });
                 }
             });
-            // --- FIN NUEVO BLOQUE ---
         }
     }
 
@@ -839,8 +913,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                     .then(res => res.json())
-                    .then(response => { // Renombrado a 'response'
-                        if (response.success) { // Aquí no hay response.data.data, es response.data.tasks_html
+                    .then(response => { 
+                        if (response.success) { 
                             sectorTasksList.innerHTML = response.data.tasks_html;
                             if (response.data.kpi_data) {
                                 updateSectorKPIs(response.data.kpi_data);
@@ -886,7 +960,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                 .then(res => res.json())
-                .then(response => { // Renombrado a 'response'
+                .then(response => { 
                     if (response.success) {
                         closureTableBody.innerHTML = response.data.table_html;
                         if (response.data.kpi_data) {
@@ -932,7 +1006,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
                 .then(res => res.json())
-                .then(response => { // Renombrado a 'response'
+                .then(response => { 
                     if (response.success) {
                         productionTableBody.innerHTML = response.data.tasks_html;
                         if (response.data.kpi_data) {
@@ -981,8 +1055,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 method: 'POST',
                 body: params
             })
-            .then(res => res.json()) // Asumimos que la respuesta es JSON, como en otros refrescos
-            .then(response => { // Renombrado a 'response'
+            .then(res => res.json()) 
+            .then(response => { 
                 if (response.success) {
                     archivedOrdersTableBody.innerHTML = response.data.table_html;
                     console.log('Refresco de pedidos archivados exitoso: ' + (response.data?.message || ''));
@@ -1044,11 +1118,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.body.appendChild(a);
                 a.click();
                 window.URL.revokeObjectURL(url);
-                alert('Exportación completada con éxito.'); // Mantener alerta de éxito para exportación
+                alert('Exportación completada con éxito.'); 
             })
             .catch(error => {
                 console.error("Error al exportar pedidos:", error);
-                alert('Error al exportar pedidos: ' + error.message); // Mantener alerta de error para exportación
+                alert('Error al exportar pedidos: ' + error.message); 
             })
             .finally(() => {
                 exportAssignationOrdersBtn.disabled = false;
@@ -1058,64 +1132,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // --- LÓGICA PARA EL POPUP DE NUEVO PEDIDO ---
-    const abrirModalBtn = document.getElementById('abrir-nuevo-pedido-modal');
     const nuevoPedidoModal = document.getElementById('nuevo-pedido-modal');
     const nuevoPedidoForm = document.getElementById('nuevo-pedido-form');
 
-    if (abrirModalBtn && nuevoPedidoModal) {
-        abrirModalBtn.addEventListener('click', function() {
-            nuevoPedidoModal.style.display = 'flex';
-        });
-
+    if (nuevoPedidoModal) { 
         const closeModalBtn = nuevoPedidoModal.querySelector('.close-button');
         if (closeModalBtn) {
             closeModalBtn.addEventListener('click', function() {
                 nuevoPedidoModal.style.display = 'none';
+                if (nuevoPedidoForm) nuevoPedidoForm.reset(); 
             });
         }
-    }
-
-    if (nuevoPedidoForm) {
-        nuevoPedidoForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-
-            const submitButton = this.querySelector('button[type="submit"]');
-            submitButton.disabled = true;
-            submitButton.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creando...';
-
-            const formData = new FormData(this);
-            formData.append('action', 'ghd_crear_nuevo_pedido');
-            formData.append('nonce', ghd_ajax.nonce);
-
-            fetch(ghd_ajax.ajax_url, {
-                method: 'POST',
-                body: new URLSearchParams(formData)
-            })
-            .then(res => res.json())
-            .then(response => { // Renombrado a 'response'
-                if (response.success) {
-                    alert(response.data.message);
-                    nuevoPedidoModal.style.display = 'none';
-                    this.reset();
-
-                    const tableBody = document.getElementById('ghd-orders-table-body');
-                    if (tableBody) {
-                        const noOrdersRow = tableBody.querySelector('td[colspan="6"]');
-                        if (noOrdersRow) {
-                            tableBody.innerHTML = response.data.new_row_html;
-                        } else {
-                            tableBody.insertAdjacentHTML('afterbegin', response.data.new_row_html);
-                        }
-                    } 
-                } else {
-                    alert('Error: ' + (response.data?.message || 'No se pudo crear el pedido.'));
-                }
-            })
-            .finally(() => {
-                submitButton.disabled = false;
-                submitButton.innerHTML = '<i class="fa-solid fa-plus"></i> Crear Pedido';
-            });
-        });
     }
 }); // Cierre Correcto del DOMContentLoaded listener
 
@@ -1133,51 +1160,3 @@ window.addEventListener('load', function() {
         history.pushState("", document.title, window.location.pathname + window.location.search);
     }
 });
-
-
-// Este listener era problemático, no se usaba con formData aquí. Se ha refactorizado arriba.
-// Se mantiene comentado si se necesita alguna otra lógica aquí, pero no para refresh_archived_orders
-// const refreshArchivedBtn = document.getElementById('ghd-refresh-archived-orders');
-// if (refreshArchivedBtn) {
-//     refreshArchivedBtn.addEventListener('click', function(e) {
-//         e.preventDefault();
-        
-//         const tableBody = document.getElementById('ghd-archived-orders-table-body');
-//         if (!tableBody) return;
-
-//         tableBody.style.opacity = '0.5';
-//         refreshArchivedBtn.disabled = true;
-
-//         const params = new URLSearchParams({
-//             action: 'ghd_refresh_archived_orders',
-//             nonce: ghd_ajax.nonce
-//         });
-        
-//             fetch(ghd_ajax.ajax_url, {
-//                 method: 'POST',
-//                 body: new URLSearchParams(formData)
-//             })
-//             .then(res => {
-//                 if (!res.ok) {
-//                     throw new Error('Error del servidor. Revisa el debug.log de WordPress.');
-//                 }
-//                 return res.json();
-//             })
-//             .then(data => {
-//                 if (data.success) {
-//                     alert(data.data.message);
-//                     window.location.reload();
-//                 } else {
-//                     alert('Error: ' + (data.data?.message || 'No se pudo crear el pedido.'));
-//                 }
-//             })
-//             .catch(error => {
-//                 console.error("Error al crear pedido:", error);
-//                 alert("Ocurrió un error inesperado. Revisa la consola para más detalles.");
-//             })
-//             .finally(() => {
-//                 submitButton.disabled = false;
-//                 submitButton.innerHTML = '<i class="fa-solid fa-plus"></i> Crear Pedido';
-//             });
-//     });
-// }

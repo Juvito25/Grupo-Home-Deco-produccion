@@ -1847,3 +1847,103 @@ body.page-template-template-login {
     background-color: var(--color-success);
     color: var(--color-blanco);
 }
+/* --- ESTILOS PARA PESTAÑAS (TABS) - ACTUALIZADO --- */
+.ghd-tabs-container {
+    margin-top: 2rem;
+    background-color: var(--color-fondo-claro);
+    border-radius: 8px;
+    border: 1px solid var(--color-borde);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    overflow: hidden; /* Para contener los bordes internos */
+}
+
+.ghd-tabs-nav {
+    display: flex;
+    border-bottom: 1px solid var(--color-borde);
+    background-color: #f8fafc; /* Fondo ligeramente diferente para la barra de navegación */
+    padding: 0 1.5rem; /* Padding horizontal para los botones */
+    overflow-x: auto; /* Permite scroll horizontal si hay muchas pestañas */
+    -webkit-overflow-scrolling: touch; /* Mejora el scroll en iOS */
+}
+
+.ghd-tab-button {
+    background-color: transparent;
+    border: none;
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--texto-secundario);
+    cursor: pointer;
+    transition: color 0.2s ease, border-bottom-color 0.2s ease, background-color 0.2s ease; /* Añadido background-color */
+    border-bottom: 3px solid transparent; /* Borde inferior para indicar activo */
+    white-space: nowrap; /* Evita que el texto del botón se rompa */
+    display: flex;
+    align-items: center;
+    gap: 8px; /* Espacio entre el texto y el contador */
+}
+
+.ghd-tab-button:hover {
+    color: var(--texto-principal);
+    border-bottom-color: var(--color-borde);
+    background-color: rgba(74, 124, 89, 0.05); /* Fondo suave al pasar el ratón */
+}
+
+.ghd-tab-button.active {
+    background-color: #e6f2e9; /* Un verde muy suave para el fondo de la pestaña activa */
+    color: var(--color-primario); /* Texto verde corporativo principal */
+    border-bottom-color: var(--color-primario); /* Borde inferior verde corporativo */
+}
+
+.ghd-tab-counter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 9999px; /* Pill shape */
+    background-color: rgba(74, 124, 89, 0.1); /* Verde claro */
+    color: var(--color-primario);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.ghd-tab-button.active .ghd-tab-counter {
+    background-color: var(--color-primario); /* Fondo del contador verde corporativo */
+    color: var(--color-fondo-claro); /* Texto blanco para el contador activo */
+}
+
+.ghd-tab-content {
+    display: none; /* Oculto por defecto */
+    padding: 1.5rem;
+}
+
+.ghd-tab-content.active {
+    display: block; /* Mostrar el contenido activo */
+}
+
+/* Ajustes para el contenido dentro de las pestañas */
+.ghd-tab-content .header-title-wrapper {
+    margin-top: 0 !important; /* Anular el margen superior si se aplica desde el PHP */
+    margin-bottom: 1.5rem;
+}
+.ghd-tab-content .ghd-kpi-grid {
+    margin-bottom: 1.5rem; /* Ajustar margen inferior de los KPIs */
+}
+.ghd-tab-content .ghd-card.ghd-table-wrapper {
+    margin-bottom: 0; /* Eliminar margen inferior si es el último elemento en la pestaña */
+}
+
+/* Responsive para las pestañas */
+@media (max-width: 768px) {
+    .ghd-tabs-nav {
+        padding: 0 1rem; /* Menos padding en móvil */
+    }
+    .ghd-tab-button {
+        padding: 0.8rem 1rem; /* Menos padding en móvil */
+        font-size: 0.9rem;
+    }
+    .ghd-tab-content {
+        padding: 1rem; /* Menos padding en móvil */
+    }
+}

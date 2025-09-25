@@ -450,14 +450,14 @@ function ghd_calculate_admin_closure_kpis() {
 
 /**
  * Función para obtener los datos de pedidos en producción y sus KPIs.
- * V3 - Corregido para evitar duplicados en la visualización de estados y asignaciones.
+ * V4 - Corregido el cálculo del tiempo promedio para evitar valores negativos.
  */
 function ghd_get_pedidos_en_produccion_data() {
     $pedidos_args = [
         'post_type'      => 'orden_produccion',
         'posts_per_page' => -1,
         'meta_query'     => [
-            ['key' => 'estado_pedido', 'value' => ['En Producción', 'En Costura', 'En Tapicería/Embalaje', 'Listo para Entrega', 'En Despacho'], 'compare' => 'IN'] // <-- ¡NUEVO: AÑADIR 'En Despacho'!
+            ['key' => 'estado_pedido', 'value' => ['En Producción', 'En Costura', 'En Tapicería/Embalaje', 'Listo para Entrega', 'En Despacho'], 'compare' => 'IN']
         ],
         'meta_key'       => 'prioridad_pedido',
         'orderby'        => ['meta_value' => 'ASC', 'date' => 'ASC']
@@ -472,7 +472,7 @@ function ghd_get_pedidos_en_produccion_data() {
     ];
     
     $total_tiempo_produccion = 0;
-    $ahora = current_time('U');
+    $ahora = current_time('U'); // Timestamp actual en GMT
 
     ob_start();
 
@@ -482,8 +482,20 @@ function ghd_get_pedidos_en_produccion_data() {
             if (get_field('prioridad_pedido', $order_id) === 'Alta') {
                 $kpi_data['total_prioridad_alta_produccion']++;
             }
+            
+            // Obtener el timestamp de inicio de producción
             $produccion_iniciada_time = get_post_meta($order_id, 'historial_produccion_iniciada_timestamp', true);
-            $total_tiempo_produccion += $ahora - ($produccion_iniciada_time ?: get_the_modified_time('U', $order_id));
+            
+            // Si no hay un timestamp de inicio de producción, usar la fecha de creación del post como fallback
+            // Esto es importante para pedidos que se crearon antes de que se implementara el timestamp específico.
+            if (empty($produccion_iniciada_time)) {
+                $produccion_iniciada_time = get_the_time('U', $order_id); // Usar fecha de creación del post
+            }
+
+            // Asegurarse de que el tiempo de inicio no sea futuro (para evitar valores negativos)
+            // Si el tiempo de inicio es posterior a 'ahora', la duración es 0.
+            $tiempo_transcurrido = ($produccion_iniciada_time < $ahora) ? ($ahora - $produccion_iniciada_time) : 0;
+            $total_tiempo_produccion += $tiempo_transcurrido;
             
             $vendedora_obj = get_userdata(get_field('vendedora_asignada', $order_id));
             ?>
@@ -619,6 +631,7 @@ function ghd_get_pedidos_en_produccion_data() {
     wp_reset_postdata();
     $production_tasks_html = ob_get_clean();
 
+    // Recalcular el tiempo promedio después de haber sumado todos los tiempos
     if ($kpi_data['total_pedidos_produccion'] > 0) {
         $kpi_data['tiempo_promedio_str_produccion'] = number_format(($total_tiempo_produccion / $kpi_data['total_pedidos_produccion']) / 3600, 1) . 'h';
     }
@@ -636,7 +649,8 @@ function ghd_get_pedidos_en_produccion_data() {
     $kpi_data['completadas_hoy_produccion'] = $completed_production_today_query->post_count;
     
     return ['tasks_html' => $production_tasks_html, 'kpi_data' => $kpi_data];
-}// fin ghd_get_pedidos_en_produccion_data ////
+} // fin ghd_get_pedidos_en_produccion_data ////
+
 
 /**
  * --- Recopilar datos para la página de reportes ---
@@ -2792,4 +2806,94 @@ function ghd_save_embalaje_points_on_profile( $user_id ) {
     // }
 }
 
-// --- FIN Puntos de Embalaje en Perfil ---
+/**
+ * AJAX: Refresca la sección de pedidos pendientes de asignación en el panel del Admin.
+ * Devuelve el HTML actualizado de la tabla y el conteo total de pedidos.
+ */
+add_action('wp_ajax_ghd_refresh_assignation_section', 'ghd_refresh_assignation_section_callback');
+function ghd_refresh_assignation_section_callback() {
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(['message' => 'Permisos insuficientes.'], 403);
+    }
+
+    ob_start(); // Iniciar buffer de salida
+
+    $args_asignacion = array(
+        'post_type'      => 'orden_produccion',
+        'posts_per_page' => -1,
+        'meta_query'     => array(
+            array(
+                'key'     => 'estado_pedido',
+                'value'   => 'Pendiente de Asignación',
+                'compare' => '=',
+            ),
+        ),
+        'orderby' => 'date',
+        'order'   => 'DESC',
+    );
+    $pedidos_asignacion_query = new WP_Query($args_asignacion);
+
+    // Obtener la lista de vendedoras una sola vez para optimizar
+    $vendedoras_users = get_users([
+        'role__in' => ['vendedora', 'gerente_ventas'],
+        'orderby'  => 'display_name',
+        'order'    => 'ASC'
+    ]);
+
+    if ($pedidos_asignacion_query->have_posts()) :
+        while ($pedidos_asignacion_query->have_posts()) : $pedidos_asignacion_query->the_post();
+            $order_id = get_the_ID();
+            $current_vendedora_id = get_field('vendedora_asignada', $order_id);
+            $current_priority = get_field('prioridad_pedido', $order_id);
+    ?>
+            <tr id="order-row-<?php echo $order_id; ?>">
+                <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
+                <td><?php echo esc_html(get_field('nombre_cliente', $order_id)); ?></td>
+                <td><?php echo esc_html(get_field('nombre_producto', $order_id)); ?></td>
+                <td>
+                    <select class="ghd-vendedora-selector" data-order-id="<?php echo $order_id; ?>">
+                        <option value="0" <?php selected($current_vendedora_id, 0); ?>>Asignar Vendedora</option>
+                        <?php foreach ($vendedoras_users as $vendedora) : ?>
+                            <option value="<?php echo esc_attr($vendedora->ID); ?>" <?php selected($current_vendedora_id, $vendedora->ID); ?>>
+                                <?php echo esc_html($vendedora->display_name); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </td>
+                <td>
+                    <select class="ghd-priority-selector" data-order-id="<?php echo $order_id; ?>">
+                        <option value="" <?php selected($current_priority, ''); ?>>Seleccionar Prioridad</option>
+                        <option value="Alta" <?php selected($current_priority, 'Alta'); ?>>Alta</option>
+                        <option value="Media" <?php selected($current_priority, 'Media'); ?>>Media</option>
+                        <option value="Baja" <?php selected($current_priority, 'Baja'); ?>>Baja</option>
+                    </select>
+                </td>
+                <td>
+                    <button class="ghd-btn ghd-btn-primary start-production-btn" data-order-id="<?php echo $order_id; ?>" disabled>
+                        Iniciar Producción
+                    </button>
+                </td>
+            </tr>
+    <?php
+        endwhile;
+    else: 
+    ?>
+        <tr><td colspan="6" style="text-align:center;">No hay pedidos pendientes de asignación.</td></tr>
+    <?php
+    endif;
+    wp_reset_postdata(); 
+    
+    $table_html = ob_get_clean(); // Obtener el contenido del buffer
+
+    // Recalcular el total de pedidos de asignación para el contador de la pestaña
+    $total_pedidos_asignacion_actualizado = $pedidos_asignacion_query->found_posts;
+
+    wp_send_json_success([
+        'message' => 'Pedidos de asignación refrescados.',
+        'table_html' => $table_html,
+        'total_pedidos_asignacion' => $total_pedidos_asignacion_actualizado
+    ]);
+    wp_die();
+}
