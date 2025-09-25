@@ -2301,6 +2301,7 @@ function ghd_redirect_default_login_page() {
 
 /**
  * Redirige a los usuarios a su panel correspondiente DESPUÉS de un inicio de sesión exitoso.
+ * Modificado para redirigir al administrador a /panel-de-control/.
  */
 add_filter('login_redirect', 'ghd_custom_login_redirect', 10, 3);
 function ghd_custom_login_redirect($redirect_to, $requested_redirect_to, $user) {
@@ -2312,9 +2313,14 @@ function ghd_custom_login_redirect($redirect_to, $requested_redirect_to, $user) 
     
     // PRIORIDAD DE REDIRECCIÓN (de más específico a general, si un usuario tiene múltiples roles)
 
-    // 1. Administradores van al backend de WordPress
+    // 1. Administradores van a su panel de control personalizado
     if (in_array('administrator', $user_roles)) {
-        return admin_url();
+        $control_page = get_page_by_path('panel-de-control'); // <-- ¡ASEGÚRATE DE QUE ESTE SLUG SEA EL REAL!
+        if ($control_page) {
+            return get_permalink($control_page->ID);
+        }
+        // Fallback si la página de control no existe, redirige a la home
+        return home_url(); 
     }
 
     // 2. Fleteros van a su panel de entregas
