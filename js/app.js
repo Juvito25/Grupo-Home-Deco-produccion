@@ -475,6 +475,100 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     // --- FIN LÓGICA PARA EL BUSCADOR EN LA PESTAÑA DE CIERRE ---
+    
+     // --- LÓGICA PARA EL BUSCADOR EN PANELES DE SECTOR ---
+    const searchSectorInput = document.getElementById('ghd-search-sector');
+    const resetSectorSearchBtn = document.getElementById('ghd-reset-search-sector');
+    const sectorTasksList = document.querySelector('.ghd-sector-tasks-list');
+    const sectorKPIsContainer = document.querySelector('.ghd-kpi-grid'); // Contenedor de KPIs del sector
+
+    let searchSectorTimeout; // Variable para el debounce
+
+    // Función para realizar la búsqueda AJAX en Paneles de Sector
+    const performSectorSearch = () => {
+        if (!sectorTasksList || !sectorKPIsContainer) return;
+
+        const searchTerm = searchSectorInput.value.trim();
+        const campoEstado = mainContent.dataset.campoEstado || ''; // Obtener el campo de estado del sector
+        if (!campoEstado) {
+            console.error('performSectorSearch: campoEstado no definido para el sector.');
+            return;
+        }
+
+        sectorTasksList.style.opacity = '0.5';
+        sectorKPIsContainer.style.opacity = '0.5'; // También atenuar KPIs
+        resetSectorSearchBtn.disabled = true;
+
+        const params = new URLSearchParams({
+            action: 'ghd_search_sector_tasks', // Nuevo endpoint AJAX
+            nonce: ghd_ajax.nonce,
+            search_term: searchTerm,
+            campo_estado: campoEstado // Enviar el campo de estado para filtrar por sector
+        });
+
+        fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+            .then(res => res.json())
+            .then(response => {
+                if (response.success && typeof response.data.tasks_html === 'string') {
+                    sectorTasksList.innerHTML = response.data.tasks_html;
+                    if (response.data.kpi_data) {
+                        updateSectorKPIs(response.data.kpi_data); // Actualizar KPIs
+                    }
+                    console.log('Búsqueda de sector exitosa: ' + (response.data?.message || ''));
+                } else {
+                    console.error('Error al buscar tareas de sector: ' + (response.data?.message || 'Error desconocido.'));
+                    sectorTasksList.innerHTML = '<p class="no-tasks-message">No se encontraron tareas con el término de búsqueda.</p>';
+                    // Resetear KPIs si no hay resultados
+                    updateSectorKPIs({
+                        total_pedidos: 0,
+                        total_prioridad_alta: 0,
+                        completadas_hoy: 0,
+                        tiempo_promedio_str: '0.0h'
+                    });
+                }
+            })
+            .catch(error => {
+                console.error("Error de red al buscar sector:", error);
+                sectorTasksList.innerHTML = '<p class="no-tasks-message">Error de red. Inténtalo de nuevo.</p>';
+                // Resetear KPIs en caso de error de red
+                updateSectorKPIs({
+                    total_pedidos: 0,
+                    total_prioridad_alta: 0,
+                    completadas_hoy: 0,
+                    tiempo_promedio_str: '0.0h'
+                });
+            })
+            .finally(() => {
+                sectorTasksList.style.opacity = '1';
+                sectorKPIsContainer.style.opacity = '1';
+                resetSectorSearchBtn.disabled = false;
+            });
+    };
+
+    // Event Listeners para el buscador de Sector
+    if (searchSectorInput) {
+        searchSectorInput.addEventListener('keyup', function(e) {
+            clearTimeout(searchSectorTimeout); // Limpiar el timeout anterior
+            searchSectorTimeout = setTimeout(() => {
+                performSectorSearch();
+            }, 300); // Esperar 300ms después de la última pulsación
+        });
+    }
+
+    if (resetSectorSearchBtn) {
+        resetSectorSearchBtn.addEventListener('click', function() {
+            searchSectorInput.value = ''; // Limpiar el campo de búsqueda
+            clearTimeout(searchSectorTimeout); // Limpiar cualquier búsqueda pendiente
+            // Llamar a la función de refresco existente para recargar la tabla completa y KPIs
+            const refreshTasksBtn = document.getElementById('ghd-refresh-tasks');
+            if (refreshTasksBtn) {
+                refreshTasksBtn.click();
+            } else {
+                performSectorSearch(); // Fallback si el botón de refresco no existe
+            }
+        });
+    }
+    // --- FIN LÓGICA PARA EL BUSCADOR EN PANELES DE SECTOR ---
     //------------------- fin lógica buscadores -------------------------------
 
     // --- LÓGICA UNIVERSAL DE EVENTOS EN EL CONTENIDO PRINCIPAL ---

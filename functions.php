@@ -217,8 +217,16 @@ function ghd_get_sectores() {
  * @return string La cadena normalizada.
  */
 function ghd_get_normalized_string($string) {
-    return strtolower(remove_accents($string));
-}
+    // Asegurarse de que el string no sea nulo o vacío antes de procesar
+    if (empty($string)) {
+        return '';
+    }
+    // Eliminar espacios en blanco al inicio y al final
+    $string = trim($string);
+    // Convertir a minúsculas y luego eliminar acentos
+    // Usar mb_strtolower para asegurar el manejo correcto de UTF-8
+    return mb_strtolower(remove_accents($string), 'UTF-8');
+} // fin ghd_get_normalized_string ////
 
 // --- NUEVO: Función de ayuda para obtener la URL base del remito ---
 /**
@@ -3621,3 +3629,250 @@ function ghd_search_closure_orders_callback() {
     ]);
     wp_die();
 } // fin ghd_search_closure_orders_callback()
+
+/**
+ * AJAX: Busca tareas de un sector específico por término de búsqueda.
+ * Utiliza múltiples WP_Query para combinar resultados de búsqueda en título y campos ACF,
+ * garantizando insensibilidad a acentos y robustez.
+ * Devuelve el HTML de las tareas y los KPIs actualizados para el sector.
+ * V_SECTOR_FINAL_V4_DEBUG - Solución robusta y unificada, con depuración y mejora en búsqueda.
+ */
+add_action('wp_ajax_ghd_search_sector_tasks', 'ghd_search_sector_tasks_callback');
+function ghd_search_sector_tasks_callback() {
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+
+    if (!current_user_can('read')) { // Permiso básico para ver tareas
+        wp_send_json_error(['message' => 'Permisos insuficientes.'], 403);
+    }
+
+    $search_term = isset($_POST['search_term']) ? sanitize_text_field($_POST['search_term']) : '';
+    $campo_estado = isset($_POST['campo_estado']) ? sanitize_key($_POST['campo_estado']) : '';
+
+    if (empty($campo_estado)) {
+        wp_send_json_error(['message' => 'Campo de estado del sector no proporcionado.'], 400);
+    }
+
+    $found_post_ids = [];
+
+    // Normalizar el término de búsqueda en PHP (eliminar acentos y convertir a minúsculas)
+    $normalized_search_term = ghd_get_normalized_string($search_term);
+
+    // --- Determinar el sector a partir del campo_estado recibido ---
+    $base_sector_key = str_replace('estado_', '', $campo_estado);
+    $current_user = wp_get_current_user();
+    $user_roles = (array) $current_user->roles;
+    $is_leader_actual_role = false;
+    foreach($user_roles as $role) {
+        if (strpos($role, 'lider_') !== false) {
+            $is_leader_actual_role = true;
+            break;
+        }
+    }
+    $is_leader_for_rendering = $is_leader_actual_role || current_user_can('manage_options'); // Admin siempre actúa como líder para renderizado
+    $is_leader = $is_leader_for_rendering; // Variable para pasar a task-card.php
+
+    $operarios_del_sector = [];
+    if ($is_leader_for_rendering && !empty($base_sector_key)) {
+        $operarios_del_sector = get_users([
+            'role__in' => ['lider_' . $base_sector_key, 'operario_' . $base_sector_key], 
+            'orderby'  => 'display_name',
+            'order'    => 'ASC'
+        ]);
+    }
+
+    // --- Lógica para obtener IDs de todos los posts activos del sector (base para filtrar) ---
+    $base_query_args = array(
+        'post_type'      => 'orden_produccion',
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'meta_query'     => array(
+            array(
+                'key'     => $campo_estado,
+                'value'   => ['Pendiente', 'En Progreso'],
+                'compare' => 'IN',
+            ),
+        ),
+        'fields'         => 'ids', // Siempre obtener solo IDs en esta etapa
+    );
+    // Si el usuario no es Admin y no es líder, filtrar por asignación personal
+    if (!current_user_can('ghd_view_all_sector_tasks') && !$is_leader) {
+        $asignado_a_field = str_replace('estado_', 'asignado_a_', $campo_estado);
+        $base_query_args['meta_query'][] = ['key' => $asignado_a_field, 'value' => $current_user->ID, 'compare' => '='];
+    }
+
+    $base_posts_query = new WP_Query($base_query_args);
+    $all_relevant_post_ids = $base_posts_query->posts;
+    wp_reset_postdata();
+
+    // --- DEBUG: Loguear IDs relevantes antes del filtrado ---
+    error_log("GHD Debug Sector Search: Normalized Search Term: '{$normalized_search_term}'");
+    error_log("GHD Debug Sector Search: All Relevant Post IDs: " . implode(', ', $all_relevant_post_ids));
+    // --- FIN DEBUG ---
+
+    // Si no hay término de búsqueda, todos los IDs relevantes son los encontrados en la base_query
+    if (empty($normalized_search_term)) {
+        $found_post_ids = $all_relevant_post_ids;
+    } else {
+        // Si hay término de búsqueda, iterar sobre los IDs relevantes y filtrar en PHP
+        if (!empty($all_relevant_post_ids)) {
+            foreach ($all_relevant_post_ids as $post_id) {
+                $post_title = get_the_title($post_id);
+                $nombre_cliente = get_field('nombre_cliente', $post_id);
+                $nombre_producto = get_field('nombre_producto', $post_id);
+                $material_del_producto = get_field('material_del_producto', $post_id);
+                $color_del_producto = get_field('color_del_producto', $post_id);
+
+                // Normalizar todos los campos para la comparación
+                $normalized_post_title = ghd_get_normalized_string($post_title);
+                $normalized_nombre_cliente = ghd_get_normalized_string($nombre_cliente);
+                $normalized_nombre_producto = ghd_get_normalized_string($nombre_producto);
+                $normalized_material_del_producto = ghd_get_normalized_string($material_del_producto);
+                $normalized_color_del_producto = ghd_get_normalized_string($color_del_producto);
+
+                // --- DEBUG: Loguear valores normalizados para cada post ---
+                error_log("GHD Debug Sector Search: Post ID: {$post_id}");
+                error_log("  - Normalized Title: '{$normalized_post_title}'");
+                error_log("  - Normalized Cliente: '{$normalized_nombre_cliente}'");
+                error_log("  - Normalized Producto: '{$normalized_nombre_producto}'");
+                error_log("  - Normalized Material: '{$normalized_material_del_producto}'");
+                error_log("  - Normalized Color: '{$normalized_color_del_producto}'");
+                // --- FIN DEBUG ---
+
+                // --- Lógica de búsqueda mejorada para post_title y otros campos ---
+                $match_found = false;
+
+                // Coincidencia de subcadena en el código de pedido (post_title)
+                if (mb_strpos($normalized_post_title, $normalized_search_term, 0, 'UTF-8') !== false) {
+                    $match_found = true;
+                }
+                // Coincidencia de subcadena para otros campos
+                elseif (
+                    mb_strpos($normalized_nombre_cliente, $normalized_search_term, 0, 'UTF-8') !== false ||
+                    mb_strpos($normalized_nombre_producto, $normalized_search_term, 0, 'UTF-8') !== false ||
+                    mb_strpos($normalized_material_del_producto, $normalized_search_term, 0, 'UTF-8') !== false ||
+                    mb_strpos($normalized_color_del_producto, $normalized_search_term, 0, 'UTF-8') !== false
+                ) {
+                    $match_found = true;
+                }
+
+                if ($match_found) {
+                    $found_post_ids[] = $post_id;
+                }
+            }
+        }
+        // Asegurarse de que los IDs sean únicos (aunque en este flujo ya deberían serlo)
+        $found_post_ids = array_unique($found_post_ids);
+    }
+
+    // --- Consulta Final: Obtener los posts completos por ID ---
+    $pedidos_sector_query = new WP_Query(); // Inicializar una nueva WP_Query
+    if (!empty($found_post_ids)) {
+        $args_final = array(
+            'post_type'      => 'orden_produccion',
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'post__in'       => $found_post_ids,
+            'orderby'        => 'post__in', // Ordenar por el orden de los IDs proporcionados
+            'order'          => 'ASC', // O el orden que prefieras
+        );
+        $pedidos_sector_query = new WP_Query($args_final);
+    }
+    // Si $found_post_ids está vacío, $pedidos_sector_query no tendrá posts.
+
+    // Recalcular KPIs y generar HTML para la lista de tareas del sector
+    // Los KPIs se calculan sobre los posts que se van a mostrar.
+    $sector_kpi_data = [
+        'total_pedidos'        => $pedidos_sector_query->post_count,
+        'total_prioridad_alta' => 0,
+        'tiempo_promedio_str'  => '0.0h',
+        'completadas_hoy'      => 0,
+    ];
+    
+    $total_tiempo_espera = 0;
+    $ahora = current_time('U');
+
+    if ($pedidos_sector_query->have_posts()) {
+        foreach ($pedidos_sector_query->posts as $pedido) {
+            if (get_field('prioridad_pedido', $pedido->ID) === 'Alta') {
+                $sector_kpi_data['total_prioridad_alta']++;
+            }
+            // Para el tiempo de espera, usar la fecha de modificación del post como proxy
+            $total_tiempo_espera += $ahora - get_the_modified_time('U', $pedido->ID);
+        }
+    }
+    if ($sector_kpi_data['total_pedidos'] > 0) {
+        $promedio_horas = ($total_tiempo_espera / $sector_kpi_data['total_pedidos']) / 3600;
+        $sector_kpi_data['tiempo_promedio_str'] = number_format($promedio_horas, 1) . 'h';
+    }
+
+    // Lógica para calcular 'completadas_hoy' para el sector
+    $today_start = strtotime('today', current_time('timestamp', true));
+    $today_end   = strtotime('tomorrow - 1 second', current_time('timestamp', true));
+    $completadas_hoy_args = [
+        'post_type'      => 'orden_produccion',
+        'posts_per_page' => -1,
+        'meta_query'     => [
+            [
+                'key'     => $campo_estado,
+                'value'   => 'Completado',
+                'compare' => '=',
+            ],
+            [
+                'key'     => str_replace('estado_', 'fecha_completado_', $campo_estado),
+                'value'   => date('Y-m-d H:i:s', $today_start),
+                'compare' => '>=',
+                'type'    => 'DATETIME',
+            ],
+            [
+                'key'     => str_replace('estado_', 'fecha_completado_', $campo_estado),
+                'value'   => date('Y-m-d H:i:s', $today_end),
+                'compare' => '<=',
+                'type'    => 'DATETIME',
+            ],
+        ],
+    ];
+    $completadas_hoy_query = new WP_Query($completadas_hoy_args);
+    $sector_kpi_data['completadas_hoy'] = $completadas_hoy_query->post_count;
+    wp_reset_postdata(); // Resetear postdata después de esta query
+
+    ob_start(); // Iniciar buffer de salida para el HTML de las tareas
+
+    if ($pedidos_sector_query->have_posts()) : while ($pedidos_sector_query->have_posts()) : $pedidos_sector_query->the_post();
+        $current_order_id = get_the_ID();
+        $asignado_a_field_name = str_replace('estado_', 'asignado_a_', $campo_estado);
+        $asignado_a_id = get_field($asignado_a_field_name, $current_order_id);
+        $asignado_a_user = $asignado_a_id ? get_userdata($asignado_a_id) : null;
+        $prioridad_pedido = get_field('prioridad_pedido', $current_order_id);
+
+        $task_card_args = [
+            'post_id'           => $current_order_id,
+            'titulo'            => get_the_title(),
+            'prioridad_class'   => 'prioridad-' . strtolower($prioridad_pedido ?: 'baja'),
+            'prioridad'         => $prioridad_pedido,
+            'nombre_cliente'    => get_field('nombre_cliente', $current_order_id),
+            'nombre_producto'   => get_field('nombre_producto', $current_order_id),
+            'permalink'         => get_permalink(),
+            'campo_estado'      => $campo_estado,
+            'estado_actual'     => get_field($campo_estado, $current_order_id),
+            'is_leader'         => $is_leader,
+            'operarios_sector'  => $operarios_del_sector,
+            'asignado_a_id'     => $asignado_a_id,
+            'asignado_a_name'   => $asignado_a_user ? $asignado_a_user->display_name : 'Sin asignar',
+            'logged_in_user_id' => $current_user->ID,
+        ];
+
+        get_template_part('template-parts/task-card', null, $task_card_args);
+
+    endwhile; else: ?>
+        <p class="no-tasks-message">No se encontraron tareas con el término de búsqueda.</p>
+    <?php endif; wp_reset_postdata(); 
+    
+    $tasks_html = ob_get_clean();
+
+    wp_send_json_success([
+        'message'    => 'Búsqueda de tareas de sector completada.',
+        'tasks_html' => $tasks_html,
+        'kpi_data'   => $sector_kpi_data
+    ]);
+    wp_die();
+}

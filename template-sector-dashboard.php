@@ -117,7 +117,7 @@ $pedidos_query = new WP_Query($pedidos_query_args);
     <?php get_template_part('template-parts/sidebar-sector'); ?>
 
     <main class="ghd-main-content" data-campo-estado="<?php echo esc_attr($campo_estado); ?>">
-                <header class="ghd-main-header">
+        <header class="ghd-main-header">
             <div class="header-title-wrapper">
                 <button id="mobile-menu-toggle" class="ghd-btn-icon"><i class="fa-solid fa-bars"></i></button>
                 <?php 
@@ -142,6 +142,18 @@ $pedidos_query = new WP_Query($pedidos_query_args);
                 <button id="ghd-refresh-tasks" class="ghd-btn ghd-btn-secondary"><i class="fa-solid fa-sync"></i> <span>Refrescar</span></button>
             </div>
         </header>
+
+            <!-------------------- Buscador -------------------->
+        <div class="ghd-filters-wrapper" style="margin-bottom: 1.5rem;">
+            <div class="filter-group" style="flex-grow: 2;">
+                <label for="ghd-search-sector">Buscar Tarea</label>
+                <input type="search" id="ghd-search-sector" placeholder="Código, cliente, producto..." style="width: 100%;">
+            </div>
+            <div class="filter-group" style="flex-grow: 0;">
+                <button id="ghd-reset-search-sector" class="ghd-btn ghd-btn-secondary" style="height: 42px; margin-top: auto;"><i class="fa-solid fa-xmark"></i> Limpiar</button>
+            </div>
+        </div>
+            <!--------------------Fin Buscador -------------------->
 
         <div class="ghd-kpi-grid">
             <div class="ghd-kpi-card"><div class="kpi-icon icon-blue"><i class="fa-solid fa-list-check"></i></div><div class="kpi-info"><span id="kpi-activas" class="kpi-value"><?php echo esc_html($sector_kpi_data['total_pedidos']); ?></span><span class="kpi-label">Activas</span></div></div>
