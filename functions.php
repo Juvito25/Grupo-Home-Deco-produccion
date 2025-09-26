@@ -210,6 +210,16 @@ function ghd_get_sectores() {
     ]; 
 }
 
+/**
+ * Normaliza una cadena de texto eliminando acentos y convirtiéndola a minúsculas.
+ * Utiliza la función remove_accents() de WordPress.
+ * @param string $string La cadena de texto a normalizar.
+ * @return string La cadena normalizada.
+ */
+function ghd_get_normalized_string($string) {
+    return strtolower(remove_accents($string));
+}
+
 // --- NUEVO: Función de ayuda para obtener la URL base del remito ---
 /**
  * Obtiene la URL base de la página de generación de remitos de forma robusta.
@@ -2902,4 +2912,712 @@ function ghd_refresh_assignation_section_callback() {
         'total_pedidos_asignacion' => $total_pedidos_asignacion_actualizado
     ]);
     wp_die();
+} // fin ghd_refresh_assignation_section_callback()
+
+/**
+ * Genera una cadena SQL con REPLACE anidados para eliminar acentos de una columna.
+ * Esto hace que la comparación sea insensible a acentos en MySQL.
+ * @param string $column_name El nombre de la columna SQL a normalizar (ej. 'post_title', 'pm.meta_value').
+ * @return string La cadena SQL con REPLACE anidados.
+ */
+function ghd_get_normalized_sql_column($column_name) {
+    global $wpdb;
+    $replacements = [
+        'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u',
+        'Á' => 'A', 'É' => 'E', 'Í' => 'I', 'Ó' => 'O', 'Ú' => 'U',
+        'ñ' => 'n', 'Ñ' => 'N',
+        'ü' => 'u', 'Ü' => 'U',
+        'ç' => 'c', 'Ç' => 'C',
+    ];
+    $sql = $column_name;
+    foreach ($replacements as $accented => $unaccented) {
+        $sql = $wpdb->prepare("REPLACE(%s, %s, %s)", $sql, $accented, $unaccented);
+    }
+    return $sql;
 }
+
+
+/**
+ * AJAX: Busca pedidos pendientes de asignación por término de búsqueda.
+ * Utiliza múltiples WP_Query para combinar resultados de búsqueda en título y campos ACF,
+ * garantizando insensibilidad a acentos y robustez.
+ * V_MULTIPLE_QUERY_FINAL - Solución definitiva y robusta.
+ */
+add_action('wp_ajax_ghd_search_assignation_orders', 'ghd_search_assignation_orders_callback');
+function ghd_search_assignation_orders_callback() {
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(['message' => 'Permisos insuficientes.'], 403);
+    }
+
+    $search_term = isset($_POST['search_term']) ? sanitize_text_field($_POST['search_term']) : '';
+
+    $found_post_ids = [];
+
+    // Normalizar el término de búsqueda en PHP (eliminar acentos y convertir a minúsculas)
+    $normalized_search_term = ghd_get_normalized_string($search_term);
+
+    // Si no hay término de búsqueda, simplemente cargamos todos los pedidos pendientes de asignación
+    if (empty($normalized_search_term)) {
+        $args_all = array(
+            'post_type'      => 'orden_produccion',
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'meta_query'     => array(
+                array(
+                    'key'     => 'estado_pedido',
+                    'value'   => 'Pendiente de Asignación',
+                    'compare' => '=',
+                ),
+            ),
+            'fields'         => 'ids', // Solo necesitamos los IDs
+            'orderby'        => 'date',
+            'order'          => 'DESC',
+        );
+        $query_all = new WP_Query($args_all);
+        $found_post_ids = $query_all->posts;
+        wp_reset_postdata();
+
+    } else {
+        // --- Consulta 1: Buscar en el título del post (código de pedido) ---
+        // Se busca el término normalizado en el título del post.
+        // Para que 's' sea insensible a acentos, necesitamos un filtro posts_search.
+        // Sin embargo, para evitar la complejidad de los filtros, vamos a buscar
+        // directamente en el título del post y luego filtrar los resultados en PHP.
+        // O, más simple, usar 's' y confiar en la collation de la DB para el título.
+        // Para una búsqueda 100% insensible a acentos en el título,
+        // la forma más robusta es obtener todos los posts y filtrar en PHP.
+
+        // Para evitar la complejidad de filtros posts_search y posts_where,
+        // vamos a obtener todos los posts pendientes de asignación y filtrar en PHP.
+        // Esto es menos eficiente para grandes volúmenes, pero es infalible.
+
+        $all_assignation_posts_args = array(
+            'post_type'      => 'orden_produccion',
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'meta_query'     => array(
+                array(
+                    'key'     => 'estado_pedido',
+                    'value'   => 'Pendiente de Asignación',
+                    'compare' => '=',
+                ),
+            ),
+            'fields'         => 'ids', // Solo necesitamos los IDs
+        );
+        $all_assignation_posts_query = new WP_Query($all_assignation_posts_args);
+        $all_assignation_post_ids = $all_assignation_posts_query->posts;
+        wp_reset_postdata();
+
+        if (!empty($all_assignation_post_ids)) {
+            foreach ($all_assignation_post_ids as $post_id) {
+                $post_title = get_the_title($post_id);
+                $nombre_cliente = get_field('nombre_cliente', $post_id);
+                $nombre_producto = get_field('nombre_producto', $post_id);
+                $material_del_producto = get_field('material_del_producto', $post_id);
+                $color_del_producto = get_field('color_del_producto', $post_id);
+
+                // Normalizar todos los campos para la comparación
+                $normalized_post_title = ghd_get_normalized_string($post_title);
+                $normalized_nombre_cliente = ghd_get_normalized_string($nombre_cliente);
+                $normalized_nombre_producto = ghd_get_normalized_string($nombre_producto);
+                $normalized_material_del_producto = ghd_get_normalized_string($material_del_producto);
+                $normalized_color_del_producto = ghd_get_normalized_string($color_del_producto);
+
+                // Comprobar si el término de búsqueda normalizado coincide con alguno de los campos normalizados
+                if (
+                    strpos($normalized_post_title, $normalized_search_term) !== false ||
+                    strpos($normalized_nombre_cliente, $normalized_search_term) !== false ||
+                    strpos($normalized_nombre_producto, $normalized_search_term) !== false ||
+                    strpos($normalized_material_del_producto, $normalized_search_term) !== false ||
+                    strpos($normalized_color_del_producto, $normalized_search_term) !== false
+                ) {
+                    $found_post_ids[] = $post_id;
+                }
+            }
+        }
+        // Asegurarse de que los IDs sean únicos
+        $found_post_ids = array_unique($found_post_ids);
+    }
+
+    // --- Consulta Final: Obtener los posts completos por ID ---
+    $pedidos_asignacion_query = new WP_Query(); // Inicializar una nueva WP_Query
+    if (!empty($found_post_ids)) {
+        $args_final = array(
+            'post_type'      => 'orden_produccion',
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'post__in'       => $found_post_ids,
+            'orderby'        => 'post__in', // Ordenar por el orden de los IDs proporcionados
+            'order'          => 'DESC', // O el orden que prefieras
+        );
+        $pedidos_asignacion_query = new WP_Query($args_final);
+    }
+    // Si $found_post_ids está vacío, $pedidos_asignacion_query no tendrá posts.
+
+    // Obtener la lista de vendedoras una sola vez para optimizar
+    $vendedoras_users = get_users([
+        'role__in' => ['vendedora', 'gerente_ventas'],
+        'orderby'  => 'display_name',
+        'order'    => 'ASC'
+    ]);
+
+    ob_start(); // Iniciar buffer de salida para el HTML de la tabla
+
+    if ($pedidos_asignacion_query->have_posts()) :
+        while ($pedidos_asignacion_query->have_posts()) : $pedidos_asignacion_query->the_post();
+            $order_id = get_the_ID();
+            $current_vendedora_id = get_field('vendedora_asignada', $order_id);
+            $current_priority = get_field('prioridad_pedido', $order_id);
+    ?>
+            <tr id="order-row-<?php echo $order_id; ?>">
+                <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
+                <td><?php echo esc_html(get_field('nombre_cliente', $order_id)); ?></td>
+                <td><?php echo esc_html(get_field('nombre_producto', $order_id)); ?></td>
+                <td>
+                    <select class="ghd-vendedora-selector" data-order-id="<?php echo $order_id; ?>">
+                        <option value="0" <?php selected($current_vendedora_id, 0); ?>>Asignar Vendedora</option>
+                        <?php foreach ($vendedoras_users as $vendedora) : ?>
+                            <option value="<?php echo esc_attr($vendedora->ID); ?>" <?php selected($current_vendedora_id, $vendedora->ID); ?>>
+                                <?php echo esc_html($vendedora->display_name); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </td>
+                <td>
+                    <select class="ghd-priority-selector" data-order-id="<?php echo $order_id; ?>">
+                        <option value="" <?php selected($current_priority, ''); ?>>Seleccionar Prioridad</option>
+                        <option value="Alta" <?php selected($current_priority, 'Alta'); ?>>Alta</option>
+                        <option value="Media" <?php selected($current_priority, 'Media'); ?>>Media</option>
+                        <option value="Baja" <?php selected($current_priority, 'Baja'); ?>>Baja</option>
+                    </select>
+                </td>
+                <td>
+                    <button class="ghd-btn ghd-btn-primary start-production-btn" data-order-id="<?php echo $order_id; ?>" disabled>
+                        Iniciar Producción
+                    </button>
+                </td>
+            </tr>
+    <?php
+        endwhile;
+    else: 
+    ?>
+        <tr><td colspan="6" style="text-align:center;">No se encontraron pedidos con el término de búsqueda.</td></tr>
+    <?php
+    endif;
+    wp_reset_postdata(); 
+    
+    $table_html = ob_get_clean(); // Obtener el contenido del buffer
+
+    wp_send_json_success([
+        'message' => 'Búsqueda de pedidos de asignación completada.',
+        'table_html' => $table_html,
+    ]);
+    wp_die();
+} // fin ghd_search_assignation_orders_callback()
+
+
+/**
+ * AJAX: Busca pedidos en producción por término de búsqueda.
+ * Utiliza múltiples WP_Query para combinar resultados de búsqueda en título y campos ACF,
+ * garantizando insensibilidad a acentos y robustez.
+ * Devuelve el HTML de la tabla y los KPIs actualizados.
+ */
+add_action('wp_ajax_ghd_search_production_orders', 'ghd_search_production_orders_callback');
+function ghd_search_production_orders_callback() {
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(['message' => 'Permisos insuficientes.'], 403);
+    }
+
+    $search_term = isset($_POST['search_term']) ? sanitize_text_field($_POST['search_term']) : '';
+
+    $found_post_ids = [];
+
+    // Normalizar el término de búsqueda en PHP (eliminar acentos y convertir a minúsculas)
+    $normalized_search_term = ghd_get_normalized_string($search_term);
+
+    // Si no hay término de búsqueda, simplemente cargamos todos los pedidos en producción
+    if (empty($normalized_search_term)) {
+        // Reutilizamos la función existente para obtener todos los datos de producción
+        $production_data = ghd_get_pedidos_en_produccion_data();
+        wp_send_json_success([
+            'message'    => 'Pedidos en producción refrescados.',
+            'table_html' => $production_data['tasks_html'],
+            'kpi_data'   => $production_data['kpi_data']
+        ]);
+        wp_die();
+    } else {
+        // --- Consulta para obtener IDs de todos los posts en producción ---
+        $all_production_posts_args = array(
+            'post_type'      => 'orden_produccion',
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'meta_query'     => array(
+                array(
+                    'key'     => 'estado_pedido',
+                    'value'   => ['En Producción', 'En Costura', 'En Tapicería/Embalaje', 'Listo para Entrega', 'En Despacho'],
+                    'compare' => 'IN',
+                ),
+            ),
+            'fields'         => 'ids', // Solo necesitamos los IDs
+        );
+        $all_production_posts_query = new WP_Query($all_production_posts_args);
+        $all_production_post_ids = $all_production_posts_query->posts;
+        wp_reset_postdata();
+
+        if (!empty($all_production_post_ids)) {
+            foreach ($all_production_post_ids as $post_id) {
+                $post_title = get_the_title($post_id);
+                $nombre_cliente = get_field('nombre_cliente', $post_id);
+                $nombre_producto = get_field('nombre_producto', $post_id);
+                $material_del_producto = get_field('material_del_producto', $post_id);
+                $color_del_producto = get_field('color_del_producto', $post_id);
+
+                // Normalizar todos los campos para la comparación
+                $normalized_post_title = ghd_get_normalized_string($post_title);
+                $normalized_nombre_cliente = ghd_get_normalized_string($nombre_cliente);
+                $normalized_nombre_producto = ghd_get_normalized_string($nombre_producto);
+                $normalized_material_del_producto = ghd_get_normalized_string($material_del_producto);
+                $normalized_color_del_producto = ghd_get_normalized_string($color_del_producto);
+
+                // Comprobar si el término de búsqueda normalizado coincide con alguno de los campos normalizados
+                if (
+                    strpos($normalized_post_title, $normalized_search_term) !== false ||
+                    strpos($normalized_nombre_cliente, $normalized_search_term) !== false ||
+                    strpos($normalized_nombre_producto, $normalized_search_term) !== false ||
+                    strpos($normalized_material_del_producto, $normalized_search_term) !== false ||
+                    strpos($normalized_color_del_producto, $normalized_search_term) !== false
+                ) {
+                    $found_post_ids[] = $post_id;
+                }
+            }
+        }
+        // Asegurarse de que los IDs sean únicos
+        $found_post_ids = array_unique($found_post_ids);
+    }
+
+    // --- Consulta Final: Obtener los posts completos por ID ---
+    $pedidos_produccion_query = new WP_Query(); // Inicializar una nueva WP_Query
+    if (!empty($found_post_ids)) {
+        $args_final = array(
+            'post_type'      => 'orden_produccion',
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'post__in'       => $found_post_ids,
+            'orderby'        => 'post__in', // Ordenar por el orden de los IDs proporcionados
+            'order'          => 'DESC', // O el orden que prefieras
+        );
+        $pedidos_produccion_query = new WP_Query($args_final);
+    }
+    // Si $found_post_ids está vacío, $pedidos_produccion_query no tendrá posts.
+
+    // Recalcular KPIs y generar HTML para la tabla de producción
+    $kpi_data = [
+        'total_pedidos_produccion'        => $pedidos_produccion_query->post_count,
+        'total_prioridad_alta_produccion' => 0,
+        'tiempo_promedio_str_produccion'  => '0.0h',
+        'completadas_hoy_produccion'      => 0,
+    ];
+    
+    $total_tiempo_produccion = 0;
+    $ahora = current_time('U'); // Timestamp actual en GMT
+
+    ob_start(); // Iniciar buffer de salida para el HTML de la tabla
+
+    if ($pedidos_produccion_query->have_posts()) :
+        while ($pedidos_produccion_query->have_posts()) : $pedidos_produccion_query->the_post();
+            $order_id = get_the_ID();
+            if (get_field('prioridad_pedido', $order_id) === 'Alta') {
+                $kpi_data['total_prioridad_alta_produccion']++;
+            }
+            
+            $produccion_iniciada_time = get_post_meta($order_id, 'historial_produccion_iniciada_timestamp', true);
+            if (empty($produccion_iniciada_time)) {
+                $produccion_iniciada_time = get_the_time('U', $order_id);
+            }
+            $tiempo_transcurrido = ($produccion_iniciada_time < $ahora) ? ($ahora - $produccion_iniciada_time) : 0;
+            $total_tiempo_produccion += $tiempo_transcurrido;
+            
+            $vendedora_obj = get_userdata(get_field('vendedora_asignada', $order_id));
+            ?>
+            <tr id="order-row-prod-<?php echo $order_id; ?>">
+                <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
+                <td><?php echo esc_html(get_field('nombre_cliente', $order_id)); ?></td>
+                <td><?php echo $vendedora_obj ? esc_html($vendedora_obj->display_name) : 'N/A'; ?></td>
+                <td><?php echo esc_html(get_field('nombre_producto', $order_id)); ?></td>
+                <td><?php echo esc_html(get_field('material_del_producto', $order_id)); ?></td>
+                <td>
+                    <?php $color_producto = get_field('color_del_producto', $order_id); ?>
+                    <?php if ($color_producto) : ?>
+                        <span class="color-swatch" style="background-color: <?php echo esc_attr($color_producto); ?>;"></span>
+                        <?php echo esc_html($color_producto); ?>
+                    <?php else: echo 'N/A'; endif; ?>
+                </td>
+                <td class="production-observations"><?php echo nl2br(esc_html(get_field('observaciones_personalizacion', $order_id))); ?></td>
+                <td><?php echo esc_html(get_field('estado_pedido', $order_id)); ?></td>
+                <td>
+                  <div class="production-substatus-badges">
+                        <?php
+                        $sectores_produccion = ghd_get_sectores(); 
+                        foreach ($sectores_produccion as $sector_key => $sector_display_name) {
+                            $sub_estado_display = ''; // Texto a mostrar en el badge
+                            $badge_class_to_assign = 'status-gray'; // Clase CSS a asignar
+
+                            $estado_embalaje_actual = get_field('estado_embalaje', $order_id);
+                            $show_logistica_badges = ($estado_embalaje_actual === 'Completado' || $estado_embalaje_actual === 'En Progreso');
+
+                            if ($sector_key === 'logistica') {
+                                if ($show_logistica_badges) { // Solo mostrar logística si embalaje está listo
+                                    $estado_fletero = get_field('estado_logistica_fletero', $order_id);
+                                    $estado_lider_logistica = get_field('estado_logistica_lider', $order_id);
+
+                                    if ($estado_fletero === 'Pendiente') {
+                                        $sub_estado_display = 'Logística Fletero: Pendiente';
+                                        $badge_class_to_assign = 'status-blue';
+                                    } elseif ($estado_fletero === 'Recogido') {
+                                        $sub_estado_display = 'Logística Fletero: Recogido';
+                                        $badge_class_to_assign = 'status-recogido-admin';
+                                    } elseif ($estado_lider_logistica === 'Completado') {
+                                        $sub_estado_display = 'Logística: Completado';
+                                        $badge_class_to_assign = 'status-green';
+                                    } else {
+                                        $sub_estado_display = 'Logística: ' . ($estado_lider_logistica ?: 'No Asignado'); 
+                                        $badge_class_to_assign = 'status-gray';
+                                    }
+                                }
+                            } else {
+                                $sub_estado_sector = get_field('estado_' . $sector_key, $order_id);
+                                if ($sub_estado_sector && $sub_estado_sector !== 'No Asignado') {
+                                    $sub_estado_display = ucfirst($sector_display_name) . ': ' . $sub_estado_sector;
+                                    if ($sub_estado_sector === 'Completado') $badge_class_to_assign = 'status-green';
+                                    elseif ($sub_estado_sector === 'En Progreso') $badge_class_to_assign = 'status-yellow';
+                                    elseif ($sub_estado_sector === 'Pendiente') $badge_class_to_assign = 'status-blue';
+                                }
+                            }
+
+                            if ($sub_estado_display) {
+                                echo '<span class="ghd-badge ' . esc_attr($badge_class_to_assign) . '">' . esc_html($sub_estado_display) . '</span>';
+                            }
+                        }
+                        ?>
+                    </div>
+                </td>
+                <td>
+                    <div class="assigned-completed-info">
+                        <?php 
+                        foreach ($sectores_produccion as $sector_key => $sector_display_name) {
+                            $assignee_id = 0;
+                            $completed_by_id = 0;
+                            $show_info = false;
+
+                            $estado_embalaje_actual = get_field('estado_embalaje', $order_id);
+                            $show_logistica_info = ($estado_embalaje_actual === 'Completado' || $estado_embalaje_actual === 'En Progreso');
+
+                            if ($sector_key === 'logistica') {
+                                if ($show_logistica_info) {
+                                    $assignee_id = intval(get_field('logistica_fletero_id', $order_id));
+                                    $completed_by_id = intval(get_field('completado_por_logistica_lider', $order_id)); 
+                                    $show_info = ($assignee_id > 0 || $completed_by_id > 0);
+
+                                    $estado_fletero = get_field('estado_logistica_fletero', $order_id);
+                                }
+                            } else {
+                                $assignee_id = intval(get_field('asignado_a_' . $sector_key, $order_id));
+                                $completed_by_id = intval(get_field('completado_por_' . $sector_key, $order_id));
+                                $show_info = ($assignee_id > 0 || $completed_by_id > 0);
+                            }
+                            
+                            $assignee_obj = ($assignee_id > 0) ? get_userdata($assignee_id) : null;
+                            $completed_by_obj = ($completed_by_id > 0) ? get_userdata($completed_by_id) : null;
+                            
+                            if ($show_info) {
+                                echo '<p><strong>' . esc_html(ucfirst($sector_display_name)) . ':</strong></p>';
+                                if ($assignee_obj) {
+                                    echo '<span class="ghd-info-badge info-assigned">Asignado: ' . esc_html($assignee_obj->display_name) . '</span>';
+                                }
+                                if ($sector_key === 'logistica') {
+                                    $estado_fletero_actual_log = get_field('estado_logistica_fletero', $order_id);
+                                    if ($estado_fletero_actual_log === 'Recogido') {
+                                        echo '<span class="ghd-info-badge info-completed">Recogido por: ' . esc_html($assignee_obj->display_name) . '</span>';
+                                    } elseif ($estado_fletero_actual_log === 'Entregado') {
+                                        echo '<span class="ghd-info-badge info-completed">Entregado por: ' . esc_html($assignee_obj->display_name) . '</span>';
+                                    } elseif ($completed_by_obj) {
+                                        echo '<span class="ghd-info-badge info-completed">Completado Líder: ' . esc_html($completed_by_obj->display_name) . '</span>';
+                                    }
+                                } elseif ($completed_by_obj) {
+                                    echo '<span class="ghd-info-badge info-completed">Completado: ' . esc_html($completed_by_obj->display_name) . '</span>';
+                                }
+                            }
+                        }
+                        ?>
+                    </div> 
+                </td> 
+                </td>                
+                <td><a href="<?php the_permalink(); ?>" class="ghd-btn ghd-btn-secondary ghd-btn-small">Ver</a></td>
+            </tr>
+            <?php
+        endwhile;
+    else : ?>
+        <tr><td colspan="11" style="text-align:center;">No se encontraron pedidos con el término de búsqueda.</td></tr>
+    <?php endif;
+    wp_reset_postdata();
+    $table_html = ob_get_clean();
+
+    // Recalcular KPIs para la respuesta AJAX
+    if ($pedidos_produccion_query->post_count > 0) {
+        $kpi_data['tiempo_promedio_str_produccion'] = number_format(($total_tiempo_produccion / $pedidos_produccion_query->post_count) / 3600, 1) . 'h';
+    } else {
+        $kpi_data['tiempo_promedio_str_produccion'] = '0.0h';
+    }
+
+    // Código para calcular 'completadas_hoy_produccion' se mantiene igual...
+    $today_start = strtotime('today', current_time('timestamp', true));
+    $today_end   = strtotime('tomorrow - 1 second', current_time('timestamp', true));
+    $completed_production_today_args = [
+        'post_type'      => 'orden_produccion',
+        'posts_per_page' => -1,
+        'meta_query'     => [['key' => 'estado_pedido', 'value' => 'Pendiente de Cierre Admin', 'compare' => '=']],
+        'date_query'     => [['after' => date('Y-m-d H:i:s', $today_start), 'before' => date('Y-m-d H:i:s', $today_end), 'inclusive' => true, 'column' => 'post_modified_gmt']]
+    ];
+    $completed_production_today_query = new WP_Query($completed_production_today_args);
+    $kpi_data['completadas_hoy_produccion'] = $completed_production_today_query->post_count;
+    
+    wp_send_json_success([
+        'message'    => 'Búsqueda de pedidos en producción completada.',
+        'table_html' => $table_html,
+        'kpi_data'   => $kpi_data
+    ]);
+    wp_die();
+} // fin ghd_search_production_orders_callback()
+
+/**
+ * AJAX: Busca pedidos pendientes de cierre por término de búsqueda.
+ * Utiliza múltiples WP_Query para combinar resultados de búsqueda en título y campos ACF,
+ * garantizando insensibilidad a acentos y robustez.
+ * Devuelve el HTML de la tabla y los KPIs actualizados.
+ */
+add_action('wp_ajax_ghd_search_closure_orders', 'ghd_search_closure_orders_callback');
+function ghd_search_closure_orders_callback() {
+    check_ajax_referer('ghd-ajax-nonce', 'nonce');
+
+    if (!current_user_can('manage_options') && !current_user_can('control_final_macarena')) {
+        wp_send_json_error(['message' => 'Permisos insuficientes.'], 403);
+    }
+
+    $search_term = isset($_POST['search_term']) ? sanitize_text_field($_POST['search_term']) : '';
+
+    $found_post_ids = [];
+
+    // Normalizar el término de búsqueda en PHP (eliminar acentos y convertir a minúsculas)
+    $normalized_search_term = ghd_get_normalized_string($search_term);
+
+    // Si no hay término de búsqueda, simplemente cargamos todos los pedidos pendientes de cierre
+    if (empty($normalized_search_term)) {
+        // Reutilizamos la función existente para obtener todos los datos de cierre
+        $admin_closure_kpis = ghd_calculate_admin_closure_kpis();
+        
+        ob_start();
+        $args_cierre = array(
+            'post_type'      => 'orden_produccion',
+            'posts_per_page' => -1,
+            'meta_query'     => array(
+                array(
+                    'key'     => 'estado_pedido',
+                    'value'   => 'Pendiente de Cierre Admin',
+                    'compare' => '=',
+                ),
+            ),
+            'orderby' => 'date',
+            'order'   => 'ASC',
+        );
+        $pedidos_cierre_query = new WP_Query($args_cierre);
+        $remito_base_url = ghd_get_remito_base_url();
+
+        if ($pedidos_cierre_query->have_posts()) :
+            while ($pedidos_cierre_query->have_posts()) : $pedidos_cierre_query->the_post();
+                $order_id = get_the_ID();
+                $remito_url = esc_url( add_query_arg( 'order_id', $order_id, $remito_base_url ) );
+            ?>
+                <tr id="order-row-closure-<?php echo $order_id; ?>">
+                    <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
+                    <td><?php echo esc_html(get_field('nombre_cliente', $order_id)); ?></td>
+                    <td><?php echo esc_html(get_field('nombre_producto', $order_id)); ?></td>
+                    <td><?php echo get_the_date('d/m/Y', $order_id); ?></td>
+                    <td>
+                        <a href="<?php echo $remito_url; ?>" target="_blank" class="ghd-btn ghd-btn-secondary ghd-btn-small generate-remito-btn" data-order-id="<?php echo $order_id; ?>">
+                            <i class="fa-solid fa-file-invoice"></i> Generar Remito
+                        </a>
+                        <button class="ghd-btn ghd-btn-success archive-order-btn" data-order-id="<?php echo $order_id; ?>">
+                            Archivar Pedido
+                        </button>
+                    </td>
+                </tr>
+            <?php
+            endwhile;
+        else: 
+        ?>
+            <tr><td colspan="5" style="text-align:center;">No hay pedidos pendientes de cierre.</td></tr>
+        <?php
+        endif;
+        wp_reset_postdata(); 
+        $closure_table_html = ob_get_clean();
+
+        wp_send_json_success([
+            'message'    => 'Pedidos pendientes de cierre refrescados.',
+            'table_html' => $closure_table_html,
+            'kpi_data'   => $admin_closure_kpis
+        ]);
+        wp_die();
+
+    } else {
+        // --- Consulta para obtener IDs de todos los posts pendientes de cierre ---
+        $all_closure_posts_args = array(
+            'post_type'      => 'orden_produccion',
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'meta_query'     => array(
+                array(
+                    'key'     => 'estado_pedido',
+                    'value'   => 'Pendiente de Cierre Admin',
+                    'compare' => '=',
+                ),
+            ),
+            'fields'         => 'ids', // Solo necesitamos los IDs
+        );
+        $all_closure_posts_query = new WP_Query($all_closure_posts_args);
+        $all_closure_post_ids = $all_closure_posts_query->posts;
+        wp_reset_postdata();
+
+        if (!empty($all_closure_post_ids)) {
+            foreach ($all_closure_post_ids as $post_id) {
+                $post_title = get_the_title($post_id);
+                $nombre_cliente = get_field('nombre_cliente', $post_id);
+                $nombre_producto = get_field('nombre_producto', $post_id);
+                // No hay material ni color en la tabla de cierre, solo estos campos
+                // $material_del_producto = get_field('material_del_producto', $post_id);
+                // $color_del_producto = get_field('color_del_producto', $post_id);
+
+                // Normalizar todos los campos para la comparación
+                $normalized_post_title = ghd_get_normalized_string($post_title);
+                $normalized_nombre_cliente = ghd_get_normalized_string($nombre_cliente);
+                $normalized_nombre_producto = ghd_get_normalized_string($nombre_producto);
+
+                // Comprobar si el término de búsqueda normalizado coincide con alguno de los campos normalizados
+                if (
+                    strpos($normalized_post_title, $normalized_search_term) !== false ||
+                    strpos($normalized_nombre_cliente, $normalized_search_term) !== false ||
+                    strpos($normalized_nombre_producto, $normalized_search_term) !== false
+                ) {
+                    $found_post_ids[] = $post_id;
+                }
+            }
+        }
+        // Asegurarse de que los IDs sean únicos
+        $found_post_ids = array_unique($found_post_ids);
+    }
+
+    // --- Consulta Final: Obtener los posts completos por ID ---
+    $pedidos_cierre_query = new WP_Query(); // Inicializar una nueva WP_Query
+    if (!empty($found_post_ids)) {
+        $args_final = array(
+            'post_type'      => 'orden_produccion',
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'post__in'       => $found_post_ids,
+            'orderby'        => 'post__in', // Ordenar por el orden de los IDs proporcionados
+            'order'          => 'ASC', // O el orden que prefieras
+        );
+        $pedidos_cierre_query = new WP_Query($args_final);
+    }
+    // Si $found_post_ids está vacío, $pedidos_cierre_query no tendrá posts.
+
+    // Recalcular KPIs y generar HTML para la tabla de cierre
+    $admin_closure_kpis = [
+        'total_pedidos_cierre'        => $pedidos_cierre_query->post_count,
+        'total_prioridad_alta_cierre' => 0,
+        'tiempo_promedio_str_cierre'  => '0.0h',
+        'completadas_hoy_cierre'      => 0,
+    ];
+    
+    $total_tiempo_espera = 0;
+    $ahora = current_time('U');
+
+    if ($pedidos_cierre_query->have_posts()) {
+        foreach ($pedidos_cierre_query->posts as $pedido) {
+            if (get_field('prioridad_pedido', $pedido->ID) === 'Alta') {
+                $admin_closure_kpis['total_prioridad_alta_cierre']++;
+            }
+            $total_tiempo_espera += $ahora - get_the_modified_time('U', $pedido->ID);
+        }
+    }
+    if ($admin_closure_kpis['total_pedidos_cierre'] > 0) {
+        $promedio_horas = ($total_tiempo_espera / $admin_closure_kpis['total_pedidos_cierre']) / 3600;
+        $admin_closure_kpis['tiempo_promedio_str_cierre'] = number_format($promedio_horas, 1) . 'h';
+    }
+
+    // Lógica para calcular 'completadas_hoy_cierre' (archivadas hoy por el Admin)
+    $today_start = strtotime('today', current_time('timestamp', true));
+    $today_end   = strtotime('tomorrow - 1 second', current_time('timestamp', true));
+    $completadas_hoy_args = [
+        'post_type'      => 'orden_produccion',
+        'posts_per_page' => -1,
+        'meta_query'     => [
+            [
+                'key'     => 'estado_pedido',
+                'value'   => 'Completado y Archivado',
+                'compare' => '=',
+            ],
+        ],
+        'date_query' => [ 
+            'after'     => date('Y-m-d H:i:s', $today_start),
+            'before'    => date('Y-m-d H:i:s', $today_end),
+            'inclusive' => true,
+            'column'    => 'post_modified_gmt',
+        ],
+    ];
+    $completadas_hoy_query = new WP_Query($completadas_hoy_args);
+    $admin_closure_kpis['completadas_hoy_cierre'] = $completadas_hoy_query->post_count;
+
+    ob_start(); // Iniciar buffer de salida para el HTML de la tabla
+
+    $remito_base_url = ghd_get_remito_base_url();
+    if ($pedidos_cierre_query->have_posts()) :
+        while ($pedidos_cierre_query->have_posts()) : $pedidos_cierre_query->the_post();
+            $order_id = get_the_ID();
+            $remito_url = esc_url( add_query_arg( 'order_id', $order_id, $remito_base_url ) );
+        ?>
+            <tr id="order-row-closure-<?php echo $order_id; ?>">
+                <td><a href="<?php the_permalink(); ?>" style="color: var(--color-rojo); font-weight: 600;"><?php the_title(); ?></a></td>
+                <td><?php echo esc_html(get_field('nombre_cliente', $order_id)); ?></td>
+                <td><?php echo esc_html(get_field('nombre_producto', $order_id)); ?></td>
+                <td><?php echo get_the_date('d/m/Y', $order_id); ?></td>
+                <td>
+                    <a href="<?php echo $remito_url; ?>" target="_blank" class="ghd-btn ghd-btn-secondary ghd-btn-small generate-remito-btn" data-order-id="<?php echo $order_id; ?>">
+                        <i class="fa-solid fa-file-invoice"></i> Generar Remito
+                    </a>
+                    <button class="ghd-btn ghd-btn-success archive-order-btn" data-order-id="<?php echo $order_id; ?>">
+                        Archivar Pedido
+                    </button>
+                </td>
+            </tr>
+        <?php
+        endwhile;
+    else: 
+    ?>
+        <tr><td colspan="5" style="text-align:center;">No se encontraron pedidos con el término de búsqueda.</td></tr>
+    <?php
+    endif;
+    wp_reset_postdata(); 
+    
+    $table_html = ob_get_clean(); // Obtener el contenido del buffer
+
+    wp_send_json_success([
+        'message'    => 'Búsqueda de pedidos de cierre completada.',
+        'table_html' => $table_html,
+        'kpi_data'   => $admin_closure_kpis
+    ]);
+    wp_die();
+} // fin ghd_search_closure_orders_callback()

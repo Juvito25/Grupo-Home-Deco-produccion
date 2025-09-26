@@ -213,6 +213,269 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     };
 
+    // --------------lógica para buscadores --------------   
+      // --- LÓGICA PARA EL BUSCADOR EN LA PESTAÑA DE ASIGNACIÓN ---
+    const searchAssignationInput = document.getElementById('ghd-search-assignation');
+    // const applySearchAssignationBtn = document.getElementById('ghd-apply-search-assignation'); // ELIMINAR ESTA LÍNEA
+    const resetSearchAssignationBtn = document.getElementById('ghd-reset-search-assignation');
+    const assignationTableBody = document.getElementById('ghd-orders-table-body');
+
+    let searchAssignationTimeout; // Variable para el debounce
+
+    // Función para realizar la búsqueda AJAX
+    const performAssignationSearch = () => {
+        if (!assignationTableBody) return;
+
+        const searchTerm = searchAssignationInput.value.trim();
+        assignationTableBody.style.opacity = '0.5';
+        // applySearchAssignationBtn.disabled = true; // ELIMINAR ESTA LÍNEA
+        resetSearchAssignationBtn.disabled = true;
+
+        const params = new URLSearchParams({
+            action: 'ghd_search_assignation_orders', // Endpoint AJAX
+            nonce: ghd_ajax.nonce,
+            search_term: searchTerm
+        });
+
+        fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+            .then(res => res.json())
+            .then(response => {
+                if (response.success && typeof response.data.table_html === 'string') {
+                    assignationTableBody.innerHTML = response.data.table_html;
+                    console.log('Búsqueda de asignación exitosa: ' + (response.data?.message || ''));
+                } else {
+                    console.error('Error al buscar pedidos de asignación: ' + (response.data?.message || 'Error desconocido.'));
+                    assignationTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No se encontraron pedidos con el término de búsqueda.</td></tr>';
+                }
+            })
+            .catch(error => {
+                console.error("Error de red al buscar asignación:", error);
+                assignationTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Error de red. Inténtalo de nuevo.</td></tr>';
+            })
+            .finally(() => {
+                assignationTableBody.style.opacity = '1';
+                // applySearchAssignationBtn.disabled = false; // ELIMINAR ESTA LÍNEA
+                resetSearchAssignationBtn.disabled = false;
+            });
+    };
+
+    // Event Listeners para el buscador
+    // ELIMINAR ESTE BLOQUE:
+    // if (applySearchAssignationBtn) {
+    //     applySearchAssignationBtn.addEventListener('click', performAssignationSearch);
+    // }
+
+    if (searchAssignationInput) {
+        searchAssignationInput.addEventListener('keyup', function(e) {
+            clearTimeout(searchAssignationTimeout); // Limpiar el timeout anterior
+            searchAssignationTimeout = setTimeout(() => {
+                performAssignationSearch();
+            }, 300); // Esperar 300ms después de la última pulsación
+        });
+    }
+
+    if (resetSearchAssignationBtn) {
+        resetSearchAssignationBtn.addEventListener('click', function() {
+            searchAssignationInput.value = ''; // Limpiar el campo de búsqueda
+            clearTimeout(searchAssignationTimeout); // Limpiar cualquier búsqueda pendiente
+            performAssignationSearch(); // Realizar una búsqueda vacía para mostrar todos los pedidos
+        });
+    }
+    // --- FIN LÓGICA PARA EL BUSCADOR EN LA PESTAÑA DE ASIGNACIÓN ---
+     
+    // --- LÓGICA PARA EL BUSCADOR EN LA PESTAÑA DE PRODUCCIÓN ---
+    const searchProductionInput = document.getElementById('ghd-search-production');
+    const applySearchProductionBtn = document.getElementById('ghd-apply-search-production');
+    const resetSearchProductionBtn = document.getElementById('ghd-reset-search-production');
+    const productionTableBody = document.getElementById('ghd-production-table-body');
+    const productionKPIsContainer = document.querySelector('#tab-production .ghd-kpi-grid'); // Contenedor de KPIs de producción
+
+    let searchProductionTimeout; // Variable para el debounce
+
+    // Función para realizar la búsqueda AJAX en Producción
+    const performProductionSearch = () => {
+        if (!productionTableBody || !productionKPIsContainer) return;
+
+        const searchTerm = searchProductionInput.value.trim();
+        productionTableBody.style.opacity = '0.5';
+        productionKPIsContainer.style.opacity = '0.5'; // También atenuar KPIs
+        applySearchProductionBtn.disabled = true;
+        resetSearchProductionBtn.disabled = true;
+
+        const params = new URLSearchParams({
+            action: 'ghd_search_production_orders', // Nuevo endpoint AJAX
+            nonce: ghd_ajax.nonce,
+            search_term: searchTerm
+        });
+
+        fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+            .then(res => res.json())
+            .then(response => {
+                if (response.success && typeof response.data.table_html === 'string') {
+                    productionTableBody.innerHTML = response.data.table_html;
+                    if (response.data.kpi_data) {
+                        updateAdminProductionKPIs(response.data.kpi_data); // Actualizar KPIs
+                    }
+                    console.log('Búsqueda de producción exitosa: ' + (response.data?.message || ''));
+                } else {
+                    console.error('Error al buscar pedidos en producción: ' + (response.data?.message || 'Error desconocido.'));
+                    productionTableBody.innerHTML = '<tr><td colspan="11" style="text-align:center;">No se encontraron pedidos con el término de búsqueda.</td></tr>';
+                    // Resetear KPIs si no hay resultados
+                    updateAdminProductionKPIs({
+                        total_pedidos_produccion: 0,
+                        total_prioridad_alta_produccion: 0,
+                        completadas_hoy_produccion: 0,
+                        tiempo_promedio_str_produccion: '0.0h'
+                    });
+                }
+            })
+            .catch(error => {
+                console.error("Error de red al buscar producción:", error);
+                productionTableBody.innerHTML = '<tr><td colspan="11" style="text-align:center;">Error de red. Inténtalo de nuevo.</td></tr>';
+                // Resetear KPIs en caso de error de red
+                updateAdminProductionKPIs({
+                    total_pedidos_produccion: 0,
+                    total_prioridad_alta_produccion: 0,
+                    completadas_hoy_produccion: 0,
+                    tiempo_promedio_str_produccion: '0.0h'
+                });
+            })
+            .finally(() => {
+                productionTableBody.style.opacity = '1';
+                productionKPIsContainer.style.opacity = '1';
+                applySearchProductionBtn.disabled = false;
+                resetSearchProductionBtn.disabled = false;
+            });
+    };
+
+    // Event Listeners para el buscador de Producción
+    if (applySearchProductionBtn) {
+        applySearchProductionBtn.addEventListener('click', performProductionSearch);
+    }
+
+    if (searchProductionInput) {
+        searchProductionInput.addEventListener('keyup', function(e) {
+            clearTimeout(searchProductionTimeout); // Limpiar el timeout anterior
+            searchProductionTimeout = setTimeout(() => {
+                performProductionSearch();
+            }, 300); // Esperar 300ms después de la última pulsación
+        });
+    }
+
+    if (resetSearchProductionBtn) {
+        resetSearchProductionBtn.addEventListener('click', function() {
+            searchProductionInput.value = ''; // Limpiar el campo de búsqueda
+            clearTimeout(searchProductionTimeout); // Limpiar cualquier búsqueda pendiente
+            // Llamar a la función de refresco existente para recargar la tabla completa y KPIs
+            const refreshProductionTasksBtn = document.getElementById('ghd-refresh-production-tasks');
+            if (refreshProductionTasksBtn) {
+                refreshProductionTasksBtn.click();
+            } else {
+                performProductionSearch(); // Fallback si el botón de refresco no existe
+            }
+        });
+    }
+    // --- FIN LÓGICA PARA EL BUSCADOR EN LA PESTAÑA DE PRODUCCIÓN ---
+
+    // Bloque a reemplazar en app.js
+// Ubicación: Dentro de document.addEventListener('DOMContentLoaded', function() { ... });
+//            En la sección de lógica del buscador de la pestaña de cierre.
+
+    // --- LÓGICA PARA EL BUSCADOR EN LA PESTAÑA DE CIERRE ---
+    const searchClosureInput = document.getElementById('ghd-search-closure');
+    // const applySearchClosureBtn = document.getElementById('ghd-apply-search-closure'); // ELIMINAR ESTA LÍNEA
+    const resetSearchClosureBtn = document.getElementById('ghd-reset-search-closure');
+    const closureTableBody = document.getElementById('ghd-closure-table-body');
+    const closureKPIsContainer = document.querySelector('#tab-closure .ghd-kpi-grid'); // Contenedor de KPIs de cierre
+
+    let searchClosureTimeout; // Variable para el debounce
+
+    // Función para realizar la búsqueda AJAX en Cierre
+    const performClosureSearch = () => {
+        if (!closureTableBody || !closureKPIsContainer) return;
+
+        const searchTerm = searchClosureInput.value.trim();
+        closureTableBody.style.opacity = '0.5';
+        closureKPIsContainer.style.opacity = '0.5'; // También atenuar KPIs
+        // applySearchClosureBtn.disabled = true; // ELIMINAR ESTA LÍNEA
+        resetSearchClosureBtn.disabled = true; // Solo deshabilitar el botón Limpiar
+
+        const params = new URLSearchParams({
+            action: 'ghd_search_closure_orders', // Endpoint AJAX
+            nonce: ghd_ajax.nonce,
+            search_term: searchTerm
+        });
+
+        fetch(ghd_ajax.ajax_url, { method: 'POST', body: params })
+            .then(res => res.json())
+            .then(response => {
+                if (response.success && typeof response.data.table_html === 'string') {
+                    closureTableBody.innerHTML = response.data.table_html;
+                    if (response.data.kpi_data) {
+                        updateAdminClosureKPIs(response.data.kpi_data); // Actualizar KPIs
+                    }
+                    console.log('Búsqueda de cierre exitosa: ' + (response.data?.message || ''));
+                } else {
+                    console.error('Error al buscar pedidos de cierre: ' + (response.data?.message || 'Error desconocido.'));
+                    closureTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">No se encontraron pedidos con el término de búsqueda.</td></tr>';
+                    // Resetear KPIs si no hay resultados
+                    updateAdminClosureKPIs({
+                        total_pedidos_cierre: 0,
+                        total_prioridad_alta_cierre: 0,
+                        completadas_hoy_cierre: 0,
+                        tiempo_promedio_str_cierre: '0.0h'
+                    });
+                }
+            })
+            .catch(error => {
+                console.error("Error de red al buscar cierre:", error);
+                closureTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Error de red. Inténtalo de nuevo.</td></tr>';
+                // Resetear KPIs en caso de error de red
+                updateAdminClosureKPIs({
+                    total_pedidos_cierre: 0,
+                    total_prioridad_alta_cierre: 0,
+                    completadas_hoy_cierre: 0,
+                    tiempo_promedio_str_cierre: '0.0h'
+                });
+            })
+            .finally(() => {
+                closureTableBody.style.opacity = '1';
+                closureKPIsContainer.style.opacity = '1';
+                // applySearchClosureBtn.disabled = false; // ELIMINAR ESTA LÍNEA
+                resetSearchClosureBtn.disabled = false; // Solo habilitar el botón Limpiar
+            });
+    };
+
+    // Event Listeners para el buscador de Cierre
+    // ELIMINAR ESTE BLOQUE:
+    // if (applySearchClosureBtn) {
+    //     applySearchClosureBtn.addEventListener('click', performClosureSearch);
+    // }
+
+    if (searchClosureInput) {
+        searchClosureInput.addEventListener('keyup', function(e) {
+            clearTimeout(searchClosureTimeout); // Limpiar el timeout anterior
+            searchClosureTimeout = setTimeout(() => {
+                performClosureSearch();
+            }, 300); // Esperar 300ms después de la última pulsación
+        });
+    }
+
+    if (resetSearchClosureBtn) {
+        resetSearchClosureBtn.addEventListener('click', function() {
+            searchClosureInput.value = ''; // Limpiar el campo de búsqueda
+            clearTimeout(searchClosureTimeout); // Limpiar cualquier búsqueda pendiente
+            // Llamar a la función de refresco existente para recargar la tabla completa y KPIs
+            const refreshClosureTasksBtn = document.getElementById('ghd-refresh-closure-tasks');
+            if (refreshClosureTasksBtn) {
+                refreshClosureTasksBtn.click();
+            } else {
+                performClosureSearch(); // Fallback si el botón de refresco no existe
+            }
+        });
+    }
+    // --- FIN LÓGICA PARA EL BUSCADOR EN LA PESTAÑA DE CIERRE ---
+    //------------------- fin lógica buscadores -------------------------------
 
     // --- LÓGICA UNIVERSAL DE EVENTOS EN EL CONTENIDO PRINCIPAL ---
     const mainContent = document.querySelector('.ghd-main-content');

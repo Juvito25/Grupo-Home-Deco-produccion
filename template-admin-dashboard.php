@@ -102,6 +102,17 @@ get_header();
                         </div>
                     </header>
 
+                    
+                    <div class="ghd-filters-wrapper" style="margin-bottom: 1.5rem;">
+                        <div class="filter-group" style="flex-grow: 2;">
+                            <label for="ghd-search-assignation">Buscar Pedido</label>
+                            <input type="search" id="ghd-search-assignation" placeholder="Código, cliente, producto, material..." style="width: 100%;">
+                        </div>
+                        <div class="filter-group" style="flex-grow: 0;">
+                            <button id="ghd-reset-search-assignation" class="ghd-btn ghd-btn-secondary" style="height: 42px; margin-top: auto;"><i class="fa-solid fa-xmark"></i> Limpiar</button>
+                        </div>
+                    </div>
+
                     <div class="ghd-card ghd-table-wrapper">
                         <table class="ghd-table">
                             <thead>
@@ -195,6 +206,17 @@ get_header();
                         <button id="ghd-refresh-production-tasks" class="ghd-btn ghd-btn-secondary"><i class="fa-solid fa-sync"></i> <span>Refrescar</span></button>
                     </div>
 
+                    <div class="ghd-filters-wrapper" style="margin-bottom: 1.5rem;">
+                        <div class="filter-group" style="flex-grow: 2;">
+                            <label for="ghd-search-production">Buscar Pedido</label>
+                            <input type="search" id="ghd-search-production" placeholder="Código, cliente, producto, material..." style="width: 100%;">
+                        </div>
+                        <div class="filter-group" style="flex-grow: 0;">
+                            <!-- <button id="ghd-apply-search-production" class="ghd-btn ghd-btn-primary" style="height: 42px; margin-top: auto;"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button> -->
+                            <button id="ghd-reset-search-production" class="ghd-btn ghd-btn-secondary" style="height: 42px; margin-top: auto;"><i class="fa-solid fa-xmark"></i> Limpiar</button>
+                        </div>
+                    </div>
+
                     <?php 
                     $production_kpis = $production_data_for_tabs['kpi_data']; // Reutilizamos los datos ya obtenidos
                     ?>
@@ -228,6 +250,17 @@ get_header();
                             <h2>Pedidos Pendientes de Cierre</h2>
                         <?php endif; ?>
                         <button id="ghd-refresh-closure-tasks" class="ghd-btn ghd-btn-secondary"><i class="fa-solid fa-sync"></i> <span>Refrescar</span></button>
+                    </div>
+
+                    <div class="ghd-filters-wrapper" style="margin-bottom: 1.5rem;">
+                        <div class="filter-group" style="flex-grow: 2;">
+                            <label for="ghd-search-closure">Buscar Pedido</label>
+                            <input type="search" id="ghd-search-closure" placeholder="Código, cliente, producto..." style="width: 100%;">
+                        </div>
+                        <div class="filter-group" style="flex-grow: 0;">
+                            <!-- <button id="ghd-apply-search-closure" class="ghd-btn ghd-btn-primary" style="height: 42px; margin-top: auto;"><i class="fa-solid fa-magnifying-glass"></i> Buscar</button> -->
+                            <button id="ghd-reset-search-closure" class="ghd-btn ghd-btn-secondary" style="height: 42px; margin-top: auto;"><i class="fa-solid fa-xmark"></i> Limpiar</button>
+                        </div>
                     </div>
 
                     <?php $admin_closure_kpis = $admin_closure_kpis_for_tabs; // Reutilizamos los datos ya obtenidos ?>
