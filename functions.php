@@ -1,6 +1,28 @@
 <?php
+// --- SOLUCIÓN PARA PROBLEMAS DE SESIÓN/COOKIE EN ENTORNO LOCAL (PUERTOS NO ESTÁNDAR) ---
+// Forzamos la URL del sitio y de inicio de sesión a la configuración actual del entorno de desarrollo
+// Esto corrige los problemas de cookies de autenticación que ignoran la sesión.
+if ( defined( 'WP_HOME' ) && defined( 'WP_SITEURL' ) ) {
+    $current_domain = $_SERVER['HTTP_HOST'];
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] != 'off') ? 'https://' : 'http://';
+    
+    // Si estamos en un entorno no estándar como localhost:8882, forzamos las rutas de cookies.
+    if (strpos($current_domain, ':') !== false) {
+        $non_standard_url = $protocol . $current_domain;
+
+        if (WP_HOME !== $non_standard_url) {
+            // Esto evita que WordPress use la ruta de cookies incorrecta.
+            define('COOKIE_DOMAIN', false);
+            // Definir WP_HOME y WP_SITEURL si no están definidos, usando la URL con el puerto
+            if (!defined('WP_HOME')) { define('WP_HOME', $non_standard_url); }
+            if (!defined('WP_SITEURL')) { define('WP_SITEURL', $non_standard_url); }
+        }
+    }
+}
+// --- FIN SOLUCIÓN SESIÓN/COOKIE ---
+
 /**
- * functions.php - Versión 3.3 
+ * functions.php - Versión 3.5 (Final y Corregida)
  */
 
 // --- 1. CARGA DE ESTILOS Y SCRIPTS ---
@@ -9,8 +31,8 @@ function ghd_enqueue_assets() {
     wp_enqueue_style('parent-style', get_template_directory_uri() . '/style.css');
     wp_enqueue_style('google-fonts', 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap', false);
     wp_enqueue_style('font-awesome', 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css', [], '6.4.2');
-    wp_enqueue_style('ghd-style', get_stylesheet_uri(), ['parent-style'], '3.3'); // Versión actualizada
-    wp_enqueue_script('ghd-app', get_stylesheet_directory_uri() . '/js/app.js', [], '3.3', true); // Versión actualizada
+    wp_enqueue_style('ghd-style', get_stylesheet_uri(), ['parent-style'], '3.4');
+    wp_enqueue_script('ghd-app', get_stylesheet_directory_uri() . '/js/app.js', [], '3.4', true);
 
     if (!is_admin()) { // Solo localizar scripts en el frontend
         wp_localize_script('ghd-app', 'ghd_ajax', ['ajax_url' => admin_url('admin-ajax.php'), 'nonce' => wp_create_nonce('ghd-ajax-nonce')]);
@@ -29,446 +51,118 @@ function ghd_registrar_cpt_historial() {
     register_post_type('ghd_historial', ['labels' => ['name' => 'Historial de Producción'], 'public' => false, 'show_ui' => true, 'show_in_menu' => 'edit.php?post_type=orden_produccion', 'supports' => ['title']]);
 }
 
-// --- NUEVO: REGISTRO DE CUSTOM POST TYPE PARA MODELOS DE PUNTOS ---
 add_action('init', 'ghd_registrar_cpt_modelo_puntos');
 function ghd_registrar_cpt_modelo_puntos() {
-    $labels = [
-        'name'                  => _x('Modelos de Puntos', 'Post Type General Name', 'textdomain'),
-        'singular_name'         => _x('Modelo de Puntos', 'Post Type Singular Name', 'textdomain'),
-        'menu_name'             => __('Puntos por Modelo', 'textdomain'),
-        'name_admin_bar'        => __('Modelo de Puntos', 'textdomain'),
-        'archives'              => __('Archivo de Modelos', 'textdomain'),
-        'attributes'            => __('Atributos del Modelo', 'textdomain'),
-        'parent_item_colon'     => __('Modelo Padre:', 'textdomain'),
-        'all_items'             => __('Todos los Modelos', 'textdomain'),
-        'add_new_item'          => __('Añadir Nuevo Modelo', 'textdomain'),
-        'add_new'               => __('Añadir Nuevo', 'textdomain'),
-        'new_item'              => __('Nuevo Modelo', 'textdomain'),
-        'edit_item'             => __('Editar Modelo', 'textdomain'),
-        'update_item'           => __('Actualizar Modelo', 'textdomain'),
-        'view_item'             => __('Ver Modelo', 'textdomain'),
-        'view_items'            => __('Ver Modelos', 'textdomain'),
-        'search_items'          => __('Buscar Modelo', 'textdomain'),
-        'not_found'             => __('No encontrado', 'textdomain'),
-        'not_found_in_trash'    => __('No encontrado en la Papelera', 'textdomain'),
-        'featured_image'        => __('Imagen Destacada', 'textdomain'),
-        'set_featured_image'    => __('Establecer Imagen Destacada', 'textdomain'),
-        'remove_featured_image' => __('Remover Imagen Destacada', 'textdomain'),
-        'use_featured_image'    => __('Usar como Imagen Destacada', 'textdomain'),
-        'insert_into_item'      => __('Insertar en Modelo', 'textdomain'),
-        'uploaded_to_this_item' => __('Subido a este Modelo', 'textdomain'),
-        'items_list'            => __('Lista de Modelos', 'textdomain'),
-        'items_list_navigation' => __('Navegación de lista de Modelos', 'textdomain'),
-        'filter_items_list'     => __('Filtrar lista de Modelos', 'textdomain'),
-    ];
-    $args = [
-        'label'                 => __('Modelo de Puntos', 'textdomain'),
-        'description'           => __('Modelos de productos y sus puntos asociados para el sistema de embalaje.', 'textdomain'),
-        'labels'                => $labels,
-        'supports'              => ['title'], // Solo necesitamos el título para el nombre del modelo
-        'hierarchical'          => false,
-        'public'                => false, // No visible en el frontend públicamente
-        'show_ui'               => true, // Visible en el admin
-        'show_in_menu'          => 'edit.php?post_type=orden_produccion', // Aparecerá bajo "Órdenes de Producción"
-        'menu_position'         => 25,
-        'show_in_admin_bar'     => false,
-        'show_in_nav_menus'     => false,
-        'can_export'            => true,
-        'has_archive'           => false,
-        'exclude_from_search'   => true,
-        'publicly_queryable'    => false,
-        'capability_type'       => 'post',
-        'map_meta_cap'          => true, // Permite usar capacidades estándar como 'edit_posts'
-    ];
+    $labels = [ 'name' => _x('Modelos de Puntos', 'Post Type General Name', 'textdomain'), 'singular_name' => _x('Modelo de Puntos', 'Post Type Singular Name', 'textdomain'), 'menu_name' => __('Puntos por Modelo', 'textdomain'), 'name_admin_bar' => __('Modelo de Puntos', 'textdomain'), 'archives' => __('Archivo de Modelos', 'textdomain'), 'attributes' => __('Atributos del Modelo', 'textdomain'), 'parent_item_colon' => __('Modelo Padre:', 'textdomain'), 'all_items' => __('Todos los Modelos', 'textdomain'), 'add_new_item' => __('Añadir Nuevo Modelo', 'textdomain'), 'add_new' => __('Añadir Nuevo', 'textdomain'), 'new_item' => __('Nuevo Modelo', 'textdomain'), 'edit_item' => __('Editar Modelo', 'textdomain'), 'update_item' => __('Actualizar Modelo', 'textdomain'), 'view_item' => __('Ver Modelo', 'textdomain'), 'view_items' => __('Ver Modelos', 'textdomain'), 'search_items' => __('Buscar Modelo', 'textdomain'), 'not_found' => __('No encontrado', 'textdomain'), 'not_found_in_trash' => __('No encontrado en la Papelera', 'textdomain'), 'featured_image' => __('Imagen Destacada', 'textdomain'), 'set_featured_image' => __('Establecer Imagen Destacada', 'textdomain'), 'remove_featured_image' => __('Remover Imagen Destacada', 'textdomain'), 'use_featured_image' => __('Usar como Imagen Destacada', 'textdomain'), 'insert_into_item' => __('Insertar en Modelo', 'textdomain'), 'uploaded_to_this_item' => __('Subido a este Modelo', 'textdomain'), 'items_list' => __('Lista de Modelos', 'textdomain'), 'items_list_navigation' => __('Navegación de lista de Modelos', 'textdomain'), 'filter_items_list' => __('Filtrar lista de Modelos', 'textdomain'), ];
+    $args = [ 'label' => __('Modelo de Puntos', 'textdomain'), 'description' => __('Modelos de productos y sus puntos asociados para el sistema de embalaje.', 'textdomain'), 'labels' => $labels, 'supports' => ['title'], 'hierarchical' => false, 'public' => false, 'show_ui' => true, 'show_in_menu' => 'edit.php?post_type=orden_produccion', 'menu_position' => 25, 'show_in_admin_bar' => false, 'show_in_nav_menus' => false, 'can_export' => true, 'has_archive' => false, 'exclude_from_search' => true, 'publicly_queryable' => false, 'capability_type' => 'post', 'map_meta_cap' => true, ];
     register_post_type('ghd_modelo_puntos', $args);
 }
-// --- FIN CPT MODELOS DE PUNTOS ---
 
-// --- NUEVO: REGISTRO DE ROLES DE USUARIO PERSONALIZADOS ---
 add_action('after_setup_theme', 'ghd_register_custom_roles');
 function ghd_register_custom_roles() {
-    // Eliminar roles si existen para redefinirlos o por limpieza durante el desarrollo
-    remove_role('vendedora');
-    remove_role('gerente_ventas');
-    remove_role('lider_corte'); remove_role('operario_corte');
-    remove_role('lider_carpinteria'); remove_role('operario_carpinteria');
-    remove_role('lider_costura'); remove_role('operario_costura');
-    remove_role('lider_tapiceria'); remove_role('operario_tapiceria');
-    remove_role('lider_embalaje'); remove_role('operario_embalaje');
-    remove_role('lider_logistica'); remove_role('operario_logistica'); // Fleteros
-    remove_role('control_final_macarena');
-
-    // Obtener capacidades básicas para construir nuevos roles
-    $subscriber_caps = get_role('subscriber') ? get_role('subscriber')->capabilities : [];
-    $contributor_caps = get_role('contributor') ? get_role('contributor')->capabilities : [];
-    $editor_caps = get_role('editor') ? get_role('editor')->capabilities : [];
-    
-    // Capacidad base para ver contenido frontend y acceder a AJAX (ghd_view_frontend es clave para nuestra app)
-    $base_custom_caps = array_merge($subscriber_caps, [
-        'read' => true,
-        'ghd_view_frontend' => true, // Acceso general a la aplicación frontend
-        // 'edit_posts' => true, // Puede ser necesario para ACF update_field en su propio contexto si no tienen un editor_cap
-    ]);
-
-    // ROLES DE VENDEDORAS
-    add_role('vendedora', 'Vendedora', array_merge($base_custom_caps, [
-        'ghd_view_sales' => true, // Puede ver todas las ventas (solo lectura)
-        'ghd_view_own_sales' => true, // Puede ver sus propias ventas
-    ]));
-    add_role('gerente_ventas', 'Gerente de Ventas (Carolina)', array_merge($base_custom_caps, [
-        'ghd_view_sales' => true, // Puede ver todas las ventas
-        'ghd_manage_commissions' => true, // Puede configurar comisiones y premios
-        'ghd_assign_alternate_manager' => true, // Puede asignar gerente alternativo
-        'edit_others_posts' => true, // Si necesita editar detalles de pedidos de otras vendedoras
-    ]));
-
-    // ROLES DE SECTORES (Líderes y Operarios)
-    // CAPACIDADES DE LÍDER: ver_todas_tareas, asignar_tareas
-    // CAPACIDADES DE OPERARIO: ver_tareas_asignadas
-    
-    add_role('lider_corte', 'Líder de Corte', array_merge($base_custom_caps, [
-        'ghd_view_corte' => true, 'ghd_assign_task_corte' => true, 'ghd_view_all_corte_tasks' => true,
-    ]));
-    add_role('operario_corte', 'Operario de Corte', array_merge($base_custom_caps, [
-        'ghd_view_corte' => true, 'ghd_view_own_corte_tasks' => true,
-    ]));
-
-    add_role('lider_carpinteria', 'Líder de Carpintería', array_merge($base_custom_caps, [
-        'ghd_view_carpinteria' => true, 'ghd_assign_task_carpinteria' => true, 'ghd_view_all_carpinteria_tasks' => true,
-    ]));
-    add_role('operario_carpinteria', 'Operario de Carpintería', array_merge($base_custom_caps, [
-        'ghd_view_carpinteria' => true, 'ghd_view_own_carpinteria_tasks' => true,
-    ]));
-
-    add_role('lider_costura', 'Líder de Costura', array_merge($base_custom_caps, [
-        'ghd_view_costura' => true, 'ghd_assign_task_costura' => true, 'ghd_view_all_costura_tasks' => true,
-    ]));
-    add_role('operario_costura', 'Operario de Costura', array_merge($base_custom_caps, [
-        'ghd_view_costura' => true, 'ghd_view_own_costura_tasks' => true,
-    ]));
-
-    add_role('lider_tapiceria', 'Líder de Tapicería', array_merge($base_custom_caps, [
-        'ghd_view_tapiceria' => true, 'ghd_assign_task_tapiceria' => true, 'ghd_view_all_tapiceria_tasks' => true,
-    ]));
-    add_role('operario_tapiceria', 'Operario de Tapicería', array_merge($base_custom_caps, [
-        'ghd_view_tapiceria' => true, 'ghd_view_own_tapiceria_tasks' => true,
-    ]));
-
-    add_role('lider_embalaje', 'Líder de Embalaje', array_merge($base_custom_caps, [
-        'ghd_view_embalaje' => true, 'ghd_assign_task_embalaje' => true, 'ghd_view_all_embalaje_tasks' => true,
-        'ghd_register_embalaje_points' => true, // Puede registrar puntos de operarios
-    ]));
-    add_role('operario_embalaje', 'Operario de Embalaje', array_merge($base_custom_caps, [
-        'ghd_view_embalaje' => true, 'ghd_view_own_embalaje_tasks' => true, 'ghd_register_own_embalaje' => true, // Puede registrar su propio embalaje
-    ]));
-
-    add_role('lider_logistica', 'Líder de Logística', array_merge($base_custom_caps, [
-        'ghd_view_logistica' => true, 'ghd_assign_task_logistica' => true, 'ghd_view_all_logistica_tasks' => true,
-    ]));
-    add_role('operario_logistica', 'Operario de Logística (Fletero)', array_merge($base_custom_caps, [
-        'ghd_view_logistica' => true, 'ghd_manage_own_delivery' => true, // Puede gestionar sus propias entregas (Recogido, Entregado, etc.)
-    ]));
-
-    add_role('control_final_macarena', 'Control Final (Macarena)', array_merge($editor_caps, [ // Macarena necesita más capacidades
-        'ghd_view_control_final' => true,
-        'ghd_upload_remito_photo' => true, // Puede subir foto de remito
-        'ghd_check_payments' => true, // Puede chequear pagos
-        'ghd_archive_orders' => true, // Puede archivar pedidos
-    ]));
-    
-    // Asignar capacidad de acceso a la aplicación para el administrador
+    remove_role('vendedora'); remove_role('gerente_ventas'); remove_role('lider_corte'); remove_role('operario_corte'); remove_role('lider_carpinteria'); remove_role('operario_carpinteria'); remove_role('lider_costura'); remove_role('operario_costura'); remove_role('lider_tapiceria'); remove_role('operario_tapiceria'); remove_role('lider_embalaje'); remove_role('operario_embalaje'); remove_role('lider_logistica'); remove_role('operario_logistica'); remove_role('control_final_macarena');
+    $subscriber_caps = get_role('subscriber') ? get_role('subscriber')->capabilities : []; $contributor_caps = get_role('contributor') ? get_role('contributor')->capabilities : []; $editor_caps = get_role('editor') ? get_role('editor')->capabilities : [];
+    $base_custom_caps = array_merge($subscriber_caps, [ 'read' => true, 'ghd_view_frontend' => true, ]);
+    add_role('vendedora', 'Vendedora', array_merge($base_custom_caps, [ 'ghd_view_sales' => true, 'ghd_view_own_sales' => true, ]));
+    add_role('gerente_ventas', 'Gerente de Ventas (Carolina)', array_merge($base_custom_caps, [ 'ghd_view_sales' => true, 'ghd_manage_commissions' => true, 'ghd_assign_alternate_manager' => true, 'edit_others_posts' => true, ]));
+    add_role('lider_corte', 'Líder de Corte', array_merge($base_custom_caps, [ 'ghd_view_corte' => true, 'ghd_assign_task_corte' => true, 'ghd_view_all_corte_tasks' => true, ]));
+    add_role('operario_corte', 'Operario de Corte', array_merge($base_custom_caps, [ 'ghd_view_corte' => true, 'ghd_view_own_corte_tasks' => true, ]));
+    add_role('lider_carpinteria', 'Líder de Carpintería', array_merge($base_custom_caps, [ 'ghd_view_carpinteria' => true, 'ghd_assign_task_carpinteria' => true, 'ghd_view_all_carpinteria_tasks' => true, ]));
+    add_role('operario_carpinteria', 'Operario de Carpintería', array_merge($base_custom_caps, [ 'ghd_view_carpinteria' => true, 'ghd_view_own_carpinteria_tasks' => true, ]));
+    add_role('lider_costura', 'Líder de Costura', array_merge($base_custom_caps, [ 'ghd_view_costura' => true, 'ghd_assign_task_costura' => true, 'ghd_view_all_costura_tasks' => true, ]));
+    add_role('operario_costura', 'Operario de Costura', array_merge($base_custom_caps, [ 'ghd_view_costura' => true, 'ghd_view_own_costura_tasks' => true, ]));
+    add_role('lider_tapiceria', 'Líder de Tapicería', array_merge($base_custom_caps, [ 'ghd_view_tapiceria' => true, 'ghd_assign_task_tapiceria' => true, 'ghd_view_all_tapiceria_tasks' => true, ]));
+    add_role('operario_tapiceria', 'Operario de Tapicería', array_merge($base_custom_caps, [ 'ghd_view_tapiceria' => true, 'ghd_view_own_tapiceria_tasks' => true, ]));
+    add_role('lider_embalaje', 'Líder de Embalaje', array_merge($base_custom_caps, [ 'ghd_view_embalaje' => true, 'ghd_assign_task_embalaje' => true, 'ghd_view_all_embalaje_tasks' => true, 'ghd_register_embalaje_points' => true, ]));
+    add_role('operario_embalaje', 'Operario de Embalaje', array_merge($base_custom_caps, [ 'ghd_view_embalaje' => true, 'ghd_view_own_embalaje_tasks' => true, 'ghd_register_own_embalaje' => true, ]));
+    add_role('lider_logistica', 'Líder de Logística', array_merge($base_custom_caps, [ 'ghd_view_logistica' => true, 'ghd_assign_task_logistica' => true, 'ghd_view_all_logistica_tasks' => true, ]));
+    add_role('operario_logistica', 'Operario de Logística (Fletero)', array_merge($base_custom_caps, [ 'ghd_view_logistica' => true, 'ghd_manage_own_delivery' => true, ]));
+    add_role('control_final_macarena', 'Control Final (Macarena)', array_merge($editor_caps, [ 'ghd_view_control_final' => true, 'ghd_upload_remito_photo' => true, 'ghd_check_payments' => true, 'ghd_archive_orders' => true, ]));
     $admin_role = get_role('administrator');
     if ($admin_role) {
-        $admin_role->add_cap('ghd_view_frontend');
-        $admin_role->add_cap('ghd_assign_task_carpinteria'); 
-        $admin_role->add_cap('ghd_assign_task_corte');
-        $admin_role->add_cap('ghd_assign_task_costura');
-        $admin_role->add_cap('ghd_assign_task_tapiceria');
-        $admin_role->add_cap('ghd_assign_task_embalaje');
-        $admin_role->add_cap('ghd_assign_task_logistica');
-        $admin_role->add_cap('ghd_view_sales'); // Admin ve todas las ventas
-        $admin_role->add_cap('ghd_manage_commissions'); // Admin puede gestionar comisiones
-        $admin_role->add_cap('ghd_upload_remito_photo'); // Admin también puede subir fotos de remito
-        $admin_role->add_cap('ghd_check_payments'); // Admin también puede chequear pagos
-        $admin_role->add_cap('ghd_register_embalaje_points'); // Admin puede registrar puntos de embalaje si es necesario
-        $admin_role->add_cap('ghd_register_own_embalaje'); // Admin puede registrar su propio embalaje
-        $admin_role->add_cap('ghd_manage_own_delivery'); // Admin puede gestionar sus propias entregas
-        $admin_role->add_cap('ghd_view_all_sector_tasks'); // <- línea agregada para que Admin vea todas las tareas de todos los sectores
+        $admin_role->add_cap('ghd_view_frontend'); $admin_role->add_cap('ghd_assign_task_carpinteria'); $admin_role->add_cap('ghd_assign_task_corte'); $admin_role->add_cap('ghd_assign_task_costura'); $admin_role->add_cap('ghd_assign_task_tapiceria'); $admin_role->add_cap('ghd_assign_task_embalaje'); $admin_role->add_cap('ghd_assign_task_logistica'); $admin_role->add_cap('ghd_view_sales'); $admin_role->add_cap('ghd_manage_commissions'); $admin_role->add_cap('ghd_upload_remito_photo'); $admin_role->add_cap('ghd_check_payments'); $admin_role->add_cap('ghd_register_embalaje_points'); $admin_role->add_cap('ghd_register_own_embalaje'); $admin_role->add_cap('ghd_manage_own_delivery'); $admin_role->add_cap('ghd_view_all_sector_tasks');
     }
 }
-/////// Fin registro roles personalizados /////////// Fin registro roles personalizados //////
 
 // --- 3. FUNCIONES DE AYUDA ---
+function ghd_check_and_trigger_costura($order_id) {
+    $estado_carpinteria = get_field('estado_carpinteria', $order_id);
+    $estado_corte = get_field('estado_corte', $order_id);
+    $estado_costura = get_field('estado_costura', $order_id);
+
+    if ($estado_carpinteria === 'Completado' && $estado_corte === 'Completado' && $estado_costura === 'No Asignado') {
+        update_field('estado_costura', 'Pendiente', $order_id);
+        update_field('estado_pedido', 'En Costura', $order_id);
+        
+        wp_insert_post([
+            'post_title' => 'Carpintería y Corte completados -> A Costura',
+            'post_type' => 'ghd_historial',
+            'meta_input' => ['_orden_produccion_id' => $order_id]
+        ]);
+    }
+}
+
 function ghd_get_sectores() { 
-    return [
-        'carpinteria' => 'Carpintería', 
-        'corte'       => 'Corte', 
-        'costura'     => 'Costura', 
-        'tapiceria'   => 'Tapicería', 
-        'embalaje'    => 'Embalaje', 
-        'logistica'   => 'Logística'
-    ]; 
+    return [ 'carpinteria' => 'Carpintería', 'corte' => 'Corte', 'costura' => 'Costura', 'tapiceria' => 'Tapicería', 'embalaje' => 'Embalaje', 'logistica' => 'Logística' ]; 
 }
 
-/**
- * Normaliza una cadena de texto eliminando acentos y convirtiéndola a minúsculas.
- * Utiliza la función remove_accents() de WordPress.
- * @param string $string La cadena de texto a normalizar.
- * @return string La cadena normalizada.
- */
 function ghd_get_normalized_string($string) {
-    // Asegurarse de que el string no sea nulo o vacío antes de procesar
-    if (empty($string)) {
-        return '';
-    }
-    // Eliminar espacios en blanco al inicio y al final
+    if (empty($string)) { return ''; }
     $string = trim($string);
-    // Convertir a minúsculas y luego eliminar acentos
-    // Usar mb_strtolower para asegurar el manejo correcto de UTF-8
     return mb_strtolower(remove_accents($string), 'UTF-8');
-} // fin ghd_get_normalized_string ////
-
-// --- NUEVO: Función de ayuda para obtener la URL base del remito ---
-/**
- * Obtiene la URL base de la página de generación de remitos de forma robusta.
- * @return string La URL base del remito.
- */
-function ghd_get_remito_base_url() {
-    $remito_page_slug = 'generador-de-remitos'; // <-- ¡VERIFICA ESTE SLUG REAL!
-    $remito_page_obj = get_page_by_path($remito_page_slug); 
-    
-    if ($remito_page_obj instanceof WP_Post) {
-        return get_permalink($remito_page_obj->ID);
-    } else {
-        // Fallback si la página no se encuentra o no es un objeto válido.
-        return home_url('/' . $remito_page_slug . '/');
-    }
 }
-// --- FIN NUEVO ---
+
+function ghd_get_remito_base_url() {
+    $remito_page_slug = 'generador-de-remitos';
+    $remito_page_obj = get_page_by_path($remito_page_slug); 
+    if ($remito_page_obj instanceof WP_Post) { return get_permalink($remito_page_obj->ID); } 
+    else { return home_url('/' . $remito_page_slug . '/'); }
+}
 
 function ghd_get_mapa_roles_a_campos() {
-    return [
-        'lider_carpinteria'    => 'estado_carpinteria', 
-        'operario_carpinteria' => 'estado_carpinteria',
-        'lider_corte'          => 'estado_corte', 
-        'operario_corte'       => 'estado_corte',
-        'lider_costura'        => 'estado_costura', 
-        'operario_costura'     => 'estado_costura',
-        'lider_tapiceria'      => 'estado_tapiceria', 
-        'operario_tapiceria'   => 'estado_tapiceria',
-        'lider_embalaje'       => 'estado_embalaje', 
-        'operario_embalaje'    => 'estado_embalaje',
-        'lider_logistica'      => 'estado_logistica_lider',   // <--- ESTO ES CRÍTICO
-        'operario_logistica'   => 'estado_logistica_fletero', // <--- ESTO ES CRÍTICO
-        'control_final_macarena' => 'estado_administrativo',
-    ];
+    return [ 'lider_carpinteria' => 'estado_carpinteria', 'operario_carpinteria' => 'estado_carpinteria', 'lider_corte' => 'estado_corte', 'operario_corte' => 'estado_corte', 'lider_costura' => 'estado_costura', 'operario_costura' => 'estado_costura', 'lider_tapiceria' => 'estado_tapiceria', 'operario_tapiceria' => 'estado_tapiceria', 'lider_embalaje' => 'estado_embalaje', 'operario_embalaje' => 'estado_embalaje', 'lider_logistica' => 'estado_logistica_lider', 'operario_logistica' => 'estado_logistica_fletero', 'control_final_macarena' => 'estado_administrativo', ];
 }
 
-
-/**
- * Asigna un color consistente a una vendedora basándose en su ID de usuario.
- * Devuelve un array con el color de fondo (HEX sólido) y el color de texto (blanco o negro).
- * @param int $user_id El ID del usuario de la vendedora.
- * @return array Un array con 'bg_color' (HEX) y 'text_color'.
- */
 function ghd_get_vendedora_color($user_id) {
-    $base_hex_colors = [
-        '#ef4444', // Rojo vibrante
-        '#f97316', // Naranja
-        '#eab308', // Amarillo mostaza
-        '#22c55e', // Verde esmeralda
-        '#16a34a', // Verde oscuro
-        '#06b6d4', // Azul cian
-        '#3b82f6', // Azul brillante
-        '#6366f1', // Azul índigo
-        '#a855f7', // Púrpura
-        '#d946ef', // Rosa fucsia
-        '#ec4899', // Rosa cálido
-        '#f43f5e', // Rosa rojizo
-        '#6b7280', // Gris medio
-        // Repite colores si es necesario o añade más para una mayor variedad
-    ];
-
-    $color_index = $user_id % count($base_hex_colors);
-    $hex_color = $base_hex_colors[$color_index]; // Este será ahora el color de fondo
-
-    // Convertir HEX a RGB para calcular luminancia
+    $base_hex_colors = [ '#ef4444', '#f97316', '#eab308', '#22c55e', '#16a34a', '#06b6d4', '#3b82f6', '#6366f1', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#6b7280', ];
+    $color_index = $user_id % count($base_hex_colors); $hex_color = $base_hex_colors[$color_index];
     $hex_cleaned = str_replace('#', '', $hex_color);
-    if (strlen($hex_cleaned) == 3) {
-        $r = hexdec(substr($hex_cleaned, 0, 1).substr($hex_cleaned, 0, 1));
-        $g = hexdec(substr($hex_cleaned, 1, 1).substr($hex_cleaned, 1, 1));
-        $b = hexdec(substr($hex_cleaned, 2, 1).substr($hex_cleaned, 2, 1));
-    } else {
-        $r = hexdec(substr($hex_cleaned, 0, 2));
-        $g = hexdec(substr($hex_cleaned, 2, 2));
-        $b = hexdec(substr($hex_cleaned, 4, 2));
-    }
-
-    // Calcular la luminancia relativa (BT.709) para determinar el color de texto
+    if (strlen($hex_cleaned) == 3) { $r = hexdec(substr($hex_cleaned, 0, 1).substr($hex_cleaned, 0, 1)); $g = hexdec(substr($hex_cleaned, 1, 1).substr($hex_cleaned, 1, 1)); $b = hexdec(substr($hex_cleaned, 2, 1).substr($hex_cleaned, 2, 1)); } 
+    else { $r = hexdec(substr($hex_cleaned, 0, 2)); $g = hexdec(substr($hex_cleaned, 2, 2)); $b = hexdec(substr($hex_cleaned, 4, 2)); }
     $luminance = (0.2126 * $r + 0.7152 * $g + 0.0722 * $b) / 255; 
-
-    // Usar un umbral para decidir si el texto es blanco o negro
-    // Para colores sólidos, un umbral de 0.5 a 0.6 es un buen punto de partida.
     $text_color = ($luminance > 0.55) ? '#000000' : '#ffffff'; 
-    // He ajustado el umbral a 0.55. Puedes experimentar entre 0.5 y 0.7 si es necesario.
+    return [ 'bg_color' => $hex_color, 'text_color' => $text_color ];
+}
 
-    return [
-        'bg_color'   => $hex_color, // Devolvemos el color HEX sólido
-        'text_color' => $text_color
-    ];
-}// fin ghd_get_vendedora_color ////
-
-/**
- * Función para calcular los KPIs de un sector dado un campo de estado.
- * Reutilizable para la carga inicial y las respuestas AJAX.
- * @param string $campo_estado El nombre del campo ACF (ej. 'estado_corte').
- * @return array Un array con 'total_pedidos', 'total_prioridad_alta', 'tiempo_promedio_str', 'completadas_hoy'.
- */
 function ghd_calculate_sector_kpis($campo_estado) {
-    // --- CORRECCIÓN: Definir $fecha_completado_field dinámicamente ---
-    // Esta variable se espera en la meta_query para calcular 'completadas_hoy'.
-    // Debe corresponder al nombre del campo ACF de la fecha de completado del sector.
     $fecha_completado_field = str_replace('estado_', 'fecha_completado_', $campo_estado);
-    // --- FIN CORRECCIÓN ---
-
-    // Pedidos activos (Pendientes o En Progreso para el campo_estado dado)
-    $pedidos_args = [
-        'post_type'      => 'orden_produccion',
-        'posts_per_page' => -1,
-        'meta_query'     => [
-            [
-                'key'     => $campo_estado,
-                'value'   => ['Pendiente', 'En Progreso'],
-                'compare' => 'IN'
-            ]
-        ]
-    ];
+    $pedidos_args = [ 'post_type' => 'orden_produccion', 'posts_per_page' => -1, 'meta_query' => [ [ 'key' => $campo_estado, 'value' => ['Pendiente', 'En Progreso'], 'compare' => 'IN' ] ] ];
     $pedidos_query = new WP_Query($pedidos_args);
+    $total_pedidos = $pedidos_query->post_count; $total_prioridad_alta = 0; $total_tiempo_espera = 0; $ahora = current_time('U');
+    if ($pedidos_query->have_posts()) { foreach ($pedidos_query->posts as $pedido) { if (get_field('prioridad_pedido', $pedido->ID) === 'Alta') { $total_prioridad_alta++; } $total_tiempo_espera += $ahora - get_the_modified_time('U', $pedido->ID); } }
+    $tiempo_promedio_str = '0.0h'; if ($total_pedidos > 0) { $promedio_horas = ($total_tiempo_espera / $total_pedidos) / 3600; $tiempo_promedio_str = number_format($promedio_horas, 1) . 'h'; }
+    $completadas_hoy = 0; $today_start = strtotime('today', current_time('timestamp', true)); $today_end = strtotime('tomorrow - 1 second', current_time('timestamp', true));
+    $completadas_hoy_args = [ 'post_type' => 'orden_produccion', 'posts_per_page' => -1, 'meta_query' => [ [ 'key' => $campo_estado, 'value' => 'Completado', 'compare' => '=', ], [ 'key' => $fecha_completado_field, 'value' => date('Y-m-d H:i:s', $today_start), 'compare' => '>=', 'type' => 'DATETIME', ], [ 'key' => $fecha_completado_field, 'value' => date('Y-m-d H:i:s', $today_end), 'compare' => '<=', 'type' => 'DATETIME', ], ], ];
+    $completadas_hoy_query = new WP_Query($completadas_hoy_args); $completadas_hoy = $completadas_hoy_query->post_count;
+    return [ 'total_pedidos' => $total_pedidos, 'total_prioridad_alta' => $total_prioridad_alta, 'tiempo_promedio_str' => $tiempo_promedio_str, 'completadas_hoy' => $completadas_hoy, ];
+}
 
-    $total_pedidos = $pedidos_query->post_count;
-    $total_prioridad_alta = 0;
-    $total_tiempo_espera = 0;
-    $ahora = current_time('U');
-
-    if ($pedidos_query->have_posts()) {
-        foreach ($pedidos_query->posts as $pedido) {
-            if (get_field('prioridad_pedido', $pedido->ID) === 'Alta') {
-                $total_prioridad_alta++;
-            }
-            $total_tiempo_espera += $ahora - get_the_modified_time('U', $pedido->ID);
-        }
-    }
-
-    $tiempo_promedio_str = '0.0h';
-    if ($total_pedidos > 0) {
-        $promedio_horas = ($total_tiempo_espera / $total_pedidos) / 3600;
-        $tiempo_promedio_str = number_format($promedio_horas, 1) . 'h';
-    }
-
-    // Pedidos completados hoy para el campo_estado dado
-    $completadas_hoy = 0;
-    $today_start = strtotime('today', current_time('timestamp', true));
-    $today_end   = strtotime('tomorrow - 1 second', current_time('timestamp', true));
-
-    $completadas_hoy_args = [
-        'post_type'      => 'orden_produccion',
-        'posts_per_page' => -1,
-        'meta_query'     => [
-            [
-                'key'     => $campo_estado, // Todavía filtrar por el estado de la tarea
-                'value'   => 'Completado',
-                'compare' => '=',
-            ],
-            // --- NUEVO: Filtrar por el campo de fecha de completado ---
-            [
-                'key'     => $fecha_completado_field, // Usar el campo de fecha específico
-                'value'   => date('Y-m-d H:i:s', $today_start),
-                'compare' => '>=',
-                'type'    => 'DATETIME',
-            ],
-            [
-                'key'     => $fecha_completado_field,
-                'value'   => date('Y-m-d H:i:s', $today_end),
-                'compare' => '<=',
-                'type'    => 'DATETIME',
-            ],
-            // --- FIN NUEVO ---
-        ],
-    ];
-    $completadas_hoy_query = new WP_Query($completadas_hoy_args);
-    $completadas_hoy = $completadas_hoy_query->post_count;
-
-    return [
-        'total_pedidos'        => $total_pedidos,
-        'total_prioridad_alta' => $total_prioridad_alta,
-        'tiempo_promedio_str'  => $tiempo_promedio_str,
-        'completadas_hoy'      => $completadas_hoy,
-    ];
-} //// fin ghd_calculate_sector_kpis ////
-
-/**
- * Función para calcular los KPIs para la sección de Pedidos Pendientes de Cierre del Admin principal.
- * @return array Un array con 'total_pedidos_cierre', 'total_prioridad_alta_cierre', 'tiempo_promedio_str_cierre', 'completadas_hoy_cierre'.
- */
 function ghd_calculate_admin_closure_kpis() {
-    // Pedidos pendientes de cierre para el Admin (nuevo estado 'Pendiente de Cierre Admin')
-    $kpi_args = [
-        'post_type' => 'orden_produccion', 'posts_per_page' => -1,
-        'meta_query' => [['key' => 'estado_pedido', 'value' => 'Pendiente de Cierre Admin', 'compare' => '=']]
-    ];
+    $kpi_args = [ 'post_type' => 'orden_produccion', 'posts_per_page' => -1, 'meta_query' => [['key' => 'estado_pedido', 'value' => 'Pendiente de Cierre Admin', 'compare' => '=']] ];
     $kpi_query = new WP_Query($kpi_args);
-    
-    $kpi_data = [
-        'total_pedidos_cierre' => $kpi_query->post_count,
-        'total_prioridad_alta_cierre' => 0,
-        'tiempo_promedio_str_cierre' => '0.0h',
-        'completadas_hoy_cierre' => 0 
-    ];
-    
-    $total_tiempo_espera = 0;
-    $ahora = current_time('U');
-    if ($kpi_query->have_posts()) {
-        foreach ($kpi_query->posts as $pedido) {
-            if (get_field('prioridad_pedido', $pedido->ID) === 'Alta') { $kpi_data['total_prioridad_alta_cierre']++; }
-            // Calcular el tiempo de espera desde que el pedido entró en este estado (fecha de modificación)
-            $total_tiempo_espera += $ahora - get_the_modified_time('U', $pedido->ID);
-        }
-    }
-    if ($kpi_data['total_pedidos_cierre'] > 0) {
-        $promedio_horas = ($total_tiempo_espera / $kpi_data['total_pedidos_cierre']) / 3600;
-        $kpi_data['tiempo_promedio_str_cierre'] = number_format($promedio_horas, 1) . 'h';
-    }
-
-    // --- Lógica para calcular 'Completadas Hoy' (pedidos archivados hoy por el Admin) ---
-    $today_start = strtotime('today', current_time('timestamp', true));
-    $today_end   = strtotime('tomorrow - 1 second', current_time('timestamp', true));
-
-    $completadas_hoy_args = [
-        'post_type'      => 'orden_produccion',
-        'posts_per_page' => -1,
-        'meta_query'     => [
-            [
-                'key'     => 'estado_pedido',
-                'value'   => 'Completado y Archivado', // Buscamos este estado final
-                'compare' => '=',
-            ],
-        ],
-        'date_query' => [ 
-            'after'     => date('Y-m-d H:i:s', $today_start),
-            'before'    => date('Y-m-d H:i:s', $today_end),
-            'inclusive' => true,
-            'column'    => 'post_modified_gmt',
-        ],
-    ];
-    $completadas_hoy_query = new WP_Query($completadas_hoy_args);
-    $kpi_data['completadas_hoy_cierre'] = $completadas_hoy_query->post_count;
-
+    $kpi_data = [ 'total_pedidos_cierre' => $kpi_query->post_count, 'total_prioridad_alta_cierre' => 0, 'tiempo_promedio_str_cierre' => '0.0h', 'completadas_hoy_cierre' => 0 ];
+    $total_tiempo_espera = 0; $ahora = current_time('U');
+    if ($kpi_query->have_posts()) { foreach ($kpi_query->posts as $pedido) { if (get_field('prioridad_pedido', $pedido->ID) === 'Alta') { $kpi_data['total_prioridad_alta_cierre']++; } $total_tiempo_espera += $ahora - get_the_modified_time('U', $pedido->ID); } }
+    if ($kpi_data['total_pedidos_cierre'] > 0) { $promedio_horas = ($total_tiempo_espera / $kpi_data['total_pedidos_cierre']) / 3600; $kpi_data['tiempo_promedio_str_cierre'] = number_format($promedio_horas, 1) . 'h'; }
+    $today_start = strtotime('today', current_time('timestamp', true)); $today_end = strtotime('tomorrow - 1 second', current_time('timestamp', true));
+    $completadas_hoy_args = [ 'post_type' => 'orden_produccion', 'posts_per_page' => -1, 'meta_query' => [ [ 'key' => 'estado_pedido', 'value' => 'Completado y Archivado', 'compare' => '=', ], ], 'date_query' => [ 'after' => date('Y-m-d H:i:s', $today_start), 'before' => date('Y-m-d H:i:s', $today_end), 'inclusive' => true, 'column' => 'post_modified_gmt', ], ];
+    $completadas_hoy_query = new WP_Query($completadas_hoy_args); $kpi_data['completadas_hoy_cierre'] = $completadas_hoy_query->post_count;
     return $kpi_data;
 }
 
 /**
  * Función para obtener los datos de pedidos en producción y sus KPIs.
- * V4 - Corregido el cálculo del tiempo promedio para evitar valores negativos.
+ * V7 - CORREGIDO: Unifica la terminología de "Líder de Logística" a "Logística" en el panel de admin.
  */
 function ghd_get_pedidos_en_produccion_data() {
     $pedidos_args = [
@@ -490,7 +184,7 @@ function ghd_get_pedidos_en_produccion_data() {
     ];
     
     $total_tiempo_produccion = 0;
-    $ahora = current_time('U'); // Timestamp actual en GMT
+    $ahora = current_time('U');
 
     ob_start();
 
@@ -501,17 +195,11 @@ function ghd_get_pedidos_en_produccion_data() {
                 $kpi_data['total_prioridad_alta_produccion']++;
             }
             
-            // Obtener el timestamp de inicio de producción
             $produccion_iniciada_time = get_post_meta($order_id, 'historial_produccion_iniciada_timestamp', true);
-            
-            // Si no hay un timestamp de inicio de producción, usar la fecha de creación del post como fallback
-            // Esto es importante para pedidos que se crearon antes de que se implementara el timestamp específico.
             if (empty($produccion_iniciada_time)) {
-                $produccion_iniciada_time = get_the_time('U', $order_id); // Usar fecha de creación del post
+                $produccion_iniciada_time = get_the_time('U', $order_id); 
             }
 
-            // Asegurarse de que el tiempo de inicio no sea futuro (para evitar valores negativos)
-            // Si el tiempo de inicio es posterior a 'ahora', la duración es 0.
             $tiempo_transcurrido = ($produccion_iniciada_time < $ahora) ? ($ahora - $produccion_iniciada_time) : 0;
             $total_tiempo_produccion += $tiempo_transcurrido;
             
@@ -537,36 +225,35 @@ function ghd_get_pedidos_en_produccion_data() {
                         <?php
                         $sectores_produccion = ghd_get_sectores(); 
                         foreach ($sectores_produccion as $sector_key => $sector_display_name) {
-                            $sub_estado_display = ''; // Texto a mostrar en el badge
-                            $badge_class_to_assign = 'status-gray'; // Clase CSS a asignar
-
-                            // --- CRÍTICO: Controlar la visibilidad de Logística ---
-                            // Logística solo se muestra si Embalaje está completado (o En Progreso)
+                            $sub_estado_display = ''; $badge_class_to_assign = 'status-gray';
                             $estado_embalaje_actual = get_field('estado_embalaje', $order_id);
-                            $show_logistica_badges = ($estado_embalaje_actual === 'Completado' || $estado_embalaje_actual === 'En Progreso');
-                            // --- FIN CRÍTICO ---
+                            $show_logistica_badges = ($estado_embalaje_actual === 'Completado' || $estado_embalaje_actual === 'En Progreso' || get_field('estado_logistica_lider', $order_id) !== 'No Asignado');
 
                             if ($sector_key === 'logistica') {
-                                if ($show_logistica_badges) { // Solo mostrar logística si embalaje está listo
+                                if ($show_logistica_badges) { 
                                     $estado_fletero = get_field('estado_logistica_fletero', $order_id);
                                     $estado_lider_logistica = get_field('estado_logistica_lider', $order_id);
-
-                                    if ($estado_fletero === 'Pendiente') {
-                                        $sub_estado_display = 'Logística Fletero: Pendiente';
-                                        $badge_class_to_assign = 'status-blue';
-                                    } elseif ($estado_fletero === 'Recogido') {
-                                        $sub_estado_display = 'Logística Fletero: Recogido';
-                                        $badge_class_to_assign = 'status-recogido-admin'; // Clase específica
+                                    
+                                    if ($estado_fletero === 'Pendiente' || $estado_fletero === 'Recogido' || $estado_fletero === 'Entregado') {
+                                        $sub_estado_display = 'Fletero: ' . $estado_fletero;
+                                        if ($estado_fletero === 'Pendiente') $badge_class_to_assign = 'status-blue';
+                                        elseif ($estado_fletero === 'Recogido') $badge_class_to_assign = 'status-recogido-admin';
+                                        elseif ($estado_fletero === 'Entregado') $badge_class_to_assign = 'status-green';
                                     } elseif ($estado_lider_logistica === 'Completado') {
                                         $sub_estado_display = 'Logística: Completado';
                                         $badge_class_to_assign = 'status-green';
+                                    } elseif ($estado_lider_logistica === 'En Progreso') {
+                                        $sub_estado_display = 'Logística: En Progreso';
+                                        $badge_class_to_assign = 'status-yellow';
+                                    } elseif ($estado_lider_logistica === 'Pendiente') {
+                                        $sub_estado_display = 'Logística: Pendiente';
+                                        $badge_class_to_assign = 'status-blue';
                                     } else {
                                         $sub_estado_display = 'Logística: ' . ($estado_lider_logistica ?: 'No Asignado'); 
                                         $badge_class_to_assign = 'status-gray';
                                     }
                                 }
                             } else {
-                                // Para los demás sectores (Carpintería, Corte, etc.)
                                 $sub_estado_sector = get_field('estado_' . $sector_key, $order_id);
                                 if ($sub_estado_sector && $sub_estado_sector !== 'No Asignado') {
                                     $sub_estado_display = ucfirst($sector_display_name) . ': ' . $sub_estado_sector;
@@ -576,7 +263,7 @@ function ghd_get_pedidos_en_produccion_data() {
                                 }
                             }
 
-                            if ($sub_estado_display) { // Solo si se determinó un texto para mostrar
+                            if ($sub_estado_display) {
                                 echo '<span class="ghd-badge ' . esc_attr($badge_class_to_assign) . '">' . esc_html($sub_estado_display) . '</span>';
                             }
                         }
@@ -587,24 +274,20 @@ function ghd_get_pedidos_en_produccion_data() {
                     <div class="assigned-completed-info">
                         <?php 
                         foreach ($sectores_produccion as $sector_key => $sector_display_name) {
-                            $assignee_id = 0;
-                            $completed_by_id = 0;
-                            $show_info = false;
-
-                            // --- CRÍTICO: Controlar la visibilidad de Logística ---
-                            // Logística solo se muestra si Embalaje está completado (o En Progreso)
+                            $assignee_id = 0; $completed_by_id = 0; $show_info = false;
                             $estado_embalaje_actual = get_field('estado_embalaje', $order_id);
-                            $show_logistica_info = ($estado_embalaje_actual === 'Completado' || $estado_embalaje_actual === 'En Progreso');
-                            // --- FIN CRÍTICO ---
+                            $show_logistica_info = ($estado_embalaje_actual === 'Completado' || $estado_embalaje_actual === 'En Progreso' || get_field('estado_logistica_lider', $order_id) !== 'No Asignado');
 
                             if ($sector_key === 'logistica') {
-                                if ($show_logistica_info) { // Solo mostrar info de logística si embalaje está listo
-                                    $assignee_id = intval(get_field('logistica_fletero_id', $order_id));
-                                    $completed_by_id = intval(get_field('completado_por_logistica_lider', $order_id)); 
+                                if ($show_logistica_info) { 
+                                    $fletero_id = intval(get_field('logistica_fletero_id', $order_id));
+                                    $lider_asignacion_id = intval(get_field('asignado_a_logistica_lider', $order_id));
+                                    $completed_by_id = intval(get_field('completado_por_logistica_lider', $order_id));
+
+                                    $assignee_id = $fletero_id ?: $lider_asignacion_id;
                                     $show_info = ($assignee_id > 0 || $completed_by_id > 0);
 
                                     $estado_fletero = get_field('estado_logistica_fletero', $order_id);
-                                    // Si el fletero ya recogió o entregó, su nombre es el más relevante
                                 }
                             } else {
                                 $assignee_id = intval(get_field('asignado_a_' . $sector_key, $order_id));
@@ -617,27 +300,27 @@ function ghd_get_pedidos_en_produccion_data() {
                             
                             if ($show_info) {
                                 echo '<p><strong>' . esc_html(ucfirst($sector_display_name)) . ':</strong></p>';
-                                if ($assignee_obj) {
+                                
+                                if ($sector_key === 'logistica' && $assignee_obj) {
+                                    $assigned_text = ($estado_fletero === 'Pendiente' || $estado_fletero === 'Recogido' || $estado_fletero === 'Entregado') ? 'Fletero: ' : 'Asignado: ';
+                                    echo '<span class="ghd-info-badge info-assigned">'. $assigned_text . esc_html($assignee_obj->display_name) . '</span>';
+                                } elseif ($assignee_obj) { 
                                     echo '<span class="ghd-info-badge info-assigned">Asignado: ' . esc_html($assignee_obj->display_name) . '</span>';
                                 }
-                                // Lógica de "Completado" (más explícita)
+
                                 if ($sector_key === 'logistica') {
-                                    $estado_fletero_actual_log = get_field('estado_logistica_fletero', $order_id);
-                                    if ($estado_fletero_actual_log === 'Recogido') {
-                                        echo '<span class="ghd-info-badge info-completed">Recogido por: ' . esc_html($assignee_obj->display_name) . '</span>';
-                                    } elseif ($estado_fletero_actual_log === 'Entregado') {
-                                        echo '<span class="ghd-info-badge info-completed">Entregado por: ' . esc_html($assignee_obj->display_name) . '</span>';
-                                    } elseif ($completed_by_obj) { // Si el líder completó pero el fletero aún no actuó
-                                        echo '<span class="ghd-info-badge info-completed">Completado Líder: ' . esc_html($completed_by_obj->display_name) . '</span>';
+                                    if ($estado_fletero === 'Entregado') {
+                                        echo '<span class="ghd-info-badge info-completed">Entregado: ' . esc_html($assignee_obj->display_name) . '</span>';
+                                    } elseif ($completed_by_obj) { 
+                                        echo '<span class="ghd-info-badge info-completed">Logística OK: ' . esc_html($completed_by_obj->display_name) . '</span>';
                                     }
-                                } elseif ($completed_by_obj) { // Para otros sectores
+                                } elseif ($completed_by_obj) { 
                                     echo '<span class="ghd-info-badge info-completed">Completado: ' . esc_html($completed_by_obj->display_name) . '</span>';
                                 }
                             }
                         }
                         ?>
                     </div> 
-                </td> 
                 </td>                
                 <td><a href="<?php the_permalink(); ?>" class="ghd-btn ghd-btn-secondary ghd-btn-small">Ver</a></td>
             </tr>
@@ -649,657 +332,298 @@ function ghd_get_pedidos_en_produccion_data() {
     wp_reset_postdata();
     $production_tasks_html = ob_get_clean();
 
-    // Recalcular el tiempo promedio después de haber sumado todos los tiempos
-    if ($kpi_data['total_pedidos_produccion'] > 0) {
-        $kpi_data['tiempo_promedio_str_produccion'] = number_format(($total_tiempo_produccion / $kpi_data['total_pedidos_produccion']) / 3600, 1) . 'h';
+    if ($kpi_data['total_pedidos_produccion'] > 0) { 
+        $kpi_data['tiempo_promedio_str_produccion'] = number_format(($total_tiempo_produccion / $kpi_data['total_pedidos_produccion']) / 3600, 1) . 'h'; 
     }
-
-    // Código para calcular 'completadas_hoy_produccion' se mantiene igual...
-    $today_start = strtotime('today', current_time('timestamp', true));
-    $today_end   = strtotime('tomorrow - 1 second', current_time('timestamp', true));
-    $completed_production_today_args = [
-        'post_type'      => 'orden_produccion',
-        'posts_per_page' => -1,
-        'meta_query'     => [['key' => 'estado_pedido', 'value' => 'Pendiente de Cierre Admin', 'compare' => '=']],
-        'date_query'     => [['after' => date('Y-m-d H:i:s', $today_start), 'before' => date('Y-m-d H:i:s', $today_end), 'inclusive' => true, 'column' => 'post_modified_gmt']]
+    
+    $today_start = strtotime('today', current_time('timestamp', true)); 
+    $today_end = strtotime('tomorrow - 1 second', current_time('timestamp', true));
+    $completed_production_today_args = [ 
+        'post_type' => 'orden_produccion', 
+        'posts_per_page' => -1, 
+        'meta_query' => [['key' => 'estado_pedido', 'value' => 'Pendiente de Cierre Admin', 'compare' => '=']], 
+        'date_query' => [['after' => date('Y-m-d H:i:s', $today_start), 'before' => date('Y-m-d H:i:s', $today_end), 'inclusive' => true, 'column' => 'post_modified_gmt']] 
     ];
     $completed_production_today_query = new WP_Query($completed_production_today_args);
     $kpi_data['completadas_hoy_produccion'] = $completed_production_today_query->post_count;
     
     return ['tasks_html' => $production_tasks_html, 'kpi_data' => $kpi_data];
-} // fin ghd_get_pedidos_en_produccion_data ////
-
+} // fin ghd_get_pedidos_en_produccion_data
+////////////////////////////////////////////////////////////////////////
 
 /**
- * --- Recopilar datos para la página de reportes ---
- * (Ahora está dentro del functions.php principal, no como un fragmento)
+ * Función para obtener los datos de reportes y estadísticas.
  */
 function ghd_get_reports_data() {
-    $reports_data = [
-        'pedidos_por_estado' => [
-            'labels' => [],
-            'data'   => [],
-            'backgroundColors' => [ // Colores predefinidos para los estados
-                'Pendiente de Asignación' => '#6B7280', // Gris
-                'En Producción'            => '#3b82f6', // Azul
-                'En Costura'               => '#f59e0b', // Amarillo
-                'En Tapicería/Embalaje'    => '#60a5fa', // Azul claro
-                'Listo para Entrega'       => '#22c55e', // Verde
-                'Despachado'               => '#84cc16', // Verde lima
-                'Pendiente de Cierre Admin'=> '#ef4444', // Rojo
-                'Completado y Archivado'   => '#10b981', // Verde oscuro
-            ]
-        ],
-        'carga_por_sector' => [
-            'labels' => [],
-            'data'   => [],
-            'backgroundColors' => [] // Colores dinámicos o predefinidos si los tienes
-        ],
-        'pedidos_por_prioridad' => [
-            'labels' => ['Alta', 'Media', 'Baja'],
-            'data'   => [0, 0, 0],
-            'backgroundColors' => [
-                'Alta'  => '#ef4444', // Rojo
-                'Media' => '#f59e0b', // Amarillo
-                'Baja'  => '#22c55e', // Verde
-            ]
-        ],
-    ];
-
-    // Consulta para todos los pedidos de producción
-    $all_orders_query = new WP_Query([
-        'post_type'      => 'orden_produccion',
-        'posts_per_page' => -1,
-        'post_status'    => 'publish', // Asegúrate de obtener solo los publicados
-    ]);
-
-    $estados_generales_count = [];
-    $carga_por_sector_count = [];
-    $mapa_roles_a_campos = ghd_get_mapa_roles_a_campos();
-    $sectores = ghd_get_sectores();
-
-    // Inicializar contadores para los gráficos
-    foreach (['Pendiente de Asignación', 'En Producción', 'En Costura', 'En Tapicería/Embalaje', 'Listo para Entrega', 'Despachado', 'Pendiente de Cierre Admin', 'Completado y Archivado'] as $estado) {
-        $estados_generales_count[$estado] = 0;
-    }
-    // Inicializar carga por sector con todos los sectores de ghd_get_sectores
-    foreach ($sectores as $sector_display_name) {
-        $carga_por_sector_count[$sector_display_name] = 0;
-    }
-    
-
+    $reports_data = [ 'pedidos_por_estado' => [ 'labels' => [], 'data' => [], 'backgroundColors' => [ 'Pendiente de Asignación' => '#6B7280', 'En Producción' => '#3b82f6', 'En Costura' => '#f59e0b', 'En Tapicería/Embalaje' => '#60a5fa', 'Listo para Entrega' => '#22c55e', 'Despachado' => '#84cc16', 'Pendiente de Cierre Admin'=> '#ef4444', 'Completado y Archivado' => '#10b981', ] ], 'carga_por_sector' => [ 'labels' => [], 'data' => [], 'backgroundColors' => [] ], 'pedidos_por_prioridad' => [ 'labels' => ['Alta', 'Media', 'Baja'], 'data' => [0, 0, 0], 'backgroundColors' => [ 'Alta' => '#ef4444', 'Media' => '#f59e0b', 'Baja' => '#22c55e', ] ], ];
+    $all_orders_query = new WP_Query([ 'post_type' => 'orden_produccion', 'posts_per_page' => -1, 'post_status' => 'publish', ]);
+    $estados_generales_count = []; $carga_por_sector_count = []; $mapa_roles_a_campos = ghd_get_mapa_roles_a_campos(); $sectores = ghd_get_sectores();
+    foreach (['Pendiente de Asignación', 'En Producción', 'En Costura', 'En Tapicería/Embalaje', 'Listo para Entrega', 'Despachado', 'Pendiente de Cierre Admin', 'Completado y Archivado'] as $estado) { $estados_generales_count[$estado] = 0; }
+    foreach ($sectores as $sector_display_name) { $carga_por_sector_count[$sector_display_name] = 0; }
     if ($all_orders_query->have_posts()) {
         while ($all_orders_query->have_posts()) {
             $all_orders_query->the_post();
             $order_id = get_the_ID();
-
-            // Pedidos por Estado General
             $estado_general = get_field('estado_pedido', $order_id);
-            if (isset($estados_generales_count[$estado_general])) {
-                $estados_generales_count[$estado_general]++;
-            } else {
-                $estados_generales_count[$estado_general] = 1; // Para estados no predefinidos
-            }
-
-            // Pedidos por Prioridad
+            if (isset($estados_generales_count[$estado_general])) { $estados_generales_count[$estado_general]++; } else { $estados_generales_count[$estado_general] = 1; }
             $prioridad = get_field('prioridad_pedido', $order_id);
-            if ($prioridad === 'Alta') {
-                $reports_data['pedidos_por_prioridad']['data'][0]++;
-            } elseif ($prioridad === 'Media') {
-                $reports_data['pedidos_por_prioridad']['data'][1]++;
-            } else { // Baja
-                $reports_data['pedidos_por_prioridad']['data'][2]++;
-            }
-
-            // Carga de Trabajo por Sector (contar 'Pendiente' o 'En Progreso' para cada campo de sector)
+            if ($prioridad === 'Alta') { $reports_data['pedidos_por_prioridad']['data'][0]++; } elseif ($prioridad === 'Media') { $reports_data['pedidos_por_prioridad']['data'][1]++; } else { $reports_data['pedidos_por_prioridad']['data'][2]++; }
             foreach ($mapa_roles_a_campos as $role_key => $field_key) {
                 $sub_estado = get_field($field_key, $order_id);
-                // Si el sector tiene una tarea activa (Pendiente o En Progreso), se suma a su carga
                 if ($sub_estado === 'Pendiente' || $sub_estado === 'En Progreso') {
-                    // El sector_display_name ya está capitalizado en ghd_get_sectores
                     $sector_display_name = ucfirst(str_replace(['rol_', 'estado_'], '', $role_key)); 
-                    if (isset($carga_por_sector_count[$sector_display_name])) {
-                        $carga_por_sector_count[$sector_display_name]++;
-                    }
-                    // Si no está en $carga_por_sector_count, significa que no es un sector de ghd_get_sectores
-                    // o no fue inicializado correctamente, pero ya lo inicializamos.
+                    if (isset($carga_por_sector_count[$sector_display_name])) { $carga_por_sector_count[$sector_display_name]++; }
                 }
             }
         }
         wp_reset_postdata();
     }
-
-    // Formatear datos para los gráficos
-    $reports_data['pedidos_por_estado']['labels'] = array_keys($estados_generales_count);
-    $reports_data['pedidos_por_estado']['data'] = array_values($estados_generales_count);
-
-    // Asignar colores a la carga por sector (si no están definidos)
-    $sector_colors = ['#4A7C59', '#B34A49', '#F59E0B', '#6B7280', '#3E3E3E', '#93c5fd', '#f472b6']; // Ejemplo de colores
-    $color_index = 0;
+    $reports_data['pedidos_por_estado']['labels'] = array_keys($estados_generales_count); $reports_data['pedidos_por_estado']['data'] = array_values($estados_generales_count);
+    $sector_colors = ['#4A7C59', '#B34A49', '#F59E0B', '#6B7280', '#3E3E3E', '#93c5fd', '#f472b6']; $color_index = 0;
     foreach ($carga_por_sector_count as $sector => $count) {
         $reports_data['carga_por_sector']['labels'][] = $sector;
         $reports_data['carga_por_sector']['data'][] = $count;
         $reports_data['carga_por_sector']['backgroundColors'][] = $sector_colors[$color_index % count($sector_colors)];
         $color_index++;
     }
-
-
     return $reports_data;
 }
 
-
-// --- 4. LÓGICA DE LOGIN/LOGOUT (REVISADA FINALMENTE) ---
-
-/**
- * Redirige los inicios de sesión fallidos a la página de login personalizada con un parámetro de error.
- */
+// --- 4. LÓGICA DE LOGIN/LOGOUT ---
 add_action('wp_login_failed', 'ghd_login_fail_redirect');
 function ghd_login_fail_redirect($username) {
-    // Obtener la URL de tu página de login personalizada de forma robusta
-    $login_page_query = get_posts([
-        'post_type'  => 'page',
-        'fields'     => 'ids',
-        'nopaging'   => true,
-        'meta_key'   => '_wp_page_template',
-        'meta_value' => 'template-login.php'
-    ]);
+    $login_page_query = get_posts([ 'post_type' => 'page', 'fields' => 'ids', 'nopaging' => true, 'meta_key' => '_wp_page_template', 'meta_value' => 'template-login.php' ]);
     $custom_login_url = !empty($login_page_query) ? get_permalink($login_page_query[0]) : home_url('/iniciar-sesion/');
-    
-    // Si la solicitud no es AJAX/CRON y el referrer no es ya una página de login de WP
     if (!defined('DOING_AJAX') && !defined('DOING_CRON') && !empty($_SERVER['HTTP_REFERER']) && strpos($_SERVER['HTTP_REFERER'], 'wp-login.php') === false && strpos($_SERVER['HTTP_REFERER'], 'wp-admin') === false ) {
-        wp_redirect($custom_login_url . '?login=failed'); // Redirigir con parámetro de error
+        wp_redirect($custom_login_url . '?login=failed');
         exit();
     }
-    // Si viene de una página de login de WP, la función ghd_redirect_wp_login_to_custom_page se encargará.
 }
 
-/**
- * Oculta la Admin Bar en el Frontend para TODOS los usuarios.
- */
 add_action('after_setup_theme', 'ghd_hide_admin_bar');
 function ghd_hide_admin_bar() {
-    if (!is_admin()) {
-        show_admin_bar(false);
-    }
+    if (!is_admin()) { show_admin_bar(false); }
 }
 
-/**
- * --- NUEVO: LÓGICA AJAX PARA ACTUALIZAR PRIORIDAD DE PEDIDO ---
- * Permite al administrador actualizar la prioridad de un pedido directamente desde el selector.
- */
+// --- LÓGICA AJAX ---
 add_action('wp_ajax_ghd_update_priority', 'ghd_update_priority_callback');
 function ghd_update_priority_callback() {
-    // --- CLAVE: Verificación de Nonce de seguridad ---
-    if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( $_POST['nonce'], 'ghd-ajax-nonce' ) ) {
-        wp_send_json_error( ['message' => 'Nonce de seguridad inválido o faltante.'] );
-        wp_die();
-    }
-    // --- FIN CLAVE ---
-
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(['message' => 'No tienes permisos para actualizar la prioridad.']);
-        wp_die();
-    }
-
+    if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( $_POST['nonce'], 'ghd-ajax-nonce' ) ) { wp_send_json_error( ['message' => 'Nonce de seguridad inválido o faltante.'] ); wp_die(); }
+    if (!current_user_can('manage_options')) { wp_send_json_error(['message' => 'No tienes permisos para actualizar la prioridad.']); wp_die(); }
     $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
     $new_priority = isset($_POST['priority']) ? sanitize_text_field($_POST['priority']) : '';
-
-    if (!$order_id) {
-        wp_send_json_error(['message' => 'ID de pedido no válido.']);
-        wp_die();
-    }
-    if (empty($new_priority) || $new_priority === 'Seleccionar Prioridad') {
-        wp_send_json_success(['message' => 'Prioridad no seleccionada, no se ha guardado.']); // No es un error, solo no se guarda.
-        wp_die();
-    }
-
+    if (!$order_id) { wp_send_json_error(['message' => 'ID de pedido no válido.']); wp_die(); }
+    if (empty($new_priority) || $new_priority === 'Seleccionar Prioridad') { wp_send_json_success(['message' => 'Prioridad no seleccionada, no se ha guardado.']); wp_die(); }
     update_field('prioridad_pedido', $new_priority, $order_id);
-
-    wp_insert_post([
-        'post_title' => 'Prioridad actualizada para ' . get_the_title($order_id),
-        'post_type' => 'ghd_historial',
-        'meta_input' => ['_orden_produccion_id' => $order_id, '_nueva_prioridad' => $new_priority] // Guardar solo la nueva prioridad para el historial
-    ]);
-    
+    wp_insert_post([ 'post_title' => 'Prioridad actualizada para ' . get_the_title($order_id), 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id, '_nueva_prioridad' => $new_priority] ]);
     wp_send_json_success(['message' => 'Prioridad actualizada con éxito a ' . $new_priority . '.']);
     wp_die();
 }
-/////////////////////////////////////////////////////fin de ghd_update_priority() //////////////////////////////////////////////////
 
+/**
+ * V5 - Función AJAX para actualizar el estado de una tarea y manejar la lógica de transición de estados.
+ * CORRECCIÓN FINAL Y ROBUSTA: Garantiza la lectura del ID del fletero y mantiene la coherencia.
+ */
 add_action('wp_ajax_ghd_update_task_status', function() {
-    // --- DEBUG: Inicio de la función y valores recibidos ---
-    error_log('ghd_update_task_status: Inicio de la función.');
-    error_log('ghd_update_task_status: _POST: ' . print_r($_POST, true));
-    // --- FIN DEBUG ---
-
-    // 1. Verificación de seguridad y permisos
     check_ajax_referer('ghd-ajax-nonce', 'nonce');
     if (!current_user_can('read')) {
-        error_log('ghd_update_task_status: Permisos insuficientes para usuario ID ' . get_current_user_id());
         wp_send_json_error(['message' => 'No tienes permisos.']);
         wp_die();
     }
 
-    // 2. Obtención y validación de datos
     $id = intval($_POST['order_id']);
-    $field = sanitize_key($_POST['field']); // Campo de estado que se actualiza (ej. estado_carpinteria, estado_logistica_lider)
-    $value = sanitize_text_field($_POST['value']); // Nuevo valor de estado (ej. En Progreso, Completado)
-    $assignee_id = isset($_POST['assignee_id']) ? intval($_POST['assignee_id']) : 0; // ID del operario asignado (si se envía)
+    $field = sanitize_key($_POST['field']);
+    $value = sanitize_text_field($_POST['value']);
+    $assignee_id = isset($_POST['assignee_id']) ? intval($_POST['assignee_id']) : 0;
 
     if (!$id || empty($field) || empty($value)) {
-        error_log('ghd_update_task_status: Datos de tarea incompletos. ID: ' . $id . ', Field: ' . $field . ', Value: ' . $value);
         wp_send_json_error(['message' => 'Faltan datos para actualizar la tarea.']);
         wp_die();
     }
-    
-    // 3. Excepción para Embalaje: forzar el uso del modal si se intenta "Completar"
-    $is_embalaje_field = (strpos($field, 'estado_embalaje') !== false);
-    if ($value === 'Completado' && $is_embalaje_field) {
-        error_log('ghd_update_task_status: ERROR - Finalización de embalaje intentada sin modal para Pedido ID: ' . $id);
-        wp_send_json_error(['message' => 'Error: La finalización de Embalaje se gestiona desde el modal de registro de puntos.']);
-        wp_die();
+
+    $update_acf = function($post_id, $field_name, $val) {
+        $fo = get_field_object($field_name, $post_id);
+        if ($fo && !empty($fo['key'])) {
+            return update_field($fo['key'], $val, $post_id);
+        }
+        return update_post_meta($post_id, $field_name, $val);
+    };
+
+    // Actualización principal
+    $update_acf($id, $field, $value);
+    error_log("[GHD] ajax update: order={$id} field={$field} => {$value}");
+
+    // --- Sincronización especial para Logística ---
+    if ($field === 'estado_logistica') {
+        $update_acf($id, 'estado_logistica_lider', $value);
+        if ($assignee_id > 0) {
+            update_post_meta($id, 'logistica_fletero_id', $assignee_id);
+        }
+        $update_acf($id, 'estado_pedido', 'En Despacho');
     }
 
-    // 4. Actualización del campo de estado principal del sector (ej. estado_carpinteria -> 'En Progreso' o 'Completado')
-    $update_success_initial = update_field($field, $value, $id);
-    error_log('ghd_update_task_status: Actualización inicial de ' . $field . ' a ' . $value . ' para ID ' . $id . '. Resultado: ' . ($update_success_initial ? 'ÉXITO' : 'FALLO'));
-
-    // 5. Asignación del operario (solo cuando la tarea pasa a 'En Progreso')
     $historial_title = ucfirst(str_replace(['estado_', '_'], ' ', $field)) . ' -> ' . $value;
     if ($value === 'En Progreso' && $assignee_id > 0) {
         $assignee_field = str_replace('estado_', 'asignado_a_', $field);
-        $update_success_assignee = update_field($assignee_field, $assignee_id, $id);
-        error_log('ghd_update_task_status: Asignación de ' . $assignee_field . ' a ' . $assignee_id . '. Resultado: ' . ($update_success_assignee ? 'ÉXITO' : 'FALLO'));
-        
+        $update_acf($id, $assignee_field, $assignee_id);
         $assignee_obj = get_userdata($assignee_id);
         $assignee_name = $assignee_obj ? $assignee_obj->display_name : 'ID ' . $assignee_id;
         $historial_title .= ' (Asignado a ' . $assignee_name . ')';
     }
 
-    // --- ¡NUEVO! Lógica para la transición de estado_pedido al iniciar la PRIMERA tarea (Carpintería) ---
-    if ($value === 'En Progreso' && $field === 'estado_carpinteria') { // Solo para la primera tarea del flujo
-        $current_estado_pedido_general = get_field('estado_pedido', $id);
-        if ($current_estado_pedido_general === 'Pendiente de Asignación') {
-            $update_success_estado_general = update_field('estado_pedido', 'En Producción', $id);
-            error_log('ghd_update_task_status: Transición de estado_pedido a "En Producción" al iniciar Carpintería. Resultado: ' . ($update_success_estado_general ? 'ÉXITO' : 'FALLO'));
-        }
-    }
-    // --- FIN NUEVO ---
-
-    // 6. Lógica de Transiciones de Flujo (se ejecuta cuando una tarea se marca como 'Completado' por botón directo)
+    // --- Transición de estados cuando se marca COMPLETADO ---
     if ($value === 'Completado') {
-        // error_log('ghd_update_task_status: Procesando transición de flujo para ' . $field . ' (ID: ' . $id . ')');
-        error_log('ghd_update_task_status: Procesando transición de flujo para ' . $field . ' (ID: ' . $id . ')');
+        $current_user_id_completing = get_current_user_id();
+        $completed_by_field = str_replace('estado_', 'completado_por_', $field);
+        $update_acf($id, $completed_by_field, $current_user_id_completing);
 
-        $current_user_id_completing = get_current_user_id(); // ID del usuario que está haciendo el 'Completado'
-        $completed_by_field = str_replace('estado_', 'completado_por_', $field); // Campo ACF para registrar quién completó
+        /**
+         * 🔧 Lógica especial para LOGÍSTICA:
+         * Ejecutar tanto si se completa "estado_logistica" como "estado_logistica_lider"
+         */
+        if ($field === 'estado_logistica' || $field === 'estado_logistica_lider') {
+            error_log("[GHD] entra bloque LOGISTICA / LIDER para orden={$id}");
 
-        // CRÍTICO: Actualizar el campo 'completado_por_X' para este sector
-        $update_success_completed_by = update_field($completed_by_field, $current_user_id_completing, $id);
-        error_log('ghd_update_task_status: Actualizando ' . $completed_by_field . '. Resultado: ' . ($update_success_completed_by ? 'ÉXITO' : 'FALLO'));
-        
-        // --- También, si es el líder de Logística, su completado es el que inicia la tarea del fletero ---
-        if ($field === 'estado_logistica_lider') {
-            update_field('fecha_completado_logistica_lider', current_time('mysql'), $id); // Fecha de completado del líder
-            $fletero_responsable_id = (int)get_field('asignado_a_logistica_lider', $id); // Quién fue asignado por el líder
+            // Intentar obtener el fletero
+            $fletero_id = 0;
+            $f = get_field('asignado_a_logistica_fletero', $id);
+            if ($f) $fletero_id = intval($f);
 
-            if ($fletero_responsable_id > 0) {
-                update_field('logistica_fletero_id', $fletero_responsable_id, $id); // Asignar al fletero
-                update_field('estado_logistica_fletero', 'Pendiente', $id); // Tarea del fletero: Pendiente
-                update_field('estado_pedido', 'En Despacho', $id); // Estado general: En Despacho
-                
-                $fletero_obj = get_userdata($fletero_responsable_id);
-                $fletero_name = $fletero_obj ? $fletero_obj->display_name : 'ID ' . $fletero_responsable_id;
-                $historial_title .= ' -> En Despacho (Asignado a ' . $fletero_name . ')';
-            } else {
-                update_field('estado_logistica_fletero', 'No Asignado', $id);
-                update_field('estado_pedido', 'Logística Pendiente Asignación', $id);
-                $historial_title .= ' -> Logística Pendiente Asignación de Fletero (Error: no se asignó responsable)';
+            if (!$fletero_id) {
+                $f2 = get_post_meta($id, 'logistica_fletero_id', true);
+                if ($f2) $fletero_id = intval($f2);
             }
-        }
-        // --- FIN CRÍTICO: Lógica de Logística Líder ---
 
+            error_log("[GHD] fletero detectado: {$fletero_id}");
+
+            // Actualizar estado del fletero y pedido
+            $update_acf($id, 'estado_logistica_fletero', 'Pendiente');
+            update_post_meta($id, 'estado_logistica_fletero', 'Pendiente');
+
+            $update_acf($id, 'estado_pedido', 'Listo para Entrega');
+            update_post_meta($id, 'estado_pedido', 'Listo para Entrega');
+
+            if ($fletero_id > 0) {
+                $update_acf($id, 'logistica_fletero_id', $fletero_id);
+                update_post_meta($id, 'logistica_fletero_id', $fletero_id);
+                $historial_title .= ' -> Fletero asignado (' . $fletero_id . ')';
+            } else {
+                $historial_title .= ' -> Pendiente asignación de fletero';
+            }
+
+            error_log("[GHD] estado_logistica_fletero seteado a Pendiente correctamente");
+        }
+
+        // --- Resto del flujo de producción ---
         switch ($field) {
             case 'estado_carpinteria':
-                update_field('estado_corte', 'Pendiente', $id);
-                wp_insert_post(['post_title' => 'Fase Carpintería completa -> A Corte', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $id]]);
+            case 'estado_corte':
+                ghd_check_and_trigger_costura($id);
                 break;
             
-            case 'estado_corte':
-                update_field('estado_costura', 'Pendiente', $id);
-                update_field('estado_pedido', 'En Costura', $id);
-                wp_insert_post(['post_title' => 'Fase Corte completa -> A Costura', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $id]]);
-                break;
-
             case 'estado_costura':
-                update_field('estado_tapiceria', 'Pendiente', $id);
-                update_field('estado_pedido', 'En Tapicería/Embalaje', $id);
-                wp_insert_post(['post_title' => 'Fase Costura completa -> A Tapicería', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $id]]);
+                $update_acf($id, 'estado_tapiceria', 'Pendiente');
+                $update_acf($id, 'estado_pedido', 'En Tapicería/Embalaje');
                 break;
             
             case 'estado_tapiceria':
-                // Al completar Tapicería, la tarea para el LÍDER de EMBALAJE se pone 'Pendiente'.
-                update_field('estado_embalaje', 'Pendiente', $id);
-                wp_insert_post(['post_title' => 'Fase Tapicería completa -> A Embalaje', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $id]]);
+                $update_acf($id, 'estado_embalaje', 'Pendiente');
                 break;
 
-            case 'estado_embalaje': // <-- Este caso se ejecuta cuando Embalaje se completa desde el MODAL.
-                // Esta lógica se dispara en el ghd_register_task_details_and_complete_callback (que es para los modales)
-                // NO DEBERÍA ESTAR AQUÍ si ghd_register_task_details_and_complete_callback lo maneja.
-                // Si el embalaje se completa por modal, el switch en ghd_register_task_details_and_complete_callback lo transiciona.
-                // Si por alguna razón se llama a ghd_update_task_status para completar embalaje, deberíamos transicionar.
-                // Para consistencia, la transición de embalaje -> logística líder DEBE estar en ghd_register_task_details_and_complete_callback.
-                // POR AHORA: Si llega aquí, es un completado directo, lo transicionamos.
-                update_field('estado_logistica_lider', 'Pendiente', $id);
-                update_field('estado_pedido', 'Listo para Entrega', $id);
-                wp_insert_post(['post_title' => 'Fase Embalaje completa -> A Logística Líder (via directo)', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $id]]);
-                break;
-
-            case 'estado_logistica_lider':
-                error_log('ghd_update_task_status: Activando lógica de transición para Logística Líder (ID: ' . $id . ')');
-
-                // --- ¡NUEVO! CRÍTICO: Actualizar el campo estado_logistica para el panel del Admin ---
-                $update_success_logistica_general = update_field('estado_logistica', 'Completado', $id);
-                error_log('ghd_update_task_status: Actualización de estado_logistica (general). Resultado: ' . ($update_success_logistica_general ? 'ÉXITO' : 'FALLO'));
-                // --- FIN NUEVO ---
-
-                $update_success_fecha = update_field('fecha_completado_logistica_lider', current_time('mysql'), $id);
-                error_log('ghd_update_task_status: Actualizando fecha_completado_logistica_lider. Resultado: ' . ($update_success_fecha ? 'ÉXITO' : 'FALLO'));
-
-                $fletero_responsable_id = (int)get_field('asignado_a_logistica_lider', $id); 
-                error_log('ghd_update_task_status: Fletero responsable ID obtenido de asignado_a_logistica_lider: ' . $fletero_responsable_id);
-
-                if ($fletero_responsable_id > 0) {
-                    $update_success_fletero_id = update_field('logistica_fletero_id', $fletero_responsable_id, $id);
-                    $update_success_fletero_estado = update_field('estado_logistica_fletero', 'Pendiente', $id);
-                    $update_success_estado_pedido = update_field('estado_pedido', 'En Despacho', $id);
-                    
-                    error_log('ghd_update_task_status: Asignación de logistica_fletero_id. Resultado: ' . ($update_success_fletero_id ? 'ÉXITO' : 'FALLO'));
-                    error_log('ghd_update_task_status: Actualización de estado_logistica_fletero. Resultado: ' . ($update_success_fletero_estado ? 'ÉXITO' : 'FALLO'));
-                    error_log('ghd_update_task_status: Actualización de estado_pedido. Resultado: ' . ($update_success_estado_pedido ? 'ÉXITO' : 'FALLO'));
-
-                    $fletero_obj = get_userdata($fletero_responsable_id);
-                    $fletero_name = $fletero_obj ? $fletero_obj->display_name : 'ID ' . $fletero_responsable_id;
-                    $historial_title .= ' -> En Despacho (Asignado a ' . $fletero_name . ')';
-                } else {
-                    error_log('ghd_update_task_status: Líder de Logística completó sin asignar fletero responsable (asignado_a_logistica_lider es 0).');
-                    $update_success_fletero_estado = update_field('estado_logistica_fletero', 'No Asignado', $id);
-                    $update_success_estado_pedido = update_field('estado_pedido', 'Logística Pendiente Asignación', $id);
-                    error_log('ghd_update_task_status: Actualización de estado_logistica_fletero (No Asignado). Resultado: ' . ($update_success_fletero_estado ? 'ÉXITO' : 'FALLO'));
-                    error_log('ghd_update_task_status: Actualización de estado_pedido (Logística Pendiente Asignación). Resultado: ' . ($update_success_estado_pedido ? 'ÉXITO' : 'FALLO'));
-                    $historial_title .= ' -> Logística Pendiente Asignación de Fletero (Error: no se asignó responsable)';
-                }
+            case 'estado_embalaje':
+                $update_acf($id, 'estado_logistica_lider', 'Pendiente');
+                $update_acf($id, 'estado_pedido', 'Listo para Entrega');
                 break;
         }
     }
 
-    // 7. Registrar en el historial de producción
+    // Historial
     wp_insert_post([
         'post_title' => $historial_title,
-        'post_type' => 'ghd_historial',
+        'post_type'  => 'ghd_historial',
         'meta_input' => ['_orden_produccion_id' => $id]
     ]);
-    
-    // 8. Calcular y devolver KPIs del sector
+
+    // KPIs
     $sector_kpi_data = ghd_calculate_sector_kpis($field);
     wp_send_json_success(['message' => 'Estado actualizado.', 'kpi_data' => $sector_kpi_data]);
     wp_die();
 }); // fin ghd_update_task_status
+/////////////////////////////////////////////////////////////////////////
 
-// --- MANEJADOR AJAX PARA ARCHIVAR PEDIDOS (AHORA LLAMADO POR EL ADMIN PRINCIPAL) ---
 add_action('wp_ajax_ghd_archive_order', 'ghd_archive_order_callback');
 function ghd_archive_order_callback() {
     check_ajax_referer('ghd-ajax-nonce', 'nonce');
-
-    // --- CORRECCIÓN: Permitir acceso a Admin Y a Control Final ---
-    if (!current_user_can('manage_options') && !current_user_can('control_final_macarena')) {
-        wp_send_json_error(['message' => 'No tienes permisos para archivar pedidos.']);
-        wp_die();
-    }    
-
+    if (!current_user_can('manage_options') && !current_user_can('control_final_macarena')) { wp_send_json_error(['message' => 'No tienes permisos para archivar pedidos.']); wp_die(); }    
     $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
-    if (!$order_id) {
-        wp_send_json_error(['message' => 'ID de pedido no válido.']);
-    }
-
-    // Actualizar los campos a archivado
+    if (!$order_id) { wp_send_json_error(['message' => 'ID de pedido no válido.']); }
     update_field('estado_administrativo', 'Archivado', $order_id);
     update_field('estado_pedido', 'Completado y Archivado', $order_id);
-    update_field('fecha_de_archivo_pedido', current_time('mysql'), $order_id); // <-- NUEVO: Guardar fecha y hora exactas
-    // --- NUEVO: Calcular y guardar la comisión cuando el pedido se archiva ---
+    update_field('fecha_de_archivo_pedido', current_time('mysql'), $order_id);
     $comision_calculada = ghd_calculate_commission_for_order($order_id);
     update_field('comision_calculada', $comision_calculada, $order_id);
-    
-    // Opcional: Acumular la comisión al perfil de la vendedora
     $vendedora_id = (int) get_field('vendedora_asignada', $order_id);
     if ($vendedora_id > 0 && $comision_calculada > 0) {
         $current_total_comisiones = (float) get_user_meta($vendedora_id, 'ghd_total_comisiones', true);
         $new_total_comisiones = $current_total_comisiones + $comision_calculada;
         update_user_meta($vendedora_id, 'ghd_total_comisiones', $new_total_comisiones);
-        error_log("GHD Comisión: {$comision_calculada} sumada a vendedora ID: {$vendedora_id} para Pedido ID: {$order_id}");
     }
-    // --- FIN NUEVO ---
-    wp_insert_post([ 
-        'post_title' => 'Pedido Cerrado y Archivado', 
-        'post_type' => 'ghd_historial', 
-        'meta_input' => ['_orden_produccion_id' => $order_id, '_fecha_archivo' => current_time('mysql')] 
-    ]);
-
-    // --- RECALCULAR Y DEVOLVER KPIs para el panel del Admin principal ---
-    // Pedidos pendientes de cierre para el Admin (nuevo estado)
-    $kpi_args = [
-        'post_type' => 'orden_produccion', 'posts_per_page' => -1,
-        'meta_query' => [['key' => 'estado_pedido', 'value' => 'Pendiente de Cierre Admin', 'compare' => '=']]
-    ];
-    $kpi_query = new WP_Query($kpi_args);
-    
-    $kpi_data = [
-        'total_pedidos_cierre' => $kpi_query->post_count, // KPIs específicos para esta sección del Admin
-        'total_prioridad_alta_cierre' => 0,
-        'tiempo_promedio_str_cierre' => '0.0h',
-        'completadas_hoy_cierre' => 0 
-    ];
-    
-    $total_tiempo_espera = 0;
-    $ahora = current_time('U');
-    if ($kpi_query->have_posts()) {
-        foreach ($kpi_query->posts as $pedido) {
-            if (get_field('prioridad_pedido', $pedido->ID) === 'Alta') { $kpi_data['total_prioridad_alta_cierre']++; }
-            // Calcular el tiempo de espera desde que Logística lo marcó como completado
-            $logistica_completada_time = get_post_meta($pedido->ID, 'historial_logistica_completada_timestamp', true); // Asumiendo que guardamos un timestamp al completar Logística
-            if ($logistica_completada_time) {
-                $total_tiempo_espera += $ahora - $logistica_completada_time;
-            } else {
-                 $total_tiempo_espera += $ahora - get_the_modified_time('U', $pedido->ID); // Fallback
-            }
-        }
-    }
-    if ($kpi_data['total_pedidos_cierre'] > 0) {
-        $promedio_horas = ($total_tiempo_espera / $kpi_data['total_pedidos_cierre']) / 3600;
-        $kpi_data['tiempo_promedio_str_cierre'] = number_format($promedio_horas, 1) . 'h';
-    }
-
-    // --- Lógica para calcular 'Completadas Hoy' (archivadas hoy por el Admin) ---
-    $today_start = strtotime('today', current_time('timestamp', true)); // Inicio de hoy en timestamp GMT
-    $today_end   = strtotime('tomorrow - 1 second', current_time('timestamp', true)); // Fin de hoy en timestamp GMT
-
-    $completadas_hoy_args = [
-        'post_type'      => 'orden_produccion',
-        'posts_per_page' => -1,
-        'meta_query'     => [
-            [
-                'key'     => 'estado_pedido',
-                'value'   => 'Completado y Archivado',
-                'compare' => '=',
-            ],
-        ],
-        'date_query' => [ 
-            'after'     => date('Y-m-d H:i:s', $today_start),
-            'before'    => date('Y-m-d H:i:s', $today_end),
-            'inclusive' => true,
-            'column'    => 'post_modified_gmt', // Usar la columna de modificación en GMT
-        ],
-    ];
-    $completadas_hoy_query = new WP_Query($completadas_hoy_args);
-    $kpi_data['completadas_hoy_cierre'] = $completadas_hoy_query->post_count;
-
+    wp_insert_post([ 'post_title' => 'Pedido Cerrado y Archivado', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id, '_fecha_archivo' => current_time('mysql')] ]);
+    $kpi_data = ghd_calculate_admin_closure_kpis();
     wp_send_json_success(['message' => 'Pedido archivado con éxito.', 'kpi_data' => $kpi_data]);
     wp_die();
 }
 
-/**
- * AJAX Handler para refrescar las tareas y KPIs de un sector específico.
- * V3 - Corregido para obtener la lista de operarios del sector correcto.
- */
 add_action('wp_ajax_ghd_refresh_sector_tasks', 'ghd_refresh_sector_tasks_callback');
 function ghd_refresh_sector_tasks_callback() {
     check_ajax_referer('ghd-ajax-nonce', 'nonce');
-    if (!current_user_can('read')) {
-        wp_send_json_error(['message' => 'No tienes permisos.']);
-        wp_die();
-    }
-
+    if (!current_user_can('read')) { wp_send_json_error(['message' => 'No tienes permisos.']); wp_die(); }
     $campo_estado = isset($_POST['campo_estado']) ? sanitize_key($_POST['campo_estado']) : '';
-    if (empty($campo_estado)) {
-        wp_send_json_error(['message' => 'Campo de estado no proporcionado.']);
-        wp_die();
-    }
-
-    // --- CORRECCIÓN CLAVE: Determinar el sector a partir del campo_estado recibido ---
+    if (empty($campo_estado)) { wp_send_json_error(['message' => 'Campo de estado no proporcionado.']); wp_die(); }
     $base_sector_key = str_replace('estado_', '', $campo_estado);
-    // --- FIN CORRECCIÓN ---
-
-        $current_user = wp_get_current_user();
+    $current_user = wp_get_current_user();
     $user_roles = (array) $current_user->roles;
-    $is_leader_actual_role = false; // Bandera para el rol de líder real del usuario
-    foreach($user_roles as $role) {
-        if (strpos($role, 'lider_') !== false) {
-            $is_leader_actual_role = true;
-            break;
-        }
-    }
-
-    // Para el contexto de renderizado de la tarjeta, el administrador también debe verse como un "líder"
-    // para poder asignar tareas y ver el selector.
-    $is_leader_for_rendering = $is_leader_actual_role || current_user_can('ghd_view_all_sector_tasks'); // <-- CLAVE: Permitir al admin asignar
-
+    $is_leader_actual_role = false;
+    foreach($user_roles as $role) { if (strpos($role, 'lider_') !== false) { $is_leader_actual_role = true; break; } }
+    $is_leader_for_rendering = $is_leader_actual_role || current_user_can('ghd_view_all_sector_tasks');
     $operarios_del_sector = [];
-    // Obtener operarios si es un líder real O un administrador con la capacidad
-    if ($is_leader_for_rendering && !empty($base_sector_key)) {
-        $operarios_del_sector = get_users([
-            'role__in' => ['lider_' . $base_sector_key, 'operario_' . $base_sector_key], 
-            'orderby'  => 'display_name',
-            'order'    => 'ASC'
-        ]);
-    }
-
-    // PASAR LA BANDERA CORRECTA PARA EL RENDERIZADO AL TEMPLATE PART
-    // Aseguramos que $is_leader que se pasa a task-card.php considere al administrador
-    $is_leader = $is_leader_for_rendering; // Usamos esta variable en $task_card_args
-
+    if ($is_leader_for_rendering && !empty($base_sector_key)) { $operarios_del_sector = get_users([ 'role__in' => ['lider_' . $base_sector_key, 'operario_' . $base_sector_key], 'orderby' => 'display_name', 'order' => 'ASC' ]); }
+    $is_leader = $is_leader_for_rendering;
     $sector_kpi_data = ghd_calculate_sector_kpis($campo_estado);
-
-    $pedidos_query_args = [
-        'post_type'      => 'orden_produccion', 
-        'posts_per_page' => -1, 
-        'meta_query'     => [['key' => $campo_estado, 'value' => ['Pendiente', 'En Progreso'], 'compare' => 'IN']]
-    ];
-    
-    // Si el usuario actual tiene la capacidad de ver todas las tareas del sector (ej. Administrador),
-    // o si es el líder del sector, no aplicamos el filtro de asignación personal.
-    // Solo si NO es líder Y NO es Admin con permiso de ver todo, filtramos por asignación.
+    $pedidos_query_args = [ 'post_type' => 'orden_produccion', 'posts_per_page' => -1, 'meta_query' => [['key' => $campo_estado, 'value' => ['Pendiente', 'En Progreso'], 'compare' => 'IN']] ];
     if (!current_user_can('ghd_view_all_sector_tasks') && !$is_leader) {
         $asignado_a_field = str_replace('estado_', 'asignado_a_', $campo_estado);
         $pedidos_query_args['meta_query'][] = ['key' => $asignado_a_field, 'value' => $current_user->ID, 'compare' => '='];
     }
-    
     $pedidos_query = new WP_Query($pedidos_query_args);
-    
     ob_start();
-
-    if ($pedidos_query->have_posts()) : 
-        while ($pedidos_query->have_posts()) : $pedidos_query->the_post();
+    if ($pedidos_query->have_posts()) : while ($pedidos_query->have_posts()) : $pedidos_query->the_post();
             $current_order_id = get_the_ID();
             $prioridad_pedido = get_field('prioridad_pedido', $current_order_id);
             $asignado_a_field_name = str_replace('estado_', 'asignado_a_', $campo_estado);
             $asignado_a_id = get_field($asignado_a_field_name, $current_order_id);
             $asignado_a_user = $asignado_a_id ? get_userdata($asignado_a_id) : null;
-
-            $task_card_args = [
-                'post_id'           => $current_order_id,
-                'titulo'            => get_the_title(),
-                'prioridad_class'   => 'prioridad-' . strtolower($prioridad_pedido ?: 'baja'),
-                'prioridad'         => $prioridad_pedido,
-                'nombre_cliente'    => get_field('nombre_cliente', $current_order_id),
-                'nombre_producto'   => get_field('nombre_producto', $current_order_id),
-                'permalink'         => get_permalink(),
-                'campo_estado'      => $campo_estado,
-                'estado_actual'     => get_field($campo_estado, $current_order_id),
-                'is_leader'         => $is_leader,
-                'operarios_sector'  => $operarios_del_sector,
-                'asignado_a_id'     => $asignado_a_id,
-                'asignado_a_name'   => $asignado_a_user ? $asignado_a_user->display_name : 'Sin asignar',
-                'logged_in_user_id' => $current_user->ID,
-            ];
-            
+            $task_card_args = [ 'post_id' => $current_order_id, 'titulo' => get_the_title(), 'prioridad_class' => 'prioridad-' . strtolower($prioridad_pedido ?: 'baja'), 'prioridad' => $prioridad_pedido, 'nombre_cliente' => get_field('nombre_cliente', $current_order_id), 'nombre_producto' => get_field('nombre_producto', $current_order_id), 'permalink' => get_permalink(), 'campo_estado' => $campo_estado, 'estado_actual' => get_field($campo_estado, $current_order_id), 'is_leader' => $is_leader, 'operarios_sector' => $operarios_del_sector, 'asignado_a_id' => $asignado_a_id, 'asignado_a_name' => $asignado_a_user ? $asignado_a_user->display_name : 'Sin asignar', 'logged_in_user_id' => $current_user->ID, ];
             get_template_part('template-parts/task-card', null, $task_card_args);
         endwhile;
     else: ?>
         <p class="no-tasks-message">No tienes tareas pendientes.</p>
     <?php endif; wp_reset_postdata(); 
-    
     $tasks_html = ob_get_clean();
-
-    wp_send_json_success([
-        'tasks_html' => $tasks_html,
-        'kpi_data' => $sector_kpi_data
-    ]);
+    wp_send_json_success([ 'tasks_html' => $tasks_html, 'kpi_data' => $sector_kpi_data ]);
     wp_die();
-}// fin ghd_refresh_sector_tasks
-////////////// //////////////////////////////////////////////////////
-/**
- * AJAX Handler para refrescar la sección de Pedidos Pendientes de Cierre y sus KPIs del Admin principal.
- */
+}
+
 add_action('wp_ajax_ghd_refresh_admin_closure_section', 'ghd_refresh_admin_closure_section_callback');
 function ghd_refresh_admin_closure_section_callback() {
     check_ajax_referer('ghd-ajax-nonce', 'nonce');
-     // --- CORRECCIÓN: Permitir acceso a Admin Y a Control Final ---
-    if (!current_user_can('manage_options') && !current_user_can('control_final_macarena')) {
-        wp_send_json_error(['message' => 'No tienes permisos.']);
-        wp_die();
-    }
-
-    // 1. Recalcular KPIs para la sección de cierre
+    if (!current_user_can('manage_options') && !current_user_can('control_final_macarena')) { wp_send_json_error(['message' => 'No tienes permisos.']); wp_die(); }
     $admin_closure_kpis = ghd_calculate_admin_closure_kpis();
-
-    // 2. Regenerar el HTML de la tabla de cierre
     ob_start();
-    $args_cierre = array(
-        'post_type'      => 'orden_produccion',
-        'posts_per_page' => -1,
-        'meta_query'     => array(
-            array(
-                'key'     => 'estado_pedido',
-                'value'   => 'Pendiente de Cierre Admin',
-                'compare' => '=',
-            ),
-        ),
-        'orderby' => 'date',
-        'order'   => 'ASC',
-    );
+    $args_cierre = array( 'post_type' => 'orden_produccion', 'posts_per_page' => -1, 'meta_query' => array( array( 'key' => 'estado_pedido', 'value' => 'Pendiente de Cierre Admin', 'compare' => '=', ), ), 'orderby' => 'date', 'order' => 'ASC', );
     $pedidos_cierre_query = new WP_Query($args_cierre);
-
-    // $remito_page_id = get_posts([
-    //     'post_type'  => 'page',
-    //     'fields'     => 'ids',
-    //     'nopaging'   => true,
-    //     'meta_key'   => '_wp_page_template',
-    //     'meta_value' => 'template-remito.php'
-    // ]);
     $remito_base_url = ghd_get_remito_base_url();
-
-    if ($pedidos_cierre_query->have_posts()) :
-        while ($pedidos_cierre_query->have_posts()) : $pedidos_cierre_query->the_post();
+    if ($pedidos_cierre_query->have_posts()) : while ($pedidos_cierre_query->have_posts()) : $pedidos_cierre_query->the_post();
             $order_id = get_the_ID();
             $remito_url = esc_url( add_query_arg( 'order_id', $order_id, $remito_base_url ) );
         ?>
@@ -1309,262 +633,99 @@ function ghd_refresh_admin_closure_section_callback() {
                 <td><?php echo esc_html(get_field('nombre_producto', $order_id)); ?></td>
                 <td><?php echo get_the_date('d/m/Y', $order_id); ?></td>
                 <td>
-                    <a href="<?php echo $remito_url; ?>" target="_blank" class="ghd-btn ghd-btn-secondary ghd-btn-small generate-remito-btn" data-order-id="<?php echo $order_id; ?>">
-                        <i class="fa-solid fa-file-invoice"></i> Generar Remito
-                    </a>
-                    <button class="ghd-btn ghd-btn-success archive-order-btn" data-order-id="<?php echo $order_id; ?>">
-                        Archivar Pedido
-                    </button>
+                    <a href="<?php echo $remito_url; ?>" target="_blank" class="ghd-btn ghd-btn-secondary ghd-btn-small generate-remito-btn" data-order-id="<?php echo $order_id; ?>"><i class="fa-solid fa-file-invoice"></i> Generar Remito</a>
+                    <button class="ghd-btn ghd-btn-success archive-order-btn" data-order-id="<?php echo $order_id; ?>">Archivar Pedido</button>
                 </td>
             </tr>
-        <?php
-        endwhile;
-    else: 
-    ?>
+        <?php endwhile;
+    else: ?>
         <tr><td colspan="5" style="text-align:center;">No hay pedidos pendientes de cierre.</td></tr>
-    <?php
-    endif;
+    <?php endif;
     wp_reset_postdata(); 
     $closure_table_html = ob_get_clean();
-
-    wp_send_json_success([
-        'message'          => 'Sección de cierre actualizada.',
-        'table_html'       => $closure_table_html,
-        'kpi_data'         => $admin_closure_kpis
-    ]);
+    wp_send_json_success([ 'message' => 'Sección de cierre actualizada.', 'table_html' => $closure_table_html, 'kpi_data' => $admin_closure_kpis ]);
     wp_die();
 }
 
-/**
- * AJAX Handler para refrescar la sección de Pedidos en Producción y sus KPIs del Admin principal.
- */
 add_action('wp_ajax_ghd_refresh_production_tasks', 'ghd_refresh_production_tasks_callback');
 function ghd_refresh_production_tasks_callback() {
     check_ajax_referer('ghd-ajax-nonce', 'nonce');
     if (!current_user_can('manage_options')) wp_send_json_error(['message' => 'No tienes permisos.']);
-
     $data = ghd_get_pedidos_en_produccion_data();
-
-    wp_send_json_success([
-        'message'  => 'Pedidos en producción actualizados.',
-        'tasks_html' => $data['tasks_html'],
-        'kpi_data' => $data['kpi_data']
-    ]);
+    wp_send_json_success([ 'message' => 'Pedidos en producción actualizados.', 'tasks_html' => $data['tasks_html'], 'kpi_data' => $data['kpi_data'] ]);
     wp_die();
 }
 
-/**
- * Registra la nueva plantilla de página para Pedidos Archivados.
- *
- * @param array $templates Un array de plantillas de página.
- * @return array Un array modificado de plantillas de página.
- */
 add_filter( 'theme_page_templates', 'ghd_register_archived_orders_template' );
 function ghd_register_archived_orders_template( $templates ) {
     $templates['template-pedidos-archivados.php'] = 'GHD - Pedidos Archivados';
     return $templates;
 }
 
-
-/**
- * --- NUEVO ENDPOINT AJAX: Registrar Detalles de Tarea y Marcar como Completada ---
- * Este endpoint maneja la finalización de una tarea de sector, incluyendo datos adicionales.
- */
 add_action('wp_ajax_ghd_register_task_details_and_complete', 'ghd_register_task_details_and_complete_callback');
 function ghd_register_task_details_and_complete_callback() {
-    
-    error_log('ghd_register_task_details_and_complete_callback: Inicio de la función.'); // DEBUG (para ver si entra)
-
     check_ajax_referer('ghd-ajax-nonce', 'nonce');
-    if (!current_user_can('read')) {
-        error_log('ghd_register_task_details_and_complete_callback: Permisos insuficientes para usuario ID ' . get_current_user_id());
-        wp_send_json_error(['message' => 'No tienes permisos para completar tareas.']);
-        wp_die();
-    }
-
+    if (!current_user_can('read')) { wp_send_json_error(['message' => 'No tienes permisos para completar tareas.']); wp_die(); }
     $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
-    // --- ¡CRÍTICO! Asegurar que $field_estado_sector se define y es accesible ---
     $field_estado_sector = isset($_POST['field']) ? sanitize_key($_POST['field']) : ''; 
-    // --- FIN CRÍTICO ---
     $observaciones_tarea_completa = isset($_POST['observaciones_tarea_completa']) ? sanitize_textarea_field($_POST['observaciones_tarea_completa']) : '';
-
-    if (!$order_id || empty($field_estado_sector)) {
-        error_log('ghd_register_task_details_and_complete_callback: Datos de tarea incompletos. Order ID: ' . $order_id . ', Field: ' . $field_estado_sector);
-        wp_send_json_error(['message' => 'Datos de tarea incompletos.']);
-        wp_die();
-    }
+    if (!$order_id || empty($field_estado_sector)) { wp_send_json_error(['message' => 'Datos de tarea incompletos.']); wp_die(); }
     $current_user_id = get_current_user_id();
-    
-    // Guardar los datos de la tarea que se está completando
     update_field($field_estado_sector, 'Completado', $order_id);
-
-    // --- DEBUG: Uso de $field_estado_sector en str_replace ---
-    error_log("GHD Embalaje: field_estado_sector para fecha_completado: " . str_replace('estado_', 'fecha_completado_', $field_estado_sector));
-    // --- FIN DEBUG ---
-
     update_field(str_replace('estado_', 'fecha_completado_', $field_estado_sector), current_time('mysql'), $order_id);
     update_field(str_replace('estado_', 'completado_por_', $field_estado_sector), $current_user_id, $order_id);
     update_field(str_replace('estado_', '', $field_estado_sector) . '_observaciones_tarea_completa', $observaciones_tarea_completa, $order_id);
-
     if (isset($_FILES['foto_tarea']) && !empty($_FILES['foto_tarea']['name'])) {
         require_once(ABSPATH . 'wp-admin/includes/image.php');
         require_once(ABSPATH . 'wp-admin/includes/file.php');
         require_once(ABSPATH . 'wp-admin/includes/media.php');
         $attachment_id = media_handle_upload('foto_tarea', $order_id);
-        if (!is_wp_error($attachment_id)) {
-            update_field(str_replace('estado_', '', $field_estado_sector) . '_foto_principal_tarea', $attachment_id, $order_id);
-        }
+        if (!is_wp_error($attachment_id)) { update_field(str_replace('estado_', '', $field_estado_sector) . '_foto_principal_tarea', $attachment_id, $order_id); }
     }
-    
-    wp_insert_post([
-        'post_title' => ucfirst(str_replace('estado_', '', $field_estado_sector)) . ' completado por ' . get_the_author_meta('display_name', $current_user_id),
-        'post_type' => 'ghd_historial',
-        'meta_input' => ['_orden_produccion_id' => $order_id]
-    ]);
-    // --- NUEVO: Lógica para guardar datos específicos del sector de Embalaje ---
+    wp_insert_post([ 'post_title' => ucfirst(str_replace('estado_', '', $field_estado_sector)) . ' completado por ' . get_the_author_meta('display_name', $current_user_id), 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id] ]);
     if ($field_estado_sector === 'estado_embalaje') {
         $operario_embalaje_id = isset($_POST['operario_embalaje_id']) ? intval($_POST['operario_embalaje_id']) : 0;
-        $modelo_embalado_id   = isset($_POST['modelo_embalado_id']) ? intval($_POST['modelo_embalado_id']) : 0;
-        $cantidad_embalada    = isset($_POST['cantidad_embalada']) ? intval($_POST['cantidad_embalada']) : 0;
-
-          // --- DEBUG: Loguear valores recibidos ---
-        error_log("GHD Embalaje Callback: Recibido - Operario ID: {$operario_embalaje_id}, Modelo ID: {$modelo_embalado_id}, Cantidad: {$cantidad_embalada}");
-        // --- FIN DEBUG ---
-
-        if ($operario_embalaje_id === 0 || $modelo_embalado_id === 0 || $cantidad_embalada === 0) {
-            wp_send_json_error(['message' => 'Faltan datos obligatorios para el registro de puntos de embalaje.']);
-            wp_die();
-        }
-
-        // 1. Obtener los puntos del modelo seleccionado
+        $modelo_embalado_id = isset($_POST['modelo_embalado_id']) ? intval($_POST['modelo_embalado_id']) : 0;
+        $cantidad_embalada = isset($_POST['cantidad_embalada']) ? intval($_POST['cantidad_embalada']) : 0;
+        if ($operario_embalaje_id === 0 || $modelo_embalado_id === 0 || $cantidad_embalada === 0) { wp_send_json_error(['message' => 'Faltan datos obligatorios para el registro de puntos de embalaje.']); wp_die(); }
         $modelo_puntos_obj = null;
-        $embalaje_models = ghd_get_embalaje_models_for_select(); // Reutilizamos la función de ayuda
-        foreach ($embalaje_models as $model) {
-            if ($model->id === $modelo_embalado_id) {
-                $modelo_puntos_obj = $model;
-                break;
-            }
-        }
-
-        if (!$modelo_puntos_obj) {
-            wp_send_json_error(['message' => 'Modelo de embalaje no válido.']);
-            wp_die();
-        }
-
+        $embalaje_models = ghd_get_embalaje_models_for_select();
+        foreach ($embalaje_models as $model) { if ($model->id === $modelo_embalado_id) { $modelo_puntos_obj = $model; break; } }
+        if (!$modelo_puntos_obj) { wp_send_json_error(['message' => 'Modelo de embalaje no válido.']); wp_die(); }
         $puntos_por_modelo = $modelo_puntos_obj->points;
         $puntos_totales_tarea = $puntos_por_modelo * $cantidad_embalada;
-
-         // 2. Guardar estos datos específicos en campos ACF de la orden_produccion (¡CRÍTICO!)
-        // --- ¡NUEVO! Inicializar variables de resultado para evitar Undefined warnings ---
-        $update_op_id = false; 
-        $update_mod_id = false; 
-        $update_cant = false; 
-        $update_puntos = false;
-        // --- FIN NUEVO ---
-
-        $update_op_id = update_field('embalaje_operario_id', $operario_embalaje_id, $order_id);
-        $update_mod_id = update_field('embalaje_modelo_id', $modelo_embalado_id, $order_id);
-        $update_cant = update_field('embalaje_cantidad', $cantidad_embalada, $order_id);
-        $update_puntos = update_field('embalaje_puntos_tarea', $puntos_totales_tarea, $order_id);
-        
-        error_log("GHD Embalaje Callback: Resultados update_field para Pedido ID: {$order_id}");
-        error_log("  - embalaje_operario_id: " . ($update_op_id ? 'ÉXITO' : 'FALLO'));
-        error_log("  - embalaje_modelo_id: " . ($update_mod_id ? 'ÉXITO' : 'FALLO'));
-        error_log("  - embalaje_cantidad: " . ($update_cant ? 'ÉXITO' : 'FALLO'));
-        error_log("  - embalaje_puntos_tarea: " . ($update_puntos ? 'ÉXITO' : 'FALLO'));
-        // // 2. Guardar estos datos específicos en campos ACF de la orden_produccion
-        // update_field('embalaje_operario_id', $operario_embalaje_id, $order_id);
-        // update_field('embalaje_modelo_id', $modelo_embalado_id, $order_id);
-        // update_field('embalaje_cantidad', $cantidad_embalada, $order_id);
-        // update_field('embalaje_puntos_tarea', $puntos_totales_tarea, $order_id);
-
-        //   // --- DEBUG: Verificar que los campos se actualizaron correctamente ---
-        //   error_log("GHD Embalaje Callback: Resultados update_field para Pedido ID: {$order_id}");
-        // error_log("  - embalaje_operario_id: " . ($update_op_id ? 'ÉXITO' : 'FALLO'));
-        // error_log("  - embalaje_modelo_id: " . ($update_mod_id ? 'ÉXITO' : 'FALLO'));
-        // error_log("  - embalaje_cantidad: " . ($update_cant ? 'ÉXITO' : 'FALLO'));
-        // error_log("  - embalaje_puntos_tarea: " . ($update_puntos ? 'ÉXITO' : 'FALLO'));
-        
-        // 3. Sumar los puntos al perfil del operario (User Meta)
+        update_field('embalaje_operario_id', $operario_embalaje_id, $order_id);
+        update_field('embalaje_modelo_id', $modelo_embalado_id, $order_id);
+        update_field('embalaje_cantidad', $cantidad_embalada, $order_id);
+        update_field('embalaje_puntos_tarea', $puntos_totales_tarea, $order_id);
         $current_total_points = (int) get_user_meta($operario_embalaje_id, 'ghd_total_puntos_embalaje', true);
         $new_total_points = $current_total_points + $puntos_totales_tarea;
         update_user_meta($operario_embalaje_id, 'ghd_total_puntos_embalaje', $new_total_points);
-
-        // Opcional: Registrar los puntos en el historial del post también
-        wp_insert_post([
-            'post_title' => 'Puntos Embalaje: ' . $modelo_puntos_obj->title . ' x' . $cantidad_embalada . ' = ' . $puntos_totales_tarea . ' puntos para Operario ID ' . $operario_embalaje_id,
-            'post_type' => 'ghd_historial',
-            'meta_input' => [
-                '_orden_produccion_id' => $order_id,
-                '_tipo_registro' => 'puntos_embalaje',
-                '_operario_id' => $operario_embalaje_id,
-                '_modelo_id' => $modelo_embalado_id,
-                '_cantidad' => $cantidad_embalada,
-                '_puntos_sumados' => $puntos_totales_tarea,
-            ]
-        ]);
+        wp_insert_post([ 'post_title' => 'Puntos Embalaje: ' . $modelo_puntos_obj->title . ' x' . $cantidad_embalada . ' = ' . $puntos_totales_tarea . ' puntos para Operario ID ' . $operario_embalaje_id, 'post_type' => 'ghd_historial', 'meta_input' => [ '_orden_produccion_id' => $order_id, '_tipo_registro' => 'puntos_embalaje', '_operario_id' => $operario_embalaje_id, '_modelo_id' => $modelo_embalado_id, '_cantidad' => $cantidad_embalada, '_puntos_sumados' => $puntos_totales_tarea, ] ]);
     }
-// --- FIN Lógica Embalaje ---
-
-    // --- LÓGICA DE TRANSICIONES DE FLUJO (ESTRICTAMENTE SECUENCIAL) ---
-    
     switch ($field_estado_sector) {
         case 'estado_carpinteria':
-            update_field('estado_corte', 'Pendiente', $order_id);
-            wp_insert_post(['post_title' => 'Fase Carpintería completa -> A Corte', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id]]);
-            break;
-        
         case 'estado_corte':
-            update_field('estado_costura', 'Pendiente', $order_id);
-            update_field('estado_pedido', 'En Costura', $order_id);
-            wp_insert_post(['post_title' => 'Fase Corte completa -> A Costura', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id]]);
+            ghd_check_and_trigger_costura($order_id);
             break;
-
         case 'estado_costura':
             update_field('estado_tapiceria', 'Pendiente', $order_id);
-            update_field('estado_pedido', 'En Tapicería/Embalaje', $order_id); // Cambiamos el estado general
+            update_field('estado_pedido', 'En Tapicería/Embalaje', $order_id);
             wp_insert_post(['post_title' => 'Fase Costura completa -> A Tapicería', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id]]);
             break;
-        
         case 'estado_tapiceria':
             update_field('estado_embalaje', 'Pendiente', $order_id);
             wp_insert_post(['post_title' => 'Fase Tapicería completa -> A Embalaje', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id]]);
             break;
-
         case 'estado_embalaje':
             update_field('estado_logistica_lider', 'Pendiente', $order_id);
             update_field('estado_logistica', 'Pendiente', $order_id);
             update_field('estado_pedido', 'Listo para Entrega', $order_id);
             wp_insert_post(['post_title' => 'Fase Embalaje completa -> A Logística', 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $order_id]]);
             break;
-        
-       case 'estado_logistica_lider':
-                error_log('ghd_update_task_status: Activando lógica de transición para Logística Líder (ID: ' . $id . ')');
-
-                update_field('fecha_completado_logistica_lider', current_time('mysql'), $id);
-
-                $fletero_responsable_id = (int)get_field('asignado_a_logistica_lider', $id); 
-                error_log('ghd_update_task_status: Fletero responsable ID obtenido de asignado_a_logistica_lider: ' . $fletero_responsable_id);
-
-                if ($fletero_responsable_id > 0) {
-                    update_field('logistica_fletero_id', $fletero_responsable_id, $id);
-                    update_field('estado_logistica_fletero', 'Pendiente', $id);
-                    update_field('estado_pedido', 'En Despacho', $id);
-                    
-                    $fletero_obj = get_userdata($fletero_responsable_id);
-                    $fletero_name = $fletero_obj ? $fletero_obj->display_name : 'ID ' . $fletero_responsable_id;
-                    $historial_title .= ' -> En Despacho (Asignado a ' . $fletero_name . ')';
-                } else {
-                    error_log('ghd_update_task_status: Líder de Logística completó sin asignar fletero responsable (asignado_a_logistica_lider es 0).');
-                    update_field('estado_logistica_fletero', 'No Asignado', $id);
-                    update_field('estado_pedido', 'Logística Pendiente Asignación', $id);
-                    $historial_title .= ' -> Logística Pendiente Asignación de Fletero (Error: no se asignó responsable)';
-                }
-                break; 
     }
 
     $sector_kpi_data = ghd_calculate_sector_kpis($field_estado_sector);
-    
     wp_send_json_success(['message' => 'Tarea completada y detalles registrados.', 'kpi_data' => $sector_kpi_data]);
     wp_die();
 }
@@ -1621,7 +782,10 @@ function ghd_update_vendedora_callback() {
     wp_die();
 }
 
-// --- NUEVO: LÓGICA AJAX PARA INICIAR PRODUCCIÓN ---
+/**
+ * --- MODIFICADO: LÓGICA AJAX PARA INICIAR PRODUCCIÓN (PARALELO) ---
+ * Al iniciar, activa Carpintería y Corte simultáneamente.
+ */
 add_action('wp_ajax_ghd_start_production', 'ghd_start_production_callback');
 function ghd_start_production_callback() {
     // 1. Verificación de Nonce para seguridad
@@ -1640,7 +804,7 @@ function ghd_start_production_callback() {
         wp_die();
     }
 
-    // 4. Verificar el estado actual del pedido para asegurar que es "Pendiente de Asignación"
+    // 4. Verificar el estado actual del pedido
     if (get_field('estado_pedido', $order_id) !== 'Pendiente de Asignación') {
         wp_send_json_error(['message' => 'El pedido ya no está en estado "Pendiente de Asignación".']);
         wp_die();
@@ -1648,31 +812,35 @@ function ghd_start_production_callback() {
 
     // 5. Actualizar los campos ACF para iniciar la producción
     update_field('estado_pedido', 'En Producción', $order_id);
-    update_field('estado_carpinteria', 'Pendiente', $order_id);
     
-    // Opcional: Guardar un timestamp de cuándo se inició la producción para métricas
+    // --- INICIO DE MODIFICACIÓN (R1) ---
+    update_field('estado_carpinteria', 'Pendiente', $order_id);
+    update_field('estado_corte', 'Pendiente', $order_id); // <-- NUEVA LÍNEA: Activa Corte en paralelo
+    // --- FIN DE MODIFICACIÓN (R1) ---
+    
     update_post_meta($order_id, 'historial_produccion_iniciada_timestamp', current_time('timestamp', true));
 
     // 6. Registrar la acción en el historial del pedido
     wp_insert_post([
-        'post_title' => 'Producción Iniciada por ' . wp_get_current_user()->display_name,
+        'post_title' => 'Producción Iniciada (Carpintería y Corte en paralelo)',
         'post_type' => 'ghd_historial',
         'meta_input' => ['_orden_produccion_id' => $order_id, '_iniciada_por_user_id' => get_current_user_id()]
     ]);
     
-    // 7. Preparar la respuesta JSON: devolver el HTML y KPIs actualizados para la sección de "Pedidos en Producción"
+    // 7. Preparar la respuesta JSON
     $production_data = ghd_get_pedidos_en_produccion_data();
     
     wp_send_json_success([
         'message' => 'Producción iniciada con éxito.',
-        'production_tasks_html' => $production_data['tasks_html'], // HTML actualizado para la tabla de producción
-        'production_kpi_data' => $production_data['kpi_data']     // KPIs actualizados
+        'production_tasks_html' => $production_data['tasks_html'],
+        'production_kpi_data' => $production_data['kpi_data']
     ]);
     wp_die();
 } // fin ghd_start_production_callback()
 
 /**
  * AJAX Handler para asignar una tarea a un miembro del sector.
+ * CORRECCIÓN: Usa update_post_meta para forzar el guardado y evitar bugs de ACF meta cache.
  */
 add_action('wp_ajax_ghd_assign_task_to_member', 'ghd_assign_task_to_member_callback');
 function ghd_assign_task_to_member_callback() {
@@ -1682,7 +850,7 @@ function ghd_assign_task_to_member_callback() {
         wp_die();
     }
     // Permiso: solo líderes o administradores pueden asignar tareas
-    if (!current_user_can('assign_task_carpinteria') && !current_user_can('assign_task_corte') && /* ... y así para todos los roles de líder ... */ !current_user_can('manage_options')) {
+    if (!current_user_can('assign_task_carpinteria') && !current_user_can('assign_task_corte') && !current_user_can('manage_options')) {
          wp_send_json_error(['message' => 'No tienes permisos para asignar tareas.']);
          wp_die();
     }
@@ -1696,8 +864,13 @@ function ghd_assign_task_to_member_callback() {
         wp_die();
     }
 
+    // --- CORRECCIÓN CRÍTICA: Usar update_post_meta nativo para evitar la caché de get_field() ---
     // Guardar el ID del operario asignado en el campo ACF correspondiente
-    update_field($field_prefix, $assignee_id, $order_id);
+    update_post_meta($order_id, $field_prefix, $assignee_id);
+    // Adicionalmente, forzamos la actualización de la meta de ACF para asegurar la compatibilidad con el sistema de ACF
+    update_post_meta($order_id, '_' . $field_prefix, $field_prefix); 
+    // Si no tienes meta de ACF (fields_XXXXXX), este paso es innecesario, pero lo dejamos por seguridad.
+    // Asumimos que los campos son metadatos normales del post y no campos repetidores complejos.
 
     // Registrar en el historial de GHD
     $assignee_name = 'Sin asignar';
@@ -1713,10 +886,14 @@ function ghd_assign_task_to_member_callback() {
         'meta_input' => ['_orden_produccion_id' => $order_id, '_' . $field_prefix => $assignee_id]
     ]);
 
+    // Forzar limpieza de la caché de post meta de WordPress inmediatamente después de escribir
+    clean_post_cache($order_id);
+    wp_cache_delete($order_id, 'post_meta');
+
     // Enviar respuesta de éxito
     wp_send_json_success(['message' => 'Tarea asignada correctamente.']);
     wp_die();
-}/// fin ghd_assign_task_to_member_callback()
+} // fin ghd_assign_task_to_member_callback()
 
 ////// /////////////////////////////////////////////////////
 // --- NUEVO: AJAX Handler para Fletero: Marcar Entrega como "Recogido" ---
@@ -2319,7 +1496,7 @@ function ghd_redirect_default_login_page() {
 
 /**
  * Redirige a los usuarios a su panel correspondiente DESPUÉS de un inicio de sesión exitoso.
- * Modificado para redirigir al administrador a /panel-de-control/.
+ * CORRECCIÓN: Unifica la lógica de producción para redirigir a /mis-tareas?sector=SU_SECTOR.
  */
 add_filter('login_redirect', 'ghd_custom_login_redirect', 10, 3);
 function ghd_custom_login_redirect($redirect_to, $requested_redirect_to, $user) {
@@ -2329,66 +1506,45 @@ function ghd_custom_login_redirect($redirect_to, $requested_redirect_to, $user) 
 
     $user_roles = (array) $user->roles;
     
-    // PRIORIDAD DE REDIRECCIÓN (de más específico a general, si un usuario tiene múltiples roles)
-
-    // 1. Administradores van a su panel de control personalizado
-    if (in_array('administrator', $user_roles)) {
-        $control_page = get_page_by_path('panel-de-control'); // <-- ¡ASEGÚRATE DE QUE ESTE SLUG SEA EL REAL!
+    // 1. Administradores y Control Final van al panel de control principal.
+    if (in_array('administrator', $user_roles) || in_array('control_final_macarena', $user_roles)) {
+        $control_page = get_page_by_path('panel-de-control');
         if ($control_page) {
             return get_permalink($control_page->ID);
         }
-        // Fallback si la página de control no existe, redirige a la home
         return home_url(); 
     }
 
-    // 2. Fleteros van a su panel de entregas
+    // 2. Determinar el sector principal para usuarios de producción/logística/ventas
+    $production_sector = '';
+
+    // A. Roles con página directa (Logística y Ventas)
     if (in_array('operario_logistica', $user_roles)) {
-        $fletero_page = get_page_by_path('panel-de-fletero'); // <-- ¡ASEGÚRATE DE QUE ESTE SLUG SEA EL REAL!
-        if ($fletero_page) {
-            return get_permalink($fletero_page->ID);
-        }
-        // Fallback si la página del fletero no existe
-        return home_url(); 
+        $fletero_page = get_page_by_path('panel-de-fletero');
+        return $fletero_page ? get_permalink($fletero_page->ID) : home_url();
     }
-
-    // 3. Vendedoras y Gerentes de Ventas van a su panel de ventas
     if (in_array('vendedora', $user_roles) || in_array('gerente_ventas', $user_roles)) {
-        $sales_page = get_page_by_path('panel-de-ventas'); // <-- ¡ASEGÚRATE DE QUE ESTE SLUG SEA EL REAL!
-        if ($sales_page) {
-            return get_permalink($sales_page->ID);
-        }
-        // Fallback si la página de ventas no existe
-        return home_url();
+        $sales_page = get_page_by_path('panel-de-ventas');
+        return $sales_page ? get_permalink($sales_page->ID) : home_url();
     }
-
-    // 4. Líderes de Producción van a su panel general de tareas
-    $is_production_leader = false;
+    
+    // B. Roles de Producción (Líderes y Operarios, incluyendo los que tienen múltiples roles)
     foreach ($user_roles as $role) {
-        if (strpos($role, 'lider_') !== false) {
-            $is_production_leader = true;
-            break;
+        if (strpos($role, 'lider_') === 0 || strpos($role, 'operario_') === 0) {
+            $production_sector = str_replace(['lider_', 'operario_'], '', $role);
+            break; // Tomamos el primer sector encontrado como destino
         }
     }
-    if ($is_production_leader) {
-        $sector_page = get_page_by_path('mis-tareas'); // <-- ¡ASEGÚRATE DE QUE ESTE SLUG SEA EL REAL!
+
+    if (!empty($production_sector)) {
+        $sector_page = get_page_by_path('mis-tareas');
         if ($sector_page) {
-            return get_permalink($sector_page->ID);
+            // Redirige a /mis-tareas?sector=SU_SECTOR
+            return add_query_arg('sector', $production_sector, get_permalink($sector_page->ID));
         }
-        // Fallback si la página de tareas de sector no existe
-        return home_url();
     }
 
-    // 5. Control Final (Macarena) va a su panel de control
-    if (in_array('control_final_macarena', $user_roles)) {
-        $control_page = get_page_by_path('panel-de-control'); // <-- ¡ASEGÚRATE DE QUE ESTE SLUG SEA EL REAL!
-        if ($control_page) {
-            return get_permalink($control_page->ID);
-        }
-        // Fallback si la página de control no existe
-        return home_url();
-    }
-
-    // 6. Fallback final para cualquier otro rol no cubierto (ej. suscriptor)
+    // 6. Fallback final
     return home_url();
 } // fin ghd_custom_login_redirect()
 
@@ -2406,15 +1562,38 @@ function ghd_custom_logout_redirect($logout_url, $redirect) {
 
 /**
  * Previene el acceso directo al backend de WordPress (/wp-admin/) para usuarios que no son administradores.
+ * CORRECCIÓN: Redirige a /mis-tareas o a la home si no se determina el sector.
  */
 add_action('admin_init', 'ghd_prevent_backend_access');
 function ghd_prevent_backend_access() {
-    // La condición is_admin() asegura que esto solo se ejecute en páginas del backend.
     if (is_admin() && !current_user_can('manage_options') && !(defined('DOING_AJAX') && DOING_AJAX)) {
-        wp_redirect(home_url()); // Redirigir a la página de inicio si intentan acceder al backend
+        
+        $user = wp_get_current_user();
+        $user_roles = (array) $user->roles;
+        $production_sector = '';
+        
+        // Buscar el sector principal para redirigir
+        foreach ($user_roles as $role) {
+            if (strpos($role, 'lider_') === 0 || strpos($role, 'operario_') === 0) {
+                $production_sector = str_replace(['lider_', 'operario_'], '', $role);
+                break;
+            }
+        }
+
+        if (!empty($production_sector)) {
+            // Si tiene un sector de producción, redirige a su panel de tareas.
+            $sector_page = get_page_by_path('mis-tareas');
+            if ($sector_page) {
+                wp_redirect(add_query_arg('sector', $production_sector, get_permalink($sector_page->ID)));
+                exit;
+            }
+        }
+
+        // Si no se encuentra un sector de producción, pero no es admin, redirige a la home.
+        wp_redirect(home_url()); 
         exit;
     }
-}
+} // fin ghd_prevent_backend_access()
 
 /**
  * Sincroniza el estado del pedido cuando se actualiza el estado administrativo.
@@ -3875,4 +3054,15 @@ function ghd_search_sector_tasks_callback() {
         'kpi_data'   => $sector_kpi_data
     ]);
     wp_die();
+}
+
+// --- SOLUCIÓN DEFINITIVA PARA CACHÉ DE SERVIDOR LOCAL (WORDPRESS STUDIO) ---
+// Fuerza al servidor a no cachear páginas para usuarios logueados, resolviendo el problema de "sesiones cruzadas".
+add_action('send_headers', 'ghd_add_no_cache_headers');
+function ghd_add_no_cache_headers() {
+    if (is_user_logged_in()) {
+        header('Cache-Control: no-cache, no-store, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+    }
 }

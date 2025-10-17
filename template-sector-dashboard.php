@@ -1,89 +1,82 @@
 <?php
 /*
-Template Name: Panel de Tareas (Sector) V2
+Template Name: Panel de Tareas (Sector) V4 - Multiroles Corregido
 */
 
-if (!is_user_logged_in()) { auth_redirect(); }
+// 1. Seguridad Indiscutible: Si el usuario no está logueado, se va a la página de login. Fin del script.
+if ( ! is_user_logged_in() ) {
+    auth_redirect();
+    exit;
+}
 
 $current_user = wp_get_current_user();
 $user_roles = (array) $current_user->roles;
+$requested_sector = isset($_GET['sector']) ? sanitize_text_field($_GET['sector']) : '';
 
-$allowed_leader_sectors = [];
+// 2. Determinar TODOS los sectores a los que el usuario tiene acceso
+$user_allowed_sectors = [];
+$is_leader_user = false; 
+
 foreach ($user_roles as $role) {
-    if (strpos($role, 'lider_') !== false) {
-        $allowed_leader_sectors[] = str_replace('lider_', '', remove_accents($role));
+    if (strpos($role, 'lider_') === 0) {
+        $user_allowed_sectors[] = str_replace('lider_', '', $role);
+        $is_leader_user = true; // El usuario tiene al menos un rol de líder
+    } elseif (strpos($role, 'operario_') === 0) {
+        $user_allowed_sectors[] = str_replace('operario_', '', $role);
     }
 }
+$user_allowed_sectors = array_unique($user_allowed_sectors); // Sectores únicos permitidos
 
-$requested_sector_raw = isset($_GET['sector']) ? sanitize_text_field($_GET['sector']) : '';
-$requested_sector = strtolower(remove_accents($requested_sector_raw));
+// El sector de destino por defecto es el primero que tenga en sus roles.
+$default_sector = $user_allowed_sectors[0] ?? ''; 
 
-$base_sector_key = '';
-$is_leader_for_rendering = false; // Flag para el renderizado del selector de asignación
-
-// 1. Prioridad: Administrador viendo un sector específico
-if (current_user_can('manage_options') && !empty($requested_sector) && array_key_exists($requested_sector, ghd_get_sectores())) {
+// 3. Lógica de Redirección y Validación
+if ( current_user_can('manage_options') ) {
+    // Caso A: Administrador
+    if (empty($requested_sector) || !array_key_exists($requested_sector, ghd_get_sectores())) {
+        // Redirige al panel principal si no hay sector válido.
+        wp_redirect(home_url('/panel-de-control/'));
+        exit;
+    }
     $base_sector_key = $requested_sector;
-    $is_leader_for_rendering = true; // El Admin actúa como líder para la UI
-}
-// 2. Si es un líder real del sector solicitado
-elseif (!empty($requested_sector) && in_array($requested_sector, $allowed_leader_sectors)) {
+    $is_leader_for_rendering = true; // El admin siempre puede asignar.
+
+} else {
+    // Caso B: Líder u Operario
+    
+    // Si no tiene roles de producción, lo enviamos a la home (debería ir al panel-de-ventas/fletero si esos templates no redirigieron aquí)
+    if (empty($default_sector)) {
+        wp_redirect(home_url());
+        exit;
+    }
+    
+    // Si no se solicitó un sector, o el sector solicitado NO está en la lista de sectores permitidos,
+    // lo forzamos a ir al primer sector en su lista ($default_sector).
+    if (empty($requested_sector) || !in_array($requested_sector, $user_allowed_sectors)) {
+        wp_redirect(add_query_arg('sector', $default_sector, get_permalink()));
+        exit;
+    }
+    
+    // Si llegó aquí, está en la URL correcta de un sector al que tiene acceso.
     $base_sector_key = $requested_sector;
-    $is_leader_for_rendering = true; // Es líder del sector
-}
-// 3. Si no se solicita un sector, pero es líder de alguno, redirigir al primero
-elseif (!empty($allowed_leader_sectors)) {
-    wp_redirect( add_query_arg('sector', $allowed_leader_sectors[0], get_permalink() ) );
-    exit;
-}
-// 4. Fallback si no es Admin y no es líder de ningún sector
-elseif (!current_user_can('manage_options') && empty($allowed_leader_sectors)) {
-    wp_redirect( home_url('/panel-de-control/') ); // Redirigir si no tiene permisos para ningún panel
-    exit;
+    
+    // Si tiene un rol de líder (aunque sea de otro sector), puede ver los selectores.
+    // Usamos el rol de líder del usuario, NO si el sector actual es líder.
+    $is_leader_for_rendering = $is_leader_user;
 }
 
-// 5. Último fallback si $base_sector_key sigue vacío (ej. sector inválido solicitado)
-if (empty($base_sector_key)) {
-    wp_redirect( home_url('/panel-de-control/') );
-    exit;
-}
-
+// 4. Configuración final para la UI
 get_header();
 
-// --- ¡CRÍTICO! DETERMINACIÓN PRECISA DEL $campo_estado Y $is_leader FINAL ---
 $mapa_roles = ghd_get_mapa_roles_a_campos();
-$campo_estado = ''; // Se inicializa y se rellena con el campo ACF correcto.
-
-// Si el usuario actual tiene el rol de líder del $base_sector_key, o es Admin viendo ese sector
-if ($is_leader_for_rendering) {
-    // Si es un Admin, o un líder real, queremos el campo de estado para el ROL DE LÍDER de ese sector.
-    if (isset($mapa_roles['lider_' . $base_sector_key])) {
-        $campo_estado = $mapa_roles['lider_' . $base_sector_key];
-    }
-} 
-// Si NO es líder de renderizado (ej. un operario que tiene su propio panel)
-elseif (isset($mapa_roles['operario_' . $base_sector_key])) {
-    $campo_estado = $mapa_roles['operario_' . $base_sector_key];
-} 
-// Casos especiales para Control Final (Macarena)
-elseif ($base_sector_key === 'control_final') {
-    $campo_estado = 'estado_administrativo';
-}
-
-// Fallback si por alguna razón no se encontró un campo de estado específico
-if (empty($campo_estado)) {
-    // Esto no debería ocurrir si el mapeo de roles y los slugs son correctos.
-    error_log("GHD Error: campo_estado no determinado para base_sector_key: {$base_sector_key} y roles del usuario.");
-    $campo_estado = 'estado_' . $base_sector_key; // Último intento de inferir (pero indica un problema)
-}
-
-$is_leader = $is_leader_for_rendering; // La variable $is_leader para task-card.php ahora es $is_leader_for_rendering
+$campo_estado = 'estado_' . $base_sector_key;
 
 $sector_display_map = ghd_get_sectores(); 
 $sector_name = $sector_display_map[$base_sector_key] ?? ucfirst($base_sector_key);
 
 $operarios_del_sector = [];
-if ($is_leader && !empty($base_sector_key)) {
+if ($is_leader_for_rendering) {
+    // La lista de operarios ahora incluye todos los operarios del sector BASE_SECTOR_KEY (no todos los sectores permitidos).
     $operarios_del_sector = get_users([
         'role__in' => ['lider_' . $base_sector_key, 'operario_' . $base_sector_key], 
         'orderby'  => 'display_name',
@@ -104,38 +97,34 @@ $pedidos_query_args = [
     'meta_query'     => [['key' => $campo_estado, 'value' => ['Pendiente', 'En Progreso'], 'compare' => 'IN']]
 ];
 
-if (!current_user_can('ghd_view_all_sector_tasks') && !$is_leader) {
+// Si NO es admin y el sector solicitado NO es un sector que el usuario deba supervisar (es decir, es un operario normal), se aplica el filtro por asignación.
+// PERO, si es un líder (is_leader_user es true), puede ver todas las tareas de su sector, aunque esté mirando otro sector.
+if (!current_user_can('manage_options') && !$is_leader_user) {
     $asignado_a_field = str_replace('estado_', 'asignado_a_', $campo_estado);
     $pedidos_query_args['meta_query'][] = ['key' => $asignado_a_field, 'value' => $current_user->ID, 'compare' => '='];
 }
 
 $pedidos_query = new WP_Query($pedidos_query_args);
-
 ?>
 
 <div class="ghd-app-wrapper">
-    <?php get_template_part('template-parts/sidebar-sector'); ?>
+    <?php 
+    // Pasamos los sectores permitidos al sidebar para que solo muestre las pestañas correctas
+    get_template_part('template-parts/sidebar-sector', null, ['allowed_sectors' => $user_allowed_sectors, 'current_sector' => $base_sector_key]); 
+    ?>
 
     <main class="ghd-main-content" data-campo-estado="<?php echo esc_attr($campo_estado); ?>">
         <header class="ghd-main-header">
             <div class="header-title-wrapper">
                 <button id="mobile-menu-toggle" class="ghd-btn-icon"><i class="fa-solid fa-bars"></i></button>
-                <?php 
-                // --- NUEVO: El botón "Volver" solo se muestra para Administradores ---
-                if (current_user_can('manage_options')) {
-                    // Obtener la URL de la página que lista TODOS los sectores para el Administrador
-                    // Reemplaza 'tu-slug-de-pagina-sectores' con el SLUG REAL de tu página con template-sectores.php
-                    $sectores_page_admin = get_page_by_path('tu-slug-de-pagina-sectores'); 
-                    $back_button_url = $sectores_page_admin ? get_permalink($sectores_page_admin->ID) : home_url('/panel-de-control/sectores'); // Fallback URL
-                    $back_button_text = 'Volver a Sectores';
+                <?php if (current_user_can('manage_options')) :
+                    $sectores_page_admin = get_page_by_path('sectores');
+                    $back_button_url = $sectores_page_admin ? get_permalink($sectores_page_admin->ID) : home_url('/panel-de-control/');
                 ?>
                     <a href="<?php echo esc_url($back_button_url); ?>" class="ghd-btn ghd-btn-secondary ghd-btn-small" style="margin-right: 15px;">
-                        <i class="fa-solid fa-arrow-left"></i> <?php echo esc_html($back_button_text); ?>
+                        <i class="fa-solid fa-arrow-left"></i> Volver a Sectores
                     </a>
-                <?php 
-                }
-                // --- FIN NUEVO: Bloque condicional para el botón "Volver" ---
-                ?>
+                <?php endif; ?>
                 <h2>Tareas de <?php echo esc_html($sector_name); ?></h2>
             </div>
             <div class="header-actions">
@@ -143,7 +132,6 @@ $pedidos_query = new WP_Query($pedidos_query_args);
             </div>
         </header>
 
-            <!-------------------- Buscador -------------------->
         <div class="ghd-filters-wrapper" style="margin-bottom: 1.5rem;">
             <div class="filter-group" style="flex-grow: 2;">
                 <label for="ghd-search-sector">Buscar Tarea</label>
@@ -153,7 +141,6 @@ $pedidos_query = new WP_Query($pedidos_query_args);
                 <button id="ghd-reset-search-sector" class="ghd-btn ghd-btn-secondary" style="height: 42px; margin-top: auto;"><i class="fa-solid fa-xmark"></i> Limpiar</button>
             </div>
         </div>
-            <!--------------------Fin Buscador -------------------->
 
         <div class="ghd-kpi-grid">
             <div class="ghd-kpi-card"><div class="kpi-icon icon-blue"><i class="fa-solid fa-list-check"></i></div><div class="kpi-info"><span id="kpi-activas" class="kpi-value"><?php echo esc_html($sector_kpi_data['total_pedidos']); ?></span><span class="kpi-label">Activas</span></div></div>
@@ -180,7 +167,7 @@ $pedidos_query = new WP_Query($pedidos_query_args);
                     'permalink'         => get_permalink(),
                     'campo_estado'      => $campo_estado,
                     'estado_actual'     => get_field($campo_estado, $current_order_id),
-                    'is_leader'         => $is_leader,
+                    'is_leader'         => $is_leader_for_rendering,
                     'operarios_sector'  => $operarios_del_sector,
                     'asignado_a_id'     => $asignado_a_id,
                     'asignado_a_name'   => $asignado_a_user ? $asignado_a_user->display_name : 'Sin asignar',
