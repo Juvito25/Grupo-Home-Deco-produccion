@@ -3067,53 +3067,52 @@ function ghd_add_no_cache_headers() {
     }
 }
 ////////////////////////////////////////////////////////////////////// ////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////
 /**
  * --- FASE 2: INTEGRACIÓN EXTERNA ---
- * ENDPOINT REST API PARA CREACIÓN DE PEDIDOS (n8n -> WordPress)
+ * ENDPOINTS REST API PARA EL PROYECTO
  */
 
-// 1. Registrar la nueva ruta en la API REST de WordPress
-add_action('rest_api_init', 'ghd_register_order_creation_endpoint');
-function ghd_register_order_creation_endpoint() {
-    // Endpoint existente para crear pedidos
+// 1. Registrar todos los endpoints de la API en un solo lugar
+add_action('rest_api_init', 'ghd_register_api_endpoints');
+function ghd_register_api_endpoints() {
+    // Endpoint para CREAR un pedido
     register_rest_route('ghd/v1', '/order', [
         'methods'  => 'POST',
         'callback' => 'ghd_create_order_from_api_callback',
         'permission_callback' => 'ghd_api_permission_check'
     ]);
 
-    // --- NUEVO: Endpoint para listar usuarios ---
+    // Endpoint para LISTAR usuarios
     register_rest_route('ghd/v1', '/users', [
         'methods'  => 'GET',
         'callback' => 'ghd_get_users_callback',
-        'permission_callback' => 'ghd_api_permission_check' // Reutilizamos la misma seguridad
+        'permission_callback' => 'ghd_api_permission_check'
     ]);
-} // fin ghd_register_order_creation_endpoint()
 
-// 2. Función de Permisos: Valida la API Key
+    // Endpoint para LISTAR pedidos
+    register_rest_route('ghd/v1', '/orders', [
+        'methods'  => 'GET',
+        'callback' => 'ghd_get_orders_callback',
+        'permission_callback' => 'ghd_api_permission_check'
+    ]);
+} // fin ghd_register_api_endpoints()
+
+// 2. Función de Permisos: Valida la API Key para todos los endpoints
 function ghd_api_permission_check($request) {
     $api_key = $request->get_header('X-GHD-API-KEY');
-    
-    // IMPORTANTE: Reemplaza 'CLAVE_SECRETA_PARA_N8N' con una clave segura y compleja.
-    // Para mayor seguridad, esta clave debería definirse en el archivo wp-config.php.
     $secret_key = defined('GHD_API_SECRET_KEY') ? GHD_API_SECRET_KEY : 'CLAVE_SECRETA_PARA_N8N'; 
 
     if (hash_equals($secret_key, $api_key)) {
         return true;
     }
     
-    return new WP_Error(
-        'rest_forbidden',
-        'Acceso denegado. API Key inválida o faltante.',
-        ['status' => 401]
-    );
-}
+    return new WP_Error('rest_forbidden', 'Acceso denegado. API Key inválida o faltante.', ['status' => 401]);
+} // fin ghd_api_permission_check()
 
-// 3. Función Callback: Procesa los datos y crea el pedido
+// 3. Callback para POST /order: Crear Pedido
 function ghd_create_order_from_api_callback($request) {
     $params = $request->get_json_params();
-
-    // Validación de datos mínimos obligatorios
     $nombre_cliente = sanitize_text_field($params['nombre_cliente'] ?? '');
     $nombre_producto = sanitize_text_field($params['nombre_producto'] ?? '');
     $woocommerce_order_id = sanitize_text_field($params['woocommerce_order_id'] ?? '');
@@ -3122,23 +3121,16 @@ function ghd_create_order_from_api_callback($request) {
         return new WP_REST_Response(['message' => 'Error: Los campos nombre_cliente, nombre_producto y woocommerce_order_id son obligatorios.'], 400);
     }
 
-    // Creación del post 'orden_produccion'
-    $post_data = [
-        'post_type'   => 'orden_produccion',
-        'post_title'  => 'Pedido API: ' . $woocommerce_order_id, // Título temporal
-        'post_status' => 'publish',
-    ];
+    $post_data = ['post_type' => 'orden_produccion', 'post_title' => 'Pedido API: ' . $woocommerce_order_id, 'post_status' => 'publish'];
     $new_post_id = wp_insert_post($post_data, true);
 
     if (is_wp_error($new_post_id)) {
         return new WP_REST_Response(['message' => 'Error interno al crear el post: ' . $new_post_id->get_error_message()], 500);
     }
 
-    // Generar código de pedido y actualizar el título del post
     $nuevo_codigo = 'PED-' . date('Y') . '-' . str_pad($new_post_id, 4, '0', STR_PAD_LEFT);
     wp_update_post(['ID' => $new_post_id, 'post_title' => $nuevo_codigo]);
 
-    // Mapeo y guardado de todos los campos ACF
     $fields_to_update = [
         'woocommerce_order_id'      => $woocommerce_order_id,
         'origen_plataforma'         => sanitize_text_field($params['origen_plataforma'] ?? 'WooCommerce'),
@@ -3175,61 +3167,80 @@ function ghd_create_order_from_api_callback($request) {
         update_field($field_key, $value, $new_post_id);
     }
     
-    wp_insert_post([
-        'post_title' => 'Pedido creado vía API REST desde ' . ($fields_to_update['origen_plataforma']),
-        'post_type' => 'ghd_historial',
-        'meta_input' => ['_orden_produccion_id' => $new_post_id]
-    ]);
+    wp_insert_post(['post_title' => 'Pedido creado vía API REST desde ' . ($fields_to_update['origen_plataforma']), 'post_type' => 'ghd_historial', 'meta_input' => ['_orden_produccion_id' => $new_post_id]]);
 
-    // Devolver respuesta de éxito
-    return new WP_REST_Response([
-        'message' => 'Orden de producción creada con éxito.',
-        'ghd_order_id' => $new_post_id,
-        'ghd_order_code' => $nuevo_codigo
-    ], 201);
+    return new WP_REST_Response(['message' => 'Orden de producción creada con éxito.', 'ghd_order_id' => $new_post_id, 'ghd_order_code' => $nuevo_codigo], 201);
 } // fin ghd_create_order_from_api_callback()
 
-
 /**
- * --- NUEVO: Callback para el endpoint GET /users ---
- * Devuelve una lista de usuarios, con opción de filtrar por rol.
- * 
- * @param WP_REST_Request $request Datos de la petición.
- * @return WP_REST_Response Lista de usuarios o error.
+ * Callback para el endpoint GET /users (Listar Usuarios).
  */
 function ghd_get_users_callback($request) {
-    // 1. Obtener y sanitizar el parámetro de rol desde la URL (ej: ?role=vendedora)
     $role_filter = sanitize_text_field($request->get_param('role'));
-
-    // 2. Preparar los argumentos para la consulta de usuarios
-    $args = [
-        'orderby' => 'display_name',
-        'order'   => 'ASC',
-        'fields'  => 'all', // Obtener el objeto de usuario completo
-    ];
-
-    // Si se especificó un rol en la URL, lo añadimos como filtro
+    $args = ['orderby' => 'display_name', 'order' => 'ASC', 'fields' => 'all'];
     if (!empty($role_filter)) {
         $args['role'] = $role_filter;
     }
-
-    // 3. Ejecutar la consulta para obtener los usuarios
     $users = get_users($args);
-
-    // 4. Preparar los datos para la respuesta JSON
     $response_data = [];
     if (!empty($users)) {
         foreach ($users as $user) {
-            // Creamos un objeto limpio con solo los datos que queremos exponer
+            $response_data[] = ['id' => $user->ID, 'display_name' => $user->display_name, 'email' => $user->user_email, 'roles' => $user->roles];
+        }
+    }
+    return new WP_REST_Response($response_data, 200);
+} // fin ghd_get_users_callback()
+
+/**
+ * Callback para el endpoint GET /orders (Listar Pedidos).
+ */
+function ghd_get_orders_callback($request) {
+    // 1. Obtener y sanitizar el parámetro 'ghd_status' desde la URL
+    $status_filter = sanitize_text_field($request->get_param('ghd_status'));
+
+    // 2. Preparar los argumentos para la consulta de pedidos
+    $args = [
+        'post_type'      => 'orden_produccion',
+        'posts_per_page' => -1,
+        'orderby'        => 'date',
+        'order'          => 'DESC',
+    ];
+
+    // Si se especificó un estado en la URL, lo añadimos como un meta_query
+    if (!empty($status_filter)) {
+        $args['meta_query'] = [
+            [
+                'key'     => 'estado_pedido',
+                'value'   => $status_filter,
+                'compare' => '=',
+            ],
+        ];
+    }
+
+    // 3. Ejecutar la consulta para obtener los pedidos
+    $orders_query = new WP_Query($args);
+
+    // 4. Preparar los datos para la respuesta JSON
+    $response_data = [];
+    if ($orders_query->have_posts()) {
+        while ($orders_query->have_posts()) {
+            $orders_query->the_post();
+            $order_id = get_the_ID();
+
             $response_data[] = [
-                'id'           => $user->ID,
-                'display_name' => $user->display_name,
-                'email'        => $user->user_email,
-                'roles'        => $user->roles, // Devolvemos un array con todos sus roles
+                'id'             => $order_id,
+                'ghd_order_code' => get_the_title(),
+                'status'         => get_field('estado_pedido', $order_id),
+                'priority'       => get_field('prioridad_pedido', $order_id),
+                'client_name'    => get_field('nombre_cliente', $order_id),
+                'product_name'   => get_field('nombre_producto', $order_id),
+                'creation_date'  => get_the_date('c', $order_id),
+                'details_url'    => get_permalink($order_id),
             ];
         }
     }
+    wp_reset_postdata();
 
     // 5. Devolver la respuesta
     return new WP_REST_Response($response_data, 200);
-} // fin ghd_get_users_callback()
+}  // fin ghd_get_orders_callback()
