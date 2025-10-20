@@ -3066,3 +3066,117 @@ function ghd_add_no_cache_headers() {
         header('Expires: 0');
     }
 }
+////////////////////////////////////////////////////////////////////// ////////////////////////////////////////////////////////////////////////////
+/**
+ * --- FASE 2: INTEGRACIÓN EXTERNA ---
+ * ENDPOINT REST API PARA CREACIÓN DE PEDIDOS (n8n -> WordPress)
+ */
+
+// 1. Registrar la nueva ruta en la API REST de WordPress
+add_action('rest_api_init', 'ghd_register_order_creation_endpoint');
+function ghd_register_order_creation_endpoint() {
+    register_rest_route('ghd/v1', '/order', [
+        'methods'  => 'POST',
+        'callback' => 'ghd_create_order_from_api_callback',
+        'permission_callback' => 'ghd_api_permission_check'
+    ]);
+}
+
+// 2. Función de Permisos: Valida la API Key
+function ghd_api_permission_check($request) {
+    $api_key = $request->get_header('X-GHD-API-KEY');
+    
+    // IMPORTANTE: Reemplaza 'CLAVE_SECRETA_PARA_N8N' con una clave segura y compleja.
+    // Para mayor seguridad, esta clave debería definirse en el archivo wp-config.php.
+    $secret_key = defined('GHD_API_SECRET_KEY') ? GHD_API_SECRET_KEY : 'CLAVE_SECRETA_PARA_N8N'; 
+
+    if (hash_equals($secret_key, $api_key)) {
+        return true;
+    }
+    
+    return new WP_Error(
+        'rest_forbidden',
+        'Acceso denegado. API Key inválida o faltante.',
+        ['status' => 401]
+    );
+}
+
+// 3. Función Callback: Procesa los datos y crea el pedido
+function ghd_create_order_from_api_callback($request) {
+    $params = $request->get_json_params();
+
+    // Validación de datos mínimos obligatorios
+    $nombre_cliente = sanitize_text_field($params['nombre_cliente'] ?? '');
+    $nombre_producto = sanitize_text_field($params['nombre_producto'] ?? '');
+    $woocommerce_order_id = sanitize_text_field($params['woocommerce_order_id'] ?? '');
+
+    if (empty($nombre_cliente) || empty($nombre_producto) || empty($woocommerce_order_id)) {
+        return new WP_REST_Response(['message' => 'Error: Los campos nombre_cliente, nombre_producto y woocommerce_order_id son obligatorios.'], 400);
+    }
+
+    // Creación del post 'orden_produccion'
+    $post_data = [
+        'post_type'   => 'orden_produccion',
+        'post_title'  => 'Pedido API: ' . $woocommerce_order_id, // Título temporal
+        'post_status' => 'publish',
+    ];
+    $new_post_id = wp_insert_post($post_data, true);
+
+    if (is_wp_error($new_post_id)) {
+        return new WP_REST_Response(['message' => 'Error interno al crear el post: ' . $new_post_id->get_error_message()], 500);
+    }
+
+    // Generar código de pedido y actualizar el título del post
+    $nuevo_codigo = 'PED-' . date('Y') . '-' . str_pad($new_post_id, 4, '0', STR_PAD_LEFT);
+    wp_update_post(['ID' => $new_post_id, 'post_title' => $nuevo_codigo]);
+
+    // Mapeo y guardado de todos los campos ACF
+    $fields_to_update = [
+        'woocommerce_order_id'      => $woocommerce_order_id,
+        'origen_plataforma'         => sanitize_text_field($params['origen_plataforma'] ?? 'WooCommerce'),
+        'saldo_pendiente'           => floatval($params['saldo_pendiente'] ?? 0),
+        'estado_de_cobro_logistica' => sanitize_text_field($params['estado_de_cobro_logistica'] ?? 'Pendiente'),
+        'fecha_de_carga'            => current_time('mysql'),
+        'codigo_de_pedido'          => $nuevo_codigo,
+        'nombre_cliente'            => $nombre_cliente,
+        'nombre_producto'           => $nombre_producto,
+        'cliente_email'             => sanitize_email($params['cliente_email'] ?? ''),
+        'cliente_telefono'          => sanitize_text_field($params['cliente_telefono'] ?? ''),
+        'direccion_de_entrega'      => sanitize_textarea_field($params['direccion_de_entrega'] ?? ''),
+        'material_del_producto'     => sanitize_text_field($params['material_del_producto'] ?? ''),
+        'color_del_producto'        => sanitize_text_field($params['color_del_producto'] ?? ''),
+        'observaciones_personalizacion' => sanitize_textarea_field($params['observaciones_personalizacion'] ?? ''),
+        'cantidad_unidades_producto' => isset($params['cantidad_unidades_producto']) ? intval($params['cantidad_unidades_producto']) : 1,
+        'valor_total_del_pedido'    => floatval($params['valor_total_del_pedido'] ?? 0),
+        'valor_final_comisionable'  => floatval($params['valor_final_comisionable'] ?? 0),
+        'valor_flete_comisionable'  => floatval($params['valor_flete_comisionable'] ?? 35000),
+        'estado_pedido'             => 'Pendiente de Asignación',
+        'prioridad_pedido'          => 'Baja', 
+        'estado_carpinteria'        => 'No Asignado',
+        'estado_corte'              => 'No Asignado',
+        'estado_costura'            => 'No Asignado',
+        'estado_tapiceria'          => 'No Asignado',
+        'estado_embalaje'           => 'No Asignado',
+        'estado_logistica_lider'    => 'No Asignado',
+        'estado_logistica_fletero'  => 'No Asignado',
+        'estado_administrativo'     => 'No Asignado',
+        'comision_calculada'        => 0.0,
+    ];
+
+    foreach ($fields_to_update as $field_key => $value) {
+        update_field($field_key, $value, $new_post_id);
+    }
+    
+    wp_insert_post([
+        'post_title' => 'Pedido creado vía API REST desde ' . ($fields_to_update['origen_plataforma']),
+        'post_type' => 'ghd_historial',
+        'meta_input' => ['_orden_produccion_id' => $new_post_id]
+    ]);
+
+    // Devolver respuesta de éxito
+    return new WP_REST_Response([
+        'message' => 'Orden de producción creada con éxito.',
+        'ghd_order_id' => $new_post_id,
+        'ghd_order_code' => $nuevo_codigo
+    ], 201);
+} // fin ghd_create_order_from_api_callback()
