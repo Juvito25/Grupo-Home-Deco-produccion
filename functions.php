@@ -3075,12 +3075,20 @@ function ghd_add_no_cache_headers() {
 // 1. Registrar la nueva ruta en la API REST de WordPress
 add_action('rest_api_init', 'ghd_register_order_creation_endpoint');
 function ghd_register_order_creation_endpoint() {
+    // Endpoint existente para crear pedidos
     register_rest_route('ghd/v1', '/order', [
         'methods'  => 'POST',
         'callback' => 'ghd_create_order_from_api_callback',
         'permission_callback' => 'ghd_api_permission_check'
     ]);
-}
+
+    // --- NUEVO: Endpoint para listar usuarios ---
+    register_rest_route('ghd/v1', '/users', [
+        'methods'  => 'GET',
+        'callback' => 'ghd_get_users_callback',
+        'permission_callback' => 'ghd_api_permission_check' // Reutilizamos la misma seguridad
+    ]);
+} // fin ghd_register_order_creation_endpoint()
 
 // 2. Función de Permisos: Valida la API Key
 function ghd_api_permission_check($request) {
@@ -3180,3 +3188,48 @@ function ghd_create_order_from_api_callback($request) {
         'ghd_order_code' => $nuevo_codigo
     ], 201);
 } // fin ghd_create_order_from_api_callback()
+
+
+/**
+ * --- NUEVO: Callback para el endpoint GET /users ---
+ * Devuelve una lista de usuarios, con opción de filtrar por rol.
+ * 
+ * @param WP_REST_Request $request Datos de la petición.
+ * @return WP_REST_Response Lista de usuarios o error.
+ */
+function ghd_get_users_callback($request) {
+    // 1. Obtener y sanitizar el parámetro de rol desde la URL (ej: ?role=vendedora)
+    $role_filter = sanitize_text_field($request->get_param('role'));
+
+    // 2. Preparar los argumentos para la consulta de usuarios
+    $args = [
+        'orderby' => 'display_name',
+        'order'   => 'ASC',
+        'fields'  => 'all', // Obtener el objeto de usuario completo
+    ];
+
+    // Si se especificó un rol en la URL, lo añadimos como filtro
+    if (!empty($role_filter)) {
+        $args['role'] = $role_filter;
+    }
+
+    // 3. Ejecutar la consulta para obtener los usuarios
+    $users = get_users($args);
+
+    // 4. Preparar los datos para la respuesta JSON
+    $response_data = [];
+    if (!empty($users)) {
+        foreach ($users as $user) {
+            // Creamos un objeto limpio con solo los datos que queremos exponer
+            $response_data[] = [
+                'id'           => $user->ID,
+                'display_name' => $user->display_name,
+                'email'        => $user->user_email,
+                'roles'        => $user->roles, // Devolvemos un array con todos sus roles
+            ];
+        }
+    }
+
+    // 5. Devolver la respuesta
+    return new WP_REST_Response($response_data, 200);
+} // fin ghd_get_users_callback()
